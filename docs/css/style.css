@@ -166,6 +166,29 @@ h3 { margin: 0 0 0.4rem; font-size: 1.05rem; }
 }
 .arena__footnote { font-size: 0.85rem; color: var(--muted); margin-top: 1.4rem; }
 
+/* ---------- playground ---------- */
+.playground { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .playground { grid-template-columns: 1fr; } }
+.playground textarea {
+  font-family: var(--mono); font-size: 0.8rem; line-height: 1.55; width: 100%;
+  min-height: 500px; resize: vertical; padding: 0.85rem 1rem;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--term-bg); color: var(--term-ink);
+}
+.playground .pane__body { min-height: 500px; }
+.playground input[type="text"], .playground input[type="number"], .playground input[type="date"] {
+  font-family: var(--mono); font-size: 0.85rem; border: 1px solid var(--line);
+  border-radius: 8px; padding: 0.35rem 0.6rem; background: var(--bg); color: var(--ink);
+}
+.playground input[type="text"] { flex: 1; min-width: 11rem; }
+.playground input[type="number"] { width: 5.5rem; }
+.playground__toolbar { gap: 0.5rem; }
+.seg-btn {
+  font-family: var(--mono); font-size: 0.85rem; padding: 0.35rem 0.8rem;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; color: var(--muted);
+}
+.seg-btn:hover { border-color: var(--blue); color: var(--blue); }
+
 /* ---------- pillars ---------- */
 .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.6rem; }
 @media (max-width: 900px) { .pillars { grid-template-columns: 1fr; } }
