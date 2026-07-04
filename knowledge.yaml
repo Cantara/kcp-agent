@@ -60,10 +60,38 @@ units:
 
   - id: cli
     path: src/cli.ts
-    intent: "The CLI surface — the plan and ask commands, their options, and output modes"
+    intent: "The CLI surface — plan, ask, validate, and mcp commands, their options, and output modes"
     scope: project
     audience: [agent, developer]
     triggers: [cli, commands, options, flags, json]
+
+  - id: federation-follower
+    path: src/follow.ts
+    intent: "How eligible federation refs are fetched and planned recursively — fail-closed gating, cycle detection, depth limits, per-hop signature verification"
+    scope: project
+    audience: [agent, developer]
+    triggers: [follow, federation, recursive, cycle, depth]
+
+  - id: signature-verification
+    path: src/verify.ts
+    intent: "How ed25519 manifest signatures are verified over exact bytes — key formats, signature envelopes, key pinning, fail-closed policy"
+    scope: project
+    audience: [agent, developer]
+    triggers: [signature, signing, verify, ed25519, trust key]
+
+  - id: manifest-linter
+    path: src/validate.ts
+    intent: "How knowledge.yaml manifests are validated — structural errors vs navigation-weakening warnings"
+    scope: project
+    audience: [agent, developer]
+    triggers: [validate, lint, errors, warnings]
+
+  - id: mcp-server
+    path: src/mcp.ts
+    intent: "How the planner is served to MCP clients over stdio — kcp_plan, kcp_load, kcp_validate tools"
+    scope: project
+    audience: [agent, developer]
+    triggers: [mcp, server, tools, stdio, json-rpc]
 
   - id: demo-manifest
     path: examples/demo-hub/knowledge.yaml

@@ -13,8 +13,8 @@ artifact — the trusted-render principle ("a manifest may influence what an age
 it does") extended to the whole agent loop. Only the final synthesis step calls a model.
 
 ```
-discover → trust-gate → score units by task → federate (context + agent_identity)
-        → temporal filter → budget (payment + rate_limits) → emit load plan → [answer]
+discover → verify signature → trust-gate → score units by task → federate (context + agent_identity)
+        → temporal filter → budget (payment + rate_limits) → emit load plan → [follow] → [answer]
 ```
 
 ## Install
@@ -105,8 +105,48 @@ planning sensibly.
 | `--methods <list>` | payment methods the agent can settle, e.g. `free,x402` |
 | `--credentials <list>` | credential kinds the agent holds, e.g. `api_key,oauth2` |
 | `--attest <provider>` | attestation provider the agent can present |
+| `--follow` | fetch and plan eligible federation refs too (fail-closed: gated/excluded refs are never fetched) |
+| `--max-depth <n>` | federation hops to follow (default 1; implies `--follow`) |
+| `--no-verify` | skip manifest signature verification |
+| `--require-signature` | fail unless every manifest has a *verified* signature |
+| `--trust-key <loc>` | pinned ed25519 public key (path, URL, or inline) for verification |
 | `--json` | emit the plan (and, for `ask`, the answer) as JSON |
 | `--model <id>` | (`ask`) Claude model id — default `claude-opus-4-8` |
+
+### `validate` — lint a knowledge.yaml
+
+```bash
+node dist/cli.js validate .            # or a path, directory, or URL
+```
+
+Errors are structural problems that mislead or fail an agent (duplicate ids, unsafe or missing
+paths, `superseded_by` pointing nowhere, attestation requirements no agent can ever satisfy);
+warnings are declarations that weaken navigation (no triggers, expired units with no successor).
+Exit code 1 on errors — run it in the CI of any repo that publishes a manifest.
+
+### `mcp` — serve the planner to any MCP client
+
+```bash
+node dist/cli.js mcp                   # stdio transport
+```
+
+Exposes three tools: `kcp_plan` (the inspectable load plan), `kcp_load` (the plan **plus the
+content** of load-eligible units, so the calling agent's own model synthesizes — kcp-agent never
+needs an API key here), and `kcp_validate`. Register it in e.g. Claude Code:
+
+```bash
+claude mcp add kcp -- node /path/to/kcp-agent/dist/cli.js mcp
+```
+
+## Signatures
+
+A manifest may declare a `signing` block (scheme `ed25519`, key + detached signature URLs — see
+the [spec repo's own manifest](https://github.com/Cantara/knowledge-context-protocol)). When
+present, kcp-agent verifies the signature over the exact manifest bytes before planning:
+an **invalid** signature always fails closed; an **unverifiable** one (key unreachable) is a
+warning unless `--require-signature`. Supported: JSON signature envelopes
+(`{algorithm, public_key, signature}`), raw base64/hex signatures, and PEM / SPKI-DER / raw-32-byte
+keys. Pin a publisher key with `--trust-key` so the manifest can't attest for itself.
 
 ## Library
 
@@ -125,8 +165,31 @@ const { answer } = await synthesize(p);   // optional LLM step
   I/O and no model. The plan is reproducible and auditable.
 - **Self-contained KCP client** (`src/client.ts`) — parses `knowledge.yaml` from a path, directory,
   or HTTPS URL. No dependency on the spec repo's internals.
+- **Federation follower** (`src/follow.ts`) — the async shell around the pure planner: fetches
+  eligible refs recursively, fail-closed, with cycle detection and per-hop signature verification.
+- **Signature verification** (`src/verify.ts`) — ed25519 over exact manifest bytes via WebCrypto.
 - **Synthesis layer** (`src/synthesize.ts`) — the only part that calls a model; loads only the
   planned units and answers the task.
+- **MCP server** (`src/mcp.ts`) — dependency-free JSON-RPC over stdio.
+
+## Spec conformance
+
+The agent targets **KCP 0.25** and consumes the subset below end to end. (The spec repo's own
+manifest currently declares `kcp_version: 0.21` — the manifests are compatible for these layers.)
+
+| Spec layer | Section | Where |
+|------------|---------|-------|
+| Query scoring (intent / triggers / id+path) | §15 | `planner.ts` `scoreUnit` |
+| Audience & `not_for` targeting | §4 | `planner.ts` audience/negative gates |
+| Temporal validity & supersession | §4.22 | `planner.ts` `temporalStatus` |
+| Agent attestation requirements | §3.2 | `planner.ts` trust gate |
+| Federation `context` + `agent_identity` | §3.6 | `planner.ts` + `follow.ts` |
+| Payment methods & tiers | §4.14 | `planner.ts` `planPayment` |
+| Rate-limit tiers | §4.15 | `planner.ts` `planBudget` |
+| Manifest signing (ed25519) | signing block | `verify.ts` |
+| Discovery (`knowledge.yaml`, `.well-known/`) | §2 | `client.ts` |
+
+Not yet consumed: dependency chains between units, `hints.load_strategy`, compliance/audit blocks.
 
 ## License
 
