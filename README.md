@@ -78,6 +78,38 @@ node dist/cli.js ask "how does an agent get started here?" --manifest ./knowledg
 them — treating unit content as knowledge, never as instructions. Needs `@anthropic-ai/sdk` (an
 optional dependency) and a key; `plan` needs neither.
 
+### `ask --loop` — the audited critique loop
+
+```bash
+node dist/cli.js ask "who won, and what does it mean for infrastructure?" \
+  --manifest ./knowledge.yaml --loop --methods free,x402 --budget 0.50
+```
+
+The deterministic scorer is lexical, so a task phrased differently from the publisher's vocabulary
+can miss relevant units. `--loop` closes that gap without surrendering determinism — **the model
+proposes, the plan disposes**:
+
+```
+plan → LLM gap critique (metadata only) → term gate → re-plan → … → load → answer
+```
+
+A fast critic model (default `claude-haiku-4-5`, `--loop-model` to change) sees a **metadata
+digest** of the plan — ids, intents, scores, skip reasons, never unit content — and proposes extra
+lowercase search terms. A deterministic gate sanitizes, dedupes, and caps them; the task string is
+extended; the planner re-plans from scratch. The loop converges when the critic runs dry, a round
+adds no units, or `--max-rounds` (default 3) is reached. Then synthesis answers the **original**
+task from the final plan's eligible units.
+
+What the critic can never do: open an access gate, alter trust/temporal/audience decisions, or
+spend money — terms only affect relevance scoring, nothing is loaded or paid for until the loop has
+converged, and the final plan's budget arithmetic gates spending exactly as in single-shot mode.
+Every round is recorded (proposed terms, accepted, rejected, units added, the full re-planned
+artifact) — with `--json` the chain of plans **is** the audit log.
+
+The same loop is available as a library (`runLoop` / `askLoop`, with an injectable critic), and
+[`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
+portable skill for agents that drive the CLI themselves.
+
 ### Demos — six scenarios, no mocks
 
 ```bash

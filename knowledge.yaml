@@ -100,6 +100,20 @@ units:
     audience: [agent, developer]
     triggers: [example, demo, sample manifest]
 
+  - id: critique-loop
+    path: src/loop.ts
+    intent: "The audited LLM loop behind ask --loop — plan, metadata-only gap critique, deterministic term gate, re-plan; the model proposes, the plan disposes"
+    scope: project
+    audience: [agent, developer]
+    triggers: [loop, critique, gap, term expansion, rounds, audit log]
+
+  - id: navigator-skill
+    path: skills/kcp-navigator/SKILL.md
+    intent: "Portable skill packaging the plan-first, fail-closed KCP navigation discipline for agents that drive the CLI themselves"
+    scope: project
+    audience: [agent]
+    triggers: [skill, navigator, discipline, plan first]
+
   - id: demo-suite
     path: examples/demos.js
     intent: "Six narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, dogfood — each CI-asserted"

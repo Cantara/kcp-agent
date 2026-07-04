@@ -26,11 +26,15 @@
 //   --json                emit the result as JSON
 //   ask only:
 //   --model <id>          Claude model id (default: claude-opus-4-8)
+//   --loop                audited critique loop: plan → LLM gap critique → re-plan → answer
+//   --max-rounds <n>      max critique rounds for --loop (default 3)
+//   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
 
 import type { PlanOptions } from "./planner.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
 import { formatPlan, formatPlanTree, formatValidation } from "./format.js";
-import { synthesize } from "./synthesize.js";
+import { synthesize, type SynthesisResult } from "./synthesize.js";
+import { askLoop } from "./loop.js";
 import { validateLocation } from "./validate.js";
 import { serveMcp } from "./mcp.js";
 
@@ -55,10 +59,13 @@ interface Args {
   trustKey?: string;
   json: boolean;
   model?: string;
+  loop: boolean;
+  maxRounds?: number;
+  loopModel?: string;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, noVerify: false, requireSignature: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, noVerify: false, requireSignature: false, loop: false };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -82,6 +89,9 @@ function parseArgs(argv: string[]): Args {
       case "--require-signature": a.requireSignature = true; break;
       case "--trust-key": a.trustKey = next(); break;
       case "--model": a.model = next(); break;
+      case "--loop": a.loop = true; break;
+      case "--max-rounds": a.maxRounds = Number(next()); break;
+      case "--loop-model": a.loopModel = next(); break;
       case "--json": a.json = true; break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
@@ -154,6 +164,27 @@ async function main() {
   if (!a.task) { console.error("Missing task.\n\n" + USAGE); process.exit(2); }
   if (!a.manifest) { console.error("Missing --manifest.\n\n" + USAGE); process.exit(2); }
 
+  if (a.command === "ask" && a.loop) {
+    const r = await askLoop(a.manifest, a.task, {
+      maxRounds: a.maxRounds,
+      loopModel: a.loopModel,
+      synthesisModel: a.model,
+      followOptions: buildFollowOptions(a),
+    });
+    if (a.json) { console.log(JSON.stringify(r, null, 2)); return; }
+    console.log(formatPlan(r.basePlans[0]));
+    for (const round of r.rounds) {
+      const terms = round.acceptedTerms.length ? round.acceptedTerms.join(", ") : "(none accepted)";
+      const added = round.addedUnits.length ? `+units ${round.addedUnits.join(", ")}` : "no new units";
+      console.log(`Loop round ${round.round}${round.model ? ` (${round.model})` : ""}: +terms ${terms} → ${added}`);
+      if (round.note) console.log(`  critic: ${round.note}`);
+    }
+    console.log(`Loop converged (${r.converged}) after ${r.rounds.length} round(s) · expanded task: "${r.expandedTask}"`);
+    if (r.rounds.some((x) => x.addedUnits.length > 0)) console.log(formatPlan(r.finalPlans[0]));
+    printAnswer(r.synthesis);
+    return;
+  }
+
   const tree = await planTree(a.manifest, a.task, buildFollowOptions(a));
   if (tree.error) throw new Error(`${tree.location}: ${tree.error}`);
   const allPlans = plans(tree);
@@ -171,6 +202,10 @@ async function main() {
     console.log(JSON.stringify({ plan: a.follow ? tree : allPlans[0], synthesis: result }, null, 2));
     return;
   }
+  printAnswer(result);
+}
+
+function printAnswer(result: SynthesisResult) {
   console.log("─".repeat(60));
   console.log(`Answer (via ${result.model}, from ${result.unitsLoaded.length} unit(s)):\n`);
   console.log(result.answer);
