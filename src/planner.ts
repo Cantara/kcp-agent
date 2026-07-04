@@ -191,11 +191,14 @@ function planBudget(
   if (caps.paymentMethods.includes("subscription") && rl?.premium) tier = "premium";
   else if (caps.credentials.length > 0 && rl?.authenticated) tier = "authenticated";
   const tierBlock = rl ? (rl as Record<string, { requests_per_minute?: number | "unlimited" }>)[tier] : undefined;
-  const perRequestCosts = selected
+  // Budget concerns what will actually be loaded: only load-eligible units are
+  // charged by the greedy selection, so cost projection matches it exactly.
+  const loadable = selected.filter((u) => u.loadEligible);
+  const perRequestCosts = loadable
     .filter((u) => u.payment.method === "x402" && u.payment.cost)
     .map((u) => ({ unit: u.id, cost: u.payment.cost as string }));
   const projectedSpend = money(
-    selected.reduce((sum, u) => sum + (u.payment.pricePerRequest ?? 0), 0)
+    loadable.reduce((sum, u) => sum + (u.payment.pricePerRequest ?? 0), 0)
   );
   const currency = budget?.currency ?? "USDC";
   return {
@@ -264,19 +267,21 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       loadEligible = false;
       reasons.push("restricted: requires attestation the agent cannot present");
     }
-    // economics (before access: a supported settle-per-request method IS the access ritual)
+    // economics
     const payment = planPayment(unit.payment ?? manifest.payment, caps);
     if (!payment.affordable) { loadEligible = false; reasons.push(`unaffordable: ${payment.method}`); }
-    // access: authenticated/restricted needs a credential — unless the unit is
-    // payable per-request (x402: no account, no session; the 402 handshake
-    // settles and content is served).
-    const paymentIsAccess = payment.affordable && payment.method === "x402";
+    // access: authenticated/restricted needs a credential. Payment never
+    // substitutes for identity — `access` declares the authentication axis
+    // only (spec §4.11, v0.25.1), and a genuinely gated+paid unit requires
+    // auth *before* payment (RFC-0005). An anonymous-paid unit is declared
+    // `access: public` with a payment block, so it never reaches this gate.
     if ((unit.access === "authenticated" || unit.access === "restricted") && caps.credentials.length === 0) {
-      if (paymentIsAccess) {
-        reasons.push(`access '${unit.access}' satisfied by x402 settle-per-request`);
-      } else {
-        reasons.push(`access '${unit.access}': agent holds no credentials`);
-        if (unit.access === "restricted") loadEligible = false;
+      reasons.push(`access '${unit.access}': agent holds no credentials`);
+      if (unit.access === "restricted") loadEligible = false;
+      if (payment.method === "x402") {
+        reasons.push(
+          `hint: '${unit.access}' + x402 — if this unit is anonymous-paid the manifest should mark it public (spec §4.11, v0.25.1)`
+        );
       }
     }
 

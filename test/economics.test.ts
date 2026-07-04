@@ -1,4 +1,5 @@
-// Economics: x402 as the access ritual (#2) and deterministic budget planning (#3).
+// Economics: access is the auth axis — payment never substitutes for identity
+// (#2, spec §4.11 / v0.25.1) — and deterministic budget planning (#3).
 // Modeled on the Fjordwire scenario from "Selling News to Robots".
 
 import { describe, it, expect } from "vitest";
@@ -15,7 +16,6 @@ units:
     intent: "Exclusive: sovereign compute award decision and the winning bid"
     audience: [agent]
     triggers: [sovereign, compute, award, exclusive]
-    access: restricted
     payment:
       methods:
         - {type: x402, currency: USDC, price_per_request: "0.25"}
@@ -32,7 +32,6 @@ units:
     intent: "Feature: the subsea cable route that decided the compute award"
     audience: [agent]
     triggers: [subsea, cable, compute]
-    access: restricted
     payment:
       methods:
         - {type: x402, currency: USDC, price_per_request: "0.15"}
@@ -46,23 +45,69 @@ units:
         - {type: free}
 `;
 
+// A genuinely gated AND paid unit (spec §4.14: auth *before* payment) plus the
+// §4.11 anti-pattern shape a mis-authored anonymous-paid unit would carry.
+const GATED = `
+kcp_version: "0.25"
+project: gated
+version: 1.0.0
+auth:
+  methods:
+    - {type: oauth2, issuer: "https://auth.example.com", scopes: ["read:board"]}
+units:
+  - id: board-memo
+    path: memos/board.md
+    intent: "Board memo on the sovereign compute award decision"
+    audience: [agent]
+    triggers: [sovereign, compute, award]
+    access: restricted
+    auth_scope: "read:board"
+    payment:
+      methods:
+        - {type: x402, currency: USDC, price_per_request: "0.30"}
+`;
+
 const CAPS = { capabilities: { role: "agent", paymentMethods: ["free", "x402"] } };
 const TASK = "sovereign compute award";
 
-describe("x402 settles access (#2)", () => {
-  const m = parseManifest(FJORDWIRE, "test");
+describe("access is the auth axis — x402 never satisfies it (#2, spec §4.11 / v0.25.1)", () => {
+  const fjordwire = parseManifest(FJORDWIRE, "test");
+  const gated = parseManifest(GATED, "test");
 
-  it("a supported x402 method satisfies access:restricted without credentials", () => {
-    const p = plan(m, TASK, CAPS);
-    const exclusive = p.selected.find((u) => u.id === "chipfab-exclusive");
-    expect(exclusive?.loadEligible).toBe(true);
-    expect(exclusive?.reasons.join(" ")).toMatch(/satisfied by x402/);
+  it("fails closed on access:restricted without credentials, even when x402 is settleable", () => {
+    const p = plan(gated, TASK, CAPS);
+    const memo = p.selected.find((u) => u.id === "board-memo");
+    expect(memo?.loadEligible).toBe(false);
+    expect(memo?.reasons.join(" ")).toMatch(/holds no credentials/);
+    expect(memo?.reasons.join(" ")).not.toMatch(/satisfied by x402/);
   });
 
-  it("still gates restricted units when the agent cannot pay per-request", () => {
-    const p = plan(m, TASK, { capabilities: { role: "agent", paymentMethods: ["free"] } });
+  it("hints that a restricted + x402 unit may be a mis-authored anonymous-paid unit", () => {
+    const p = plan(gated, TASK, CAPS);
+    const memo = p.selected.find((u) => u.id === "board-memo");
+    expect(memo?.reasons.join(" ")).toMatch(/mark it public \(spec §4\.11, v0\.25\.1\)/);
+  });
+
+  it("anonymous-paid the §4.11 way — access:public + x402 — is load-eligible without credentials", () => {
+    const p = plan(fjordwire, TASK, CAPS);
     const exclusive = p.selected.find((u) => u.id === "chipfab-exclusive");
-    expect(exclusive?.loadEligible).toBe(false);
+    expect(exclusive?.loadEligible).toBe(true);
+    expect(exclusive?.payment.method).toBe("x402");
+    expect(exclusive?.reasons.join(" ")).not.toMatch(/credentials|hint/);
+  });
+
+  it("a credentialed agent passes the gate on a restricted + paid unit", () => {
+    const p = plan(gated, TASK, {
+      capabilities: { role: "agent", paymentMethods: ["free", "x402"], credentials: ["oauth2"] },
+    });
+    const memo = p.selected.find((u) => u.id === "board-memo");
+    expect(memo?.loadEligible).toBe(true);
+  });
+
+  it("gates restricted units when the agent cannot pay per-request either", () => {
+    const p = plan(gated, TASK, { capabilities: { role: "agent", paymentMethods: ["free"] } });
+    const memo = p.selected.find((u) => u.id === "board-memo");
+    expect(memo?.loadEligible).toBe(false);
   });
 
   it("keeps the credential gate when a credential exists but payment does not", () => {
