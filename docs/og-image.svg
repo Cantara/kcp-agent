@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0b1220"/>
+  <circle cx="120" cy="120" r="26" fill="#2563eb"/>
+  <circle cx="186" cy="120" r="26" fill="none" stroke="#7d8db0" stroke-width="6"/>
+  <text x="100" y="300" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="800" fill="#ffffff">The most deterministic</text>
+  <text x="100" y="385" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="800" fill="#ffffff">agents in the world.</text>
+  <text x="100" y="460" font-family="Inter, system-ui, sans-serif" font-size="34" fill="#7d8db0">Every decision defensible. The model proposes, the plan disposes.</text>
+  <text x="100" y="545" font-family="JetBrains Mono, monospace" font-size="28" fill="#2563eb">kcp-agent · cantara.github.io/kcp-agent</text>
+</svg>

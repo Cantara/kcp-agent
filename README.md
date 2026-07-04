@@ -2,6 +2,10 @@
 
 **The reference agent for the [Knowledge Context Protocol](https://github.com/Cantara/knowledge-context-protocol).**
 
+> **[The Arena →](https://cantara.github.io/kcp-agent/)** — the real planner, bundled unmodified,
+> running live in your browser, head-to-head against the usual suspects. *The most deterministic
+> agents in the world. Every decision defensible.*
+
 KCP defines how knowledge declares itself so agents can navigate it. `kcp-agent` is the other
 half: the agent that *consumes* KCP end to end. Given a task and a `knowledge.yaml`, it produces an
 inspectable **load plan** — which units to load and in what order, which to skip and exactly why,
