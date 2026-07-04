@@ -1,0 +1,41 @@
+{
+  "name": "@cantara/kcp-agent",
+  "version": "0.1.0",
+  "description": "Reference agent that consumes the Knowledge Context Protocol end-to-end — a deterministic, fail-closed navigation planner plus optional LLM synthesis.",
+  "type": "module",
+  "bin": {
+    "kcp-agent": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "agent": "node dist/cli.js"
+  },
+  "keywords": ["kcp", "knowledge-context-protocol", "agent", "mcp", "ai", "rag"],
+  "author": "eXOReaction AS",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cantara/kcp-agent.git"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.68.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

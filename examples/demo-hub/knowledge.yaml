@@ -1,0 +1,81 @@
+kcp_version: "0.25"
+project: acme-knowledge-hub
+version: 1.0.0
+updated: "2026-07-04"
+language: en
+
+network:
+  role: hub
+
+trust:
+  provenance:
+    publisher: "Acme Platform Team"
+  agent_requirements:
+    require_attestation: true
+    trusted_providers: ["internal-agents.acme.com"]
+
+payment:
+  default_tier: free
+  methods:
+    - type: free
+rate_limits:
+  default: {requests_per_minute: 10}
+  authenticated: {requests_per_minute: 100}
+
+units:
+  - id: front-door
+    path: docs/overview.md
+    intent: "What is Acme, what services exist, and how does an agent get started?"
+    scope: global
+    audience: [agent, human]
+    triggers: [overview, getting started, deploy]
+    hints: {load_strategy: eager}
+
+  - id: deploy-guide
+    path: docs/deploy.md
+    intent: "How are releases deployed to production?"
+    scope: project
+    audience: [agent, developer]
+    triggers: [deploy, release, production]
+
+  - id: incident-runbook
+    path: docs/runbook.md
+    intent: "Production incident response and deploy rollback runbook"
+    scope: project
+    audience: [agent]
+    triggers: [incident, rollback, escalation]
+    access: restricted
+    auth_scope: "read:incident"
+
+  - id: price-feed
+    path: docs/prices.md
+    intent: "Live deploy-pipeline cost metrics feed"
+    scope: module
+    audience: [agent]
+    triggers: [metrics, cost]
+    payment:
+      default_tier: metered
+      methods:
+        - type: x402
+          currency: USDC
+          price_per_request: "0.002"
+          networks: [base]
+
+  - id: legacy-policy
+    path: docs/legacy.md
+    intent: "Legacy deploy policy (retired)"
+    scope: project
+    audience: [agent]
+    triggers: [deploy, policy]
+    temporal: {valid_until: "2024-01-01", superseded_by: deploy-guide}
+
+manifests:
+  - id: platform-prod
+    url: "https://git.acme.example/platform/knowledge.yaml"
+    relationship: foundation
+    context: ["prod"]
+    agent_identity: {required: true, credential_hint: github_pat, docs_url: "https://acme.example/auth"}
+  - id: platform-dev
+    url: "https://git.acme.example/platform/knowledge-dev.yaml"
+    relationship: peer
+    context: ["dev", "test"]
