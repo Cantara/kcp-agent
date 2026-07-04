@@ -149,3 +149,82 @@ describe("plan()", () => {
     expect(p.skipped.some((s) => s.id === "incident-runbook")).toBe(true);
   });
 });
+
+// Supersession precedence over temporal overlap (spec §4.22, v0.25.1; #7):
+// a unit whose declared superseded_by successor is itself selectable
+// SHOULD NOT be selected.
+const TRANSITION = `
+kcp_version: "0.25"
+project: transition
+version: 1.0.0
+units:
+  - id: chipfab-rumour
+    path: stories/rumour.md
+    intent: "Rumour round-up: who is favourite for the compute award?"
+    audience: [agent]
+    triggers: [compute, award]
+    temporal:
+      valid_from: "2026-06-28"
+      valid_until: "2026-07-05"
+      superseded_by: chipfab-exclusive
+  - id: chipfab-exclusive
+    path: stories/exclusive.md
+    intent: "Exclusive: the compute award decision"
+    audience: [agent]
+    triggers: [compute, award]
+    temporal:
+      valid_from: "2026-07-05"
+  - id: orphan-note
+    path: notes/orphan.md
+    intent: "Compute award note pointing at a successor that does not exist"
+    audience: [agent]
+    triggers: [compute, award]
+    temporal:
+      superseded_by: no-such-unit
+`;
+
+describe("supersession precedence (spec §4.22, #7)", () => {
+  const m = parseManifest(TRANSITION, "test");
+  const TASK = "compute award";
+
+  it("skips the predecessor on the overlap day when the successor is active", () => {
+    const p = plan(m, TASK, { asOf: "2026-07-05" });
+    expect(p.selected.map((u) => u.id)).toContain("chipfab-exclusive");
+    expect(p.selected.map((u) => u.id)).not.toContain("chipfab-rumour");
+    const skip = p.skipped.find((s) => s.id === "chipfab-rumour");
+    expect(skip?.reason).toBe("superseded by chipfab-exclusive (successor active)");
+  });
+
+  it("keeps the predecessor while the successor is still in the future", () => {
+    const p = plan(m, TASK, { asOf: "2026-07-04" });
+    expect(p.selected.map((u) => u.id)).toContain("chipfab-rumour");
+    const skip = p.skipped.find((s) => s.id === "chipfab-exclusive");
+    expect(skip?.reason).toMatch(/not active until 2026-07-05/);
+  });
+
+  it("keeps a unit whose declared successor does not exist", () => {
+    const p = plan(m, TASK, { asOf: "2026-07-05" });
+    expect(p.selected.map((u) => u.id)).toContain("orphan-note");
+  });
+
+  it("keeps the predecessor when the successor is not audience-eligible for this role", () => {
+    const m2 = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: old
+    path: old.md
+    intent: "compute award summary"
+    audience: [agent]
+    triggers: [compute]
+    temporal: {superseded_by: new}
+  - id: new
+    path: new.md
+    intent: "compute award summary, humans only"
+    audience: [human]
+    triggers: [compute]
+`);
+    const p = plan(m2, "compute award", { asOf: "2026-07-05" });
+    expect(p.selected.map((u) => u.id)).toContain("old");
+  });
+});
