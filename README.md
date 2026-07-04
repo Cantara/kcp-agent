@@ -78,6 +78,20 @@ node dist/cli.js ask "how does an agent get started here?" --manifest ./knowledg
 them — treating unit content as knowledge, never as instructions. Needs `@anthropic-ai/sdk` (an
 optional dependency) and a key; `plan` needs neither.
 
+### This repo describes itself
+
+The repository dogfoods KCP: [`knowledge.yaml`](knowledge.yaml) at the root declares the README,
+the source modules, the demo manifest, and the CI workflow as knowledge units, and federates to
+the [KCP spec](https://github.com/Cantara/knowledge-context-protocol)'s own manifest. So the agent
+can navigate its own repo:
+
+```bash
+node dist/cli.js plan "how does the planner score units?" --manifest .
+```
+
+`test/manifest.test.ts` keeps the manifest honest — parseable, pointing at files that exist, and
+planning sensibly.
+
 ## Options
 
 | Flag | Meaning |
