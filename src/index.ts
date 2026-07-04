@@ -18,3 +18,8 @@ export {
   type BudgetPlan,
   type PaymentPlan,
 } from "./planner.js";
+export { formatPlan, formatPlanTree, formatValidation } from "./format.js";
+export { planTree, plans, type FollowOptions, type PlanNode, type NotFollowedRef } from "./follow.js";
+export { verifyManifestText, resolveLocation, type SignatureResult, type SignatureStatus, type VerifyOptions } from "./verify.js";
+export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";
+export { synthesize, loadPlannedUnits, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";

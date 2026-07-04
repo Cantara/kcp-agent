@@ -1,27 +1,38 @@
 #!/usr/bin/env node
 // kcp-agent — a reference agent that consumes KCP end to end.
 //
-//   kcp-agent plan "<task>" --manifest <path|dir|url> [options]   inspect the load plan (no API key)
-//   kcp-agent ask  "<task>" --manifest <path|dir|url> [options]   plan + answer via Claude
+//   kcp-agent plan     "<task>" --manifest <path|dir|url> [options]   inspect the load plan (no API key)
+//   kcp-agent ask      "<task>" --manifest <path|dir|url> [options]   plan + answer via Claude
+//   kcp-agent validate <path|dir|url>                                 lint a knowledge.yaml
+//   kcp-agent mcp                                                     serve the planner over MCP stdio
 //
-// Options (both commands):
-//   --manifest <loc>     path, directory, or HTTPS URL of a knowledge.yaml (required)
-//   --env <name>         runtime environment for federation context selection (dev/test/staging/prod)
-//   --as-of <date>       ISO date for temporal evaluation (default: today, UTC)
-//   --max-units <n>      cap on selected units (default 5)
-//   --strict             fail-closed: drop non-eligible units instead of listing them
-//   --role <role>        audience role the agent presents (default: agent)
-//   --methods <list>     payment methods the agent can settle (default: free), e.g. free,x402
-//   --credentials <list> credential kinds the agent holds, e.g. api_key,oauth2
-//   --attest <provider>  attestation provider the agent can present
-//   --json               emit the plan as JSON
+// Options (plan/ask):
+//   --manifest <loc>      path, directory, or HTTPS URL of a knowledge.yaml (required)
+//   --env <name>          runtime environment for federation context selection (dev/test/staging/prod)
+//   --as-of <date>        ISO date for temporal evaluation (default: today, UTC)
+//   --max-units <n>       cap on selected units (default 5)
+//   --strict              fail-closed: drop non-eligible units instead of listing them
+//   --role <role>         audience role the agent presents (default: agent)
+//   --methods <list>      payment methods the agent can settle (default: free), e.g. free,x402
+//   --credentials <list>  credential kinds the agent holds, e.g. api_key,oauth2
+//   --attest <provider>   attestation provider the agent can present
+//   --budget <amount>     spend ceiling for pay-per-request units (greedy by score, skip what blows it)
+//   --currency <code>     budget currency (default USDC)
+//   --follow              fetch and plan eligible federation refs too
+//   --max-depth <n>       federation hops to follow (default 1, implies --follow)
+//   --no-verify           skip manifest signature verification
+//   --require-signature   fail unless every manifest has a verified signature
+//   --trust-key <loc>     pinned ed25519 public key (path, URL, or inline) for verification
+//   --json                emit the result as JSON
 //   ask only:
-//   --model <id>         Claude model id (default: claude-opus-4-8)
+//   --model <id>          Claude model id (default: claude-opus-4-8)
 
-import { loadManifest } from "./client.js";
-import { plan, type PlanOptions } from "./planner.js";
-import { formatPlan } from "./format.js";
+import type { PlanOptions } from "./planner.js";
+import { planTree, plans, type FollowOptions } from "./follow.js";
+import { formatPlan, formatPlanTree, formatValidation } from "./format.js";
 import { synthesize } from "./synthesize.js";
+import { validateLocation } from "./validate.js";
+import { serveMcp } from "./mcp.js";
 
 interface Args {
   command: string;
@@ -35,12 +46,19 @@ interface Args {
   methods?: string[];
   credentials?: string[];
   attest?: string;
+  budget?: number;
+  currency?: string;
+  follow: boolean;
+  maxDepth?: number;
+  noVerify: boolean;
+  requireSignature: boolean;
+  trustKey?: string;
   json: boolean;
   model?: string;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, noVerify: false, requireSignature: false };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -56,6 +74,13 @@ function parseArgs(argv: string[]): Args {
       case "--methods": a.methods = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean); break;
       case "--credentials": a.credentials = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean); break;
       case "--attest": a.attest = next(); break;
+      case "--budget": a.budget = Number(next()); break;
+      case "--currency": a.currency = next(); break;
+      case "--follow": a.follow = true; break;
+      case "--max-depth": a.maxDepth = Number(next()); a.follow = true; break;
+      case "--no-verify": a.noVerify = true; break;
+      case "--require-signature": a.requireSignature = true; break;
+      case "--trust-key": a.trustKey = next(); break;
       case "--model": a.model = next(); break;
       case "--json": a.json = true; break;
       default:
@@ -73,6 +98,7 @@ function buildPlanOptions(a: Args): PlanOptions {
     asOf: a.asOf,
     maxUnits: a.maxUnits,
     strict: a.strict,
+    budget: a.budget !== undefined && !Number.isNaN(a.budget) ? { amount: a.budget, currency: a.currency } : undefined,
     capabilities: {
       ...(a.role ? { role: a.role } : {}),
       ...(a.methods ? { paymentMethods: a.methods } : {}),
@@ -82,10 +108,22 @@ function buildPlanOptions(a: Args): PlanOptions {
   };
 }
 
+function buildFollowOptions(a: Args): FollowOptions {
+  return {
+    planOptions: buildPlanOptions(a),
+    maxDepth: a.follow ? (a.maxDepth ?? 1) : 0,
+    noVerify: a.noVerify,
+    requireSignature: a.requireSignature,
+    trustedKey: a.trustKey,
+  };
+}
+
 const USAGE =
   'Usage:\n' +
-  '  kcp-agent plan "<task>" --manifest <path|dir|url> [options]\n' +
-  '  kcp-agent ask  "<task>" --manifest <path|dir|url> [options]\n' +
+  '  kcp-agent plan     "<task>" --manifest <path|dir|url> [options]\n' +
+  '  kcp-agent ask      "<task>" --manifest <path|dir|url> [options]\n' +
+  '  kcp-agent validate <path|dir|url> [--json]\n' +
+  '  kcp-agent mcp\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
 async function main() {
@@ -95,6 +133,20 @@ async function main() {
     console.log(USAGE);
     process.exit(a.command === "" ? 2 : 0);
   }
+
+  if (a.command === "mcp") {
+    await serveMcp();
+    return;
+  }
+
+  if (a.command === "validate") {
+    const location = a.manifest ?? a.task;
+    if (!location) { console.error("Missing manifest location.\n\n" + USAGE); process.exit(2); }
+    const report = await validateLocation(location);
+    console.log(a.json ? JSON.stringify(report, null, 2) : formatValidation(report));
+    process.exit(report.ok ? 0 : 1);
+  }
+
   if (a.command !== "plan" && a.command !== "ask") {
     console.error(`Unknown command: ${a.command}\n\n${USAGE}`);
     process.exit(2);
@@ -102,19 +154,21 @@ async function main() {
   if (!a.task) { console.error("Missing task.\n\n" + USAGE); process.exit(2); }
   if (!a.manifest) { console.error("Missing --manifest.\n\n" + USAGE); process.exit(2); }
 
-  const manifest = await loadManifest(a.manifest);
-  const p = plan(manifest, a.task, buildPlanOptions(a));
+  const tree = await planTree(a.manifest, a.task, buildFollowOptions(a));
+  if (tree.error) throw new Error(`${tree.location}: ${tree.error}`);
+  const allPlans = plans(tree);
 
   if (a.command === "plan") {
-    console.log(a.json ? JSON.stringify(p, null, 2) : formatPlan(p));
+    if (a.json) console.log(JSON.stringify(a.follow ? tree : allPlans[0], null, 2));
+    else console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
     return;
   }
 
-  // ask: show the plan, then synthesize.
-  if (!a.json) console.log(formatPlan(p));
-  const result = await synthesize(p, { model: a.model });
+  // ask: show the plan(s), then synthesize across every followed manifest.
+  if (!a.json) console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
+  const result = await synthesize(allPlans, { model: a.model });
   if (a.json) {
-    console.log(JSON.stringify({ plan: p, synthesis: result }, null, 2));
+    console.log(JSON.stringify({ plan: a.follow ? tree : allPlans[0], synthesis: result }, null, 2));
     return;
   }
   console.log("─".repeat(60));

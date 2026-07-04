@@ -8,6 +8,7 @@
 // principle ("audit before action") extended to the whole agent loop.
 
 import type { Manifest, Unit, PaymentMethod } from "./model.js";
+import type { SignatureResult } from "./verify.js";
 
 export interface AgentCapabilities {
   /** Role the agent presents (default "agent"). Units target audiences. */
@@ -37,11 +38,15 @@ export interface PlanOptions {
   maxUnits?: number;
   /** Fail-closed: gate any unit that is not load-eligible instead of listing it. */
   strict?: boolean;
+  /** Spend ceiling for pay-per-request units. Selection stays greedy by score; units that would blow the ceiling are skipped with the arithmetic. */
+  budget?: { amount: number; currency?: string };
 }
 
 export interface PaymentPlan {
   method: string; // the chosen method type, or "none"
   cost?: string; // e.g. "0.002 USDC/request"
+  pricePerRequest?: number; // numeric cost for budget arithmetic
+  currency?: string;
   affordable: boolean;
 }
 
@@ -74,6 +79,12 @@ export interface BudgetPlan {
   rateTier: string;
   requestsPerMinute?: number | "unlimited";
   perRequestCosts: { unit: string; cost: string }[];
+  /** Spend ceiling, when the agent planned with one. */
+  ceiling?: number;
+  currency?: string;
+  /** Total per-request cost of the selected units. */
+  projectedSpend?: number;
+  remaining?: number;
   note: string;
 }
 
@@ -88,6 +99,8 @@ export interface AgentPlan {
   federation: FederationPlan[];
   budget: BudgetPlan;
   warnings: string[];
+  /** Signature verification result — attached by the loading layer, never by the pure planner. */
+  signature?: SignatureResult;
 }
 
 const STOPWORDS = new Set([
@@ -148,7 +161,14 @@ function planPayment(payment: Unit["payment"], caps: AgentCapabilities): Payment
     if (!caps.paymentMethods.includes(m.type)) continue;
     if (m.type === "free") return { method: "free", affordable: true };
     if (m.type === "x402") {
-      return { method: "x402", cost: `${m.price_per_request} ${m.currency}/request`, affordable: true };
+      const price = Number(m.price_per_request);
+      return {
+        method: "x402",
+        cost: `${m.price_per_request} ${m.currency}/request`,
+        pricePerRequest: Number.isNaN(price) ? undefined : price,
+        currency: m.currency,
+        affordable: true,
+      };
     }
     return { method: m.type, affordable: true };
   }
@@ -156,8 +176,16 @@ function planPayment(payment: Unit["payment"], caps: AgentCapabilities): Payment
   return { method: `needs ${need.join(" or ")}`, affordable: false };
 }
 
+/** Round away float noise in currency arithmetic. */
+const money = (n: number): number => Number(n.toFixed(6));
+
 /** Resolve the rate-limit tier the agent falls into, and its per-minute ceiling. */
-function planBudget(manifest: Manifest, caps: AgentCapabilities, selected: PlannedUnit[]): BudgetPlan {
+function planBudget(
+  manifest: Manifest,
+  caps: AgentCapabilities,
+  selected: PlannedUnit[],
+  budget?: { amount: number; currency?: string }
+): BudgetPlan {
   const rl = manifest.rate_limits;
   let tier = "default";
   if (caps.paymentMethods.includes("subscription") && rl?.premium) tier = "premium";
@@ -166,12 +194,20 @@ function planBudget(manifest: Manifest, caps: AgentCapabilities, selected: Plann
   const perRequestCosts = selected
     .filter((u) => u.payment.method === "x402" && u.payment.cost)
     .map((u) => ({ unit: u.id, cost: u.payment.cost as string }));
+  const projectedSpend = money(
+    selected.reduce((sum, u) => sum + (u.payment.pricePerRequest ?? 0), 0)
+  );
+  const currency = budget?.currency ?? "USDC";
   return {
     rateTier: tier,
     requestsPerMinute: tierBlock?.requests_per_minute,
     perRequestCosts,
-    note:
-      perRequestCosts.length > 0
+    ...(budget
+      ? { ceiling: budget.amount, currency, projectedSpend, remaining: money(budget.amount - projectedSpend) }
+      : {}),
+    note: budget
+      ? `projected spend ${projectedSpend} of ${budget.amount} ${currency}; ${money(budget.amount - projectedSpend)} remaining.`
+      : perRequestCosts.length > 0
         ? `${perRequestCosts.length} selected unit(s) are pay-per-request; budget before loading.`
         : "all selected units are free to load at the resolved tier.",
   };
@@ -228,14 +264,21 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       loadEligible = false;
       reasons.push("restricted: requires attestation the agent cannot present");
     }
-    // access: authenticated/restricted needs a credential
-    if ((unit.access === "authenticated" || unit.access === "restricted") && caps.credentials.length === 0) {
-      reasons.push(`access '${unit.access}': agent holds no credentials`);
-      if (unit.access === "restricted") loadEligible = false;
-    }
-    // economics
+    // economics (before access: a supported settle-per-request method IS the access ritual)
     const payment = planPayment(unit.payment ?? manifest.payment, caps);
     if (!payment.affordable) { loadEligible = false; reasons.push(`unaffordable: ${payment.method}`); }
+    // access: authenticated/restricted needs a credential — unless the unit is
+    // payable per-request (x402: no account, no session; the 402 handshake
+    // settles and content is served).
+    const paymentIsAccess = payment.affordable && payment.method === "x402";
+    if ((unit.access === "authenticated" || unit.access === "restricted") && caps.credentials.length === 0) {
+      if (paymentIsAccess) {
+        reasons.push(`access '${unit.access}' satisfied by x402 settle-per-request`);
+      } else {
+        reasons.push(`access '${unit.access}': agent holds no credentials`);
+        if (unit.access === "restricted") loadEligible = false;
+      }
+    }
 
     if (options.strict && !loadEligible) {
       skipped.push({ id: unit.id, reason: reasons[reasons.length - 1] ?? "not load-eligible" });
@@ -248,9 +291,36 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
   }
 
   selected.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
-  const capped = selected.slice(0, maxUnits);
-  if (selected.length > capped.length) {
-    warnings.push(`${selected.length - capped.length} relevant unit(s) beyond maxUnits=${maxUnits} not selected`);
+
+  // Greedy selection by score: take each unit if it fits the remaining budget,
+  // else skip it with the arithmetic and keep walking — a cheaper lower-scored
+  // unit may still fit (deterministic, explainable; no knapsack cleverness).
+  const budget = options.budget;
+  const budgetCurrency = budget?.currency ?? "USDC";
+  let spend = 0;
+  let beyondMax = 0;
+  const capped: PlannedUnit[] = [];
+  for (const u of selected) {
+    if (capped.length >= maxUnits) { beyondMax++; continue; }
+    const price = u.payment.pricePerRequest;
+    if (budget && u.loadEligible && price !== undefined && price > 0) {
+      if (u.payment.currency !== budgetCurrency) {
+        skipped.push({ id: u.id, reason: `over budget: costs ${u.payment.cost}, budget is in ${budgetCurrency}` });
+        continue;
+      }
+      if (spend + price > budget.amount + 1e-9) {
+        skipped.push({
+          id: u.id,
+          reason: `over budget: ${price} would exceed remaining ${money(budget.amount - spend)} of ${budget.amount} ${budgetCurrency}`,
+        });
+        continue;
+      }
+      spend += price;
+    }
+    capped.push(u);
+  }
+  if (beyondMax) {
+    warnings.push(`${beyondMax} relevant unit(s) beyond maxUnits=${maxUnits} not selected`);
   }
 
   // federation: select sub-manifests by env context, note credential planning
@@ -269,7 +339,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     return { id: ref.id, url: ref.url, selected: inEnv, reason, credentialNeeded, docsUrl: ai?.docs_url };
   });
 
-  const budget = planBudget(manifest, caps, capped);
+  const budgetPlan = planBudget(manifest, caps, capped, options.budget);
 
   return {
     task,
@@ -288,7 +358,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     selected: capped,
     skipped,
     federation,
-    budget,
+    budget: budgetPlan,
     warnings,
   };
 }

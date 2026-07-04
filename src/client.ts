@@ -7,7 +7,7 @@
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier } from "./model.js";
+import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier, Signing } from "./model.js";
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => !!v && typeof v === "object" && !Array.isArray(v);
@@ -113,6 +113,15 @@ export function parseManifest(text: string, source?: string): Manifest {
   const raw = yaml.load(text);
   if (!isObj(raw)) throw new Error("manifest is not a YAML mapping");
   const trustRaw = isObj(raw["trust"]) ? raw["trust"] : undefined;
+  const signingRaw = isObj(raw["signing"]) ? raw["signing"] : undefined;
+  const signing: Signing | undefined = signingRaw
+    ? {
+        scheme: asStr(signingRaw["scheme"]),
+        scope: asStr(signingRaw["scope"]),
+        public_key: asStr(signingRaw["public_key"]),
+        signature: asStr(signingRaw["signature"]),
+      }
+    : undefined;
   const ar = trustRaw && isObj(trustRaw["agent_requirements"]) ? trustRaw["agent_requirements"] : undefined;
   return {
     project: String(raw["project"] ?? "(unnamed)"),
@@ -131,6 +140,7 @@ export function parseManifest(text: string, source?: string): Manifest {
           },
         }
       : undefined,
+    signing,
     source,
   };
 }

@@ -1,0 +1,19 @@
+kcp_version: "0.25"
+project: fed-hub
+version: 1.0.0
+units:
+  - id: hub-guide
+    path: docs/guide.md
+    intent: "How to deploy through the hub pipeline"
+    audience: [agent]
+    triggers: [deploy, pipeline]
+manifests:
+  - id: child
+    url: "../child/knowledge.yaml"
+    relationship: peer
+  - id: dev-only
+    url: "../child/knowledge.yaml"
+    context: ["dev"]
+  - id: gated
+    url: "../gated/knowledge.yaml"
+    agent_identity: {required: true, credential_hint: github_pat}

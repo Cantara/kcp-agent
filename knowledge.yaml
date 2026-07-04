@@ -1,0 +1,114 @@
+# kcp-agent eats its own dogfood — this manifest makes the reference agent's
+# repository navigable by any KCP agent, including itself:
+#
+#   node dist/cli.js plan "how does the planner score units?" --manifest .
+#
+# test/manifest.test.ts keeps this file honest: it parses the manifest, checks
+# every unit path exists on disk, and runs a plan against it.
+
+kcp_version: "0.25"
+project: kcp-agent
+version: 0.1.0
+updated: "2026-07-04"
+language: en
+
+trust:
+  provenance:
+    publisher: "eXOReaction AS / Cantara"
+
+payment:
+  default_tier: free
+  methods:
+    - type: free
+
+units:
+  - id: front-door
+    path: README.md
+    intent: "What is kcp-agent, how do I install it, and how do I run plan/ask against a knowledge.yaml?"
+    scope: global
+    audience: [agent, human]
+    triggers: [overview, getting started, install, usage, native, binaries]
+    hints: {load_strategy: eager}
+
+  - id: planner
+    path: src/planner.ts
+    intent: "How the deterministic planner scores units by task, gates trust, filters temporally, selects federation refs, and budgets payment and rate limits"
+    scope: project
+    audience: [agent, developer]
+    triggers: [planner, scoring, trust, temporal, federation, budget, load plan]
+
+  - id: kcp-model
+    path: src/model.ts
+    intent: "The compact KCP manifest model the agent consumes — units, trust, payment, rate limits, federation refs"
+    scope: project
+    audience: [agent, developer]
+    triggers: [model, schema, manifest fields, types]
+
+  - id: manifest-client
+    path: src/client.ts
+    intent: "How manifests are located and parsed from local paths, directories, and HTTPS URLs"
+    scope: project
+    audience: [agent, developer]
+    triggers: [client, loading, parsing, yaml, discovery]
+
+  - id: synthesis
+    path: src/synthesize.ts
+    intent: "How the optional Claude synthesis layer loads only the planned units and answers the task under the trusted-render posture"
+    scope: project
+    audience: [agent, developer]
+    triggers: [synthesis, claude, llm, ask, answer]
+
+  - id: cli
+    path: src/cli.ts
+    intent: "The CLI surface — plan, ask, validate, and mcp commands, their options, and output modes"
+    scope: project
+    audience: [agent, developer]
+    triggers: [cli, commands, options, flags, json]
+
+  - id: federation-follower
+    path: src/follow.ts
+    intent: "How eligible federation refs are fetched and planned recursively — fail-closed gating, cycle detection, depth limits, per-hop signature verification"
+    scope: project
+    audience: [agent, developer]
+    triggers: [follow, federation, recursive, cycle, depth]
+
+  - id: signature-verification
+    path: src/verify.ts
+    intent: "How ed25519 manifest signatures are verified over exact bytes — key formats, signature envelopes, key pinning, fail-closed policy"
+    scope: project
+    audience: [agent, developer]
+    triggers: [signature, signing, verify, ed25519, trust key]
+
+  - id: manifest-linter
+    path: src/validate.ts
+    intent: "How knowledge.yaml manifests are validated — structural errors vs navigation-weakening warnings"
+    scope: project
+    audience: [agent, developer]
+    triggers: [validate, lint, errors, warnings]
+
+  - id: mcp-server
+    path: src/mcp.ts
+    intent: "How the planner is served to MCP clients over stdio — kcp_plan, kcp_load, kcp_validate tools"
+    scope: project
+    audience: [agent, developer]
+    triggers: [mcp, server, tools, stdio, json-rpc]
+
+  - id: demo-manifest
+    path: examples/demo-hub/knowledge.yaml
+    intent: "A worked example manifest exercising every planner stage — trust gating, temporal validity, payment, rate limits, federation"
+    scope: project
+    audience: [agent, developer]
+    triggers: [example, demo, sample manifest]
+
+  - id: ci-natives
+    path: .github/workflows/ci.yml
+    intent: "How CI tests the agent and cross-compiles self-contained native executables with Deno"
+    scope: project
+    audience: [agent, developer]
+    triggers: [ci, build, release, compile, workflow]
+
+manifests:
+  - id: kcp-spec
+    url: "https://raw.githubusercontent.com/Cantara/knowledge-context-protocol/main/knowledge.yaml"
+    label: "Knowledge Context Protocol — the spec this agent implements"
+    relationship: foundation
