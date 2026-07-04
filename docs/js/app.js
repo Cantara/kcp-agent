@@ -414,6 +414,46 @@ function initPlayground() {
   renderPlayground();
 }
 
+/* ---------- the receipts: conformance matrix + bundle integrity ---------- */
+
+const GH = "https://github.com/Cantara/kcp-agent/blob/main/";
+
+async function initConformance() {
+  const table = $("conf-table");
+  if (!table) return;
+  try {
+    const res = await fetch("conformance.json");
+    if (!res.ok) throw new Error(`fetch conformance.json: ${res.status}`);
+    const { rows } = await res.json();
+    const link = (f) => `<a href="${GH}${esc(f)}" target="_blank" rel="noopener"><code>${esc(f)}</code></a>`;
+    table.querySelector("tbody").innerHTML = rows
+      .map(
+        (r) => `<tr>
+          <td>${esc(r.layer)}</td>
+          <td>${esc(r.section)}</td>
+          <td>${r.impl.map(link).join("<br>")}<br><code>${esc(r.where)}</code></td>
+          <td>${r.proofs
+            .map((p) => `<span class="proof">${link(p.file)} — <q>${esc(p.test)}</q></span>`)
+            .join("")}</td>
+        </tr>`
+      )
+      .join("");
+  } catch (e) {
+    table.querySelector("tbody").innerHTML = `<tr><td colspan="4">could not load conformance.json (${esc(e.message)})</td></tr>`;
+  }
+}
+
+async function initBundleSha() {
+  const el = $("bundle-sha");
+  if (!el) return;
+  try {
+    const res = await fetch("js/bundle-info.json");
+    if (res.ok) el.textContent = (await res.json()).sha256;
+  } catch {
+    /* keep the "build locally" placeholder */
+  }
+}
+
 /* ---------- wiring ---------- */
 
 const $ = (id) => document.getElementById(id);
@@ -462,6 +502,10 @@ loadManifests()
       `Could not load the example manifests (${e.message}). ` +
       "If you opened this file directly, serve the docs/ directory instead: npx serve docs";
   })
-  // The playground has no manifest dependency — it runs even if the arena's
-  // example fetch fails.
-  .finally(initPlayground);
+  // The playground and receipts have no arena dependency — they run even if
+  // the arena's example fetch fails.
+  .finally(() => {
+    initPlayground();
+    initConformance();
+    initBundleSha();
+  });

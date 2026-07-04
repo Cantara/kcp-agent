@@ -189,6 +189,23 @@ h3 { margin: 0 0 0.4rem; font-size: 1.05rem; }
 }
 .seg-btn:hover { border-color: var(--blue); color: var(--blue); }
 
+/* ---------- receipts / conformance ---------- */
+.conformance { overflow-x: auto; margin-top: 1.4rem; }
+.conformance table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.conformance th, .conformance td {
+  text-align: left; vertical-align: top; padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+.conformance th {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--line);
+}
+.conformance td:nth-child(2) { font-family: var(--mono); white-space: nowrap; color: var(--blue-dark); }
+.conformance td:nth-child(3) code { white-space: nowrap; }
+.conformance .proof { display: block; color: var(--muted); }
+.conformance .proof + .proof { margin-top: 0.2rem; }
+.conformance .proof q { font-style: italic; }
+
 /* ---------- pillars ---------- */
 .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 1.6rem; }
 @media (max-width: 900px) { .pillars { grid-template-columns: 1fr; } }

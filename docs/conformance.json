@@ -1,0 +1,106 @@
+{
+  "$comment": "The conformance matrix rendered on the gh-pages site. test/docs.test.ts enforces that every impl file exists and every proof names a real test in the referenced file — a claim cannot outlive its proof.",
+  "spec": "KCP 0.25",
+  "rows": [
+    {
+      "layer": "Query scoring (intent / triggers / id+path)",
+      "section": "§15",
+      "where": "planner.ts · scoreUnit",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/planner.test.ts", "test": "selects task-relevant, agent-audience, in-time units and ranks by score" }
+      ]
+    },
+    {
+      "layer": "Audience & not_for targeting",
+      "section": "§4",
+      "where": "planner.ts · audience / negative gates",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/planner.test.ts", "test": "not_for negative targeting skips a unit its publisher scoped out (spec §4)" }
+      ]
+    },
+    {
+      "layer": "Access is the auth axis — payment never substitutes for identity",
+      "section": "§4.11",
+      "where": "planner.ts · access gate",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/economics.test.ts", "test": "fails closed on access:restricted without credentials, even when x402 is settleable" },
+        { "file": "test/invariants.test.ts", "test": "restricted units are never load-eligible when the agent holds no credentials" }
+      ]
+    },
+    {
+      "layer": "Temporal validity & supersession precedence",
+      "section": "§4.22",
+      "where": "planner.ts · temporalStatus",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/planner.test.ts", "test": "skips the predecessor on the overlap day when the successor is active" },
+        { "file": "test/invariants.test.ts", "test": "never selects a unit whose declared successor is itself selectable (spec §4.22)" }
+      ]
+    },
+    {
+      "layer": "Agent attestation requirements",
+      "section": "§3.2",
+      "where": "planner.ts · trust gate",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/planner.test.ts", "test": "gates a restricted unit when the agent cannot attest" },
+        { "file": "test/planner.test.ts", "test": "allows the restricted unit once the agent presents a trusted provider" }
+      ]
+    },
+    {
+      "layer": "Federation context + agent_identity, fail-closed follow",
+      "section": "§3.6",
+      "where": "planner.ts + follow.ts",
+      "impl": ["src/planner.ts", "src/follow.ts"],
+      "proofs": [
+        { "file": "test/planner.test.ts", "test": "selects federation sub-manifests by env context and flags credential needs" },
+        { "file": "test/follow.test.ts", "test": "fails closed: never fetches context-excluded or credential-gated refs" }
+      ]
+    },
+    {
+      "layer": "Payment methods & tiers",
+      "section": "§4.14",
+      "where": "planner.ts · planPayment",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/planner.test.ts", "test": "plans x402 payment and marks it unaffordable without the method" },
+        { "file": "test/economics.test.ts", "test": "anonymous-paid the §4.11 way — access:public + x402 — is load-eligible without credentials" }
+      ]
+    },
+    {
+      "layer": "Budget ceilings & rate-limit tiers",
+      "section": "§4.15",
+      "where": "planner.ts · planBudget",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/economics.test.ts", "test": "buys by score until the ceiling, skips what would blow it, keeps walking" },
+        { "file": "test/planner.test.ts", "test": "resolves the rate-limit tier from agent credentials" },
+        { "file": "test/invariants.test.ts", "test": "projected spend of load-eligible units never exceeds the ceiling" }
+      ]
+    },
+    {
+      "layer": "Manifest signing (ed25519 over exact bytes, fail-closed)",
+      "section": "signing block",
+      "where": "verify.ts + follow.ts",
+      "impl": ["src/verify.ts", "src/follow.ts"],
+      "proofs": [
+        { "file": "test/verify.test.ts", "test": "fails closed on tampered content" },
+        { "file": "test/verify.test.ts", "test": "verifies a JSON signature envelope with embedded key (the Cantara convention)" },
+        { "file": "test/follow.test.ts", "test": "enforces requireSignature fail-closed on unsigned manifests" }
+      ]
+    },
+    {
+      "layer": "Discovery (knowledge.yaml from path, directory, URL)",
+      "section": "§2",
+      "where": "client.ts",
+      "impl": ["src/client.ts"],
+      "proofs": [
+        { "file": "test/manifest.test.ts", "test": "parses into the compact model" },
+        { "file": "test/manifest.test.ts", "test": "plans a typical task against itself" }
+      ]
+    }
+  ]
+}
