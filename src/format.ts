@@ -66,7 +66,10 @@ export function formatPlan(p: AgentPlan): string {
   // budget
   out.push(c.bold("Budget: ") +
     `tier ${c.cyan(p.budget.rateTier)}` +
-    (p.budget.requestsPerMinute !== undefined ? c.dim(` · ${p.budget.requestsPerMinute} req/min`) : ""));
+    (p.budget.requestsPerMinute !== undefined ? c.dim(` · ${p.budget.requestsPerMinute} req/min`) : "") +
+    (p.budget.ceiling !== undefined
+      ? c.cyan(` · ${p.budget.projectedSpend}/${p.budget.ceiling} ${p.budget.currency}`) + c.dim(` (${p.budget.remaining} remaining)`)
+      : ""));
   if (p.budget.perRequestCosts.length) {
     for (const rc of p.budget.perRequestCosts) out.push(c.dim(`  pay-per-request: ${rc.unit} → ${rc.cost}`));
   }

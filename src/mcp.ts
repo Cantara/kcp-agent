@@ -50,6 +50,8 @@ const PLAN_ARGS = {
     as_of: { type: "string", description: "ISO date for temporal evaluation (default: today, UTC)" },
     max_units: { type: "number", description: "Cap on selected units (default 5)" },
     strict: { type: "boolean", description: "Fail-closed: drop non-eligible units instead of listing them" },
+    budget: { type: "number", description: "Spend ceiling for pay-per-request units" },
+    currency: { type: "string", description: "Budget currency (default USDC)" },
     follow: { type: "boolean", description: "Follow eligible federation refs (default false)" },
     max_depth: { type: "number", description: "Federation hops to follow when follow=true (default 1)" },
   },
@@ -90,6 +92,10 @@ function toFollowOptions(args: Record<string, unknown>): FollowOptions {
     asOf: args["as_of"] === undefined ? undefined : String(args["as_of"]),
     maxUnits: args["max_units"] === undefined ? undefined : Number(args["max_units"]),
     strict: args["strict"] === true,
+    budget:
+      args["budget"] === undefined
+        ? undefined
+        : { amount: Number(args["budget"]), currency: args["currency"] === undefined ? undefined : String(args["currency"]) },
   };
   return {
     planOptions,

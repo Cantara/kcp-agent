@@ -105,6 +105,8 @@ planning sensibly.
 | `--methods <list>` | payment methods the agent can settle, e.g. `free,x402` |
 | `--credentials <list>` | credential kinds the agent holds, e.g. `api_key,oauth2` |
 | `--attest <provider>` | attestation provider the agent can present |
+| `--budget <amount>` | spend ceiling for pay-per-request units — greedy by score, skips (with arithmetic) what would blow it |
+| `--currency <code>` | budget currency (default `USDC`) |
 | `--follow` | fetch and plan eligible federation refs too (fail-closed: gated/excluded refs are never fetched) |
 | `--max-depth <n>` | federation hops to follow (default 1; implies `--follow`) |
 | `--no-verify` | skip manifest signature verification |
@@ -147,6 +149,29 @@ an **invalid** signature always fails closed; an **unverifiable** one (key unrea
 warning unless `--require-signature`. Supported: JSON signature envelopes
 (`{algorithm, public_key, signature}`), raw base64/hex signatures, and PEM / SPKI-DER / raw-32-byte
 keys. Pin a publisher key with `--trust-key` so the manifest can't attest for itself.
+
+## Writing triggers agents can find
+
+The scorer is **lexical and deterministic** — intent, triggers, and id/path are matched against the
+task's terms; there is no model and no embedding. That's the feature (reproducible, auditable,
+free), and it has an honest consequence: **a unit is only findable through the words its manifest
+declares.** A real miss from the field:
+
+```
+task: "sovereign compute award and infrastructure implications"
+  · datacenter-power: no task-relevance match      ← the story's best infrastructure angle
+```
+
+The unit's triggers were `[datacenter, power grid, capacity, Nordics]` and its intent never said
+"infrastructure" — zero lexical overlap, score 0, skipped. The fix belongs in the manifest, not
+the planner:
+
+- **Write triggers for the questions agents ask, not the nouns in the content.** "infrastructure",
+  "energy costs", "where does the compute run" — the phrasings of tasks — beat article vocabulary.
+- **Spend intent words on question terms too**: intent is scored, so "How the power grid limits
+  sovereign compute infrastructure" is findable where "Live Nordic datacenter power-grid feed" is not.
+- Run `kcp-agent plan` with your expected tasks against your own manifest before publishing —
+  the skip reasons show exactly what a real agent would miss and why.
 
 ## Library
 

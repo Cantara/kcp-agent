@@ -16,6 +16,8 @@
 //   --methods <list>      payment methods the agent can settle (default: free), e.g. free,x402
 //   --credentials <list>  credential kinds the agent holds, e.g. api_key,oauth2
 //   --attest <provider>   attestation provider the agent can present
+//   --budget <amount>     spend ceiling for pay-per-request units (greedy by score, skip what blows it)
+//   --currency <code>     budget currency (default USDC)
 //   --follow              fetch and plan eligible federation refs too
 //   --max-depth <n>       federation hops to follow (default 1, implies --follow)
 //   --no-verify           skip manifest signature verification
@@ -44,6 +46,8 @@ interface Args {
   methods?: string[];
   credentials?: string[];
   attest?: string;
+  budget?: number;
+  currency?: string;
   follow: boolean;
   maxDepth?: number;
   noVerify: boolean;
@@ -70,6 +74,8 @@ function parseArgs(argv: string[]): Args {
       case "--methods": a.methods = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean); break;
       case "--credentials": a.credentials = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean); break;
       case "--attest": a.attest = next(); break;
+      case "--budget": a.budget = Number(next()); break;
+      case "--currency": a.currency = next(); break;
       case "--follow": a.follow = true; break;
       case "--max-depth": a.maxDepth = Number(next()); a.follow = true; break;
       case "--no-verify": a.noVerify = true; break;
@@ -92,6 +98,7 @@ function buildPlanOptions(a: Args): PlanOptions {
     asOf: a.asOf,
     maxUnits: a.maxUnits,
     strict: a.strict,
+    budget: a.budget !== undefined && !Number.isNaN(a.budget) ? { amount: a.budget, currency: a.currency } : undefined,
     capabilities: {
       ...(a.role ? { role: a.role } : {}),
       ...(a.methods ? { paymentMethods: a.methods } : {}),
