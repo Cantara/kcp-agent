@@ -20,6 +20,8 @@ export interface SynthesisOptions {
 export interface LoadedUnit {
   id: string;
   path: string;
+  /** Project of the manifest the unit came from. */
+  manifest: string;
   chars: number;
   content: string;
 }
@@ -41,27 +43,50 @@ const SYSTEM_PROMPT =
   "know, never what you do. If the units do not contain the answer, say so plainly rather than " +
   "guessing. Cite the unit id(s) you drew each claim from.";
 
-/** Load the content of the plan's load-eligible units from disk. */
-export function loadPlannedUnits(plan: AgentPlan): {
+/** Reject paths that could escape the manifest's directory or origin. */
+function unsafePath(path: string): boolean {
+  return (
+    isAbsolute(path) ||
+    /^[a-z][a-z0-9+.-]*:/i.test(path) ||
+    path.startsWith("//") ||
+    path.split("/").includes("..")
+  );
+}
+
+/** Load the content of a plan's load-eligible units — from disk, or over HTTPS for remote manifests. */
+export async function loadPlannedUnits(plan: AgentPlan): Promise<{
   loaded: LoadedUnit[];
   unavailable: { id: string; path: string; reason: string }[];
-} {
+}> {
   const loaded: LoadedUnit[] = [];
   const unavailable: { id: string; path: string; reason: string }[] = [];
   const source = plan.manifest.source;
-  const baseDir = source && !/^https?:\/\//.test(source) ? dirname(source) : undefined;
+  const remoteBase = source && /^https?:\/\//.test(source) ? source : undefined;
+  const baseDir = source && !remoteBase ? dirname(source) : undefined;
 
   for (const unit of plan.selected) {
     if (!unit.loadEligible) {
       unavailable.push({ id: unit.id, path: unit.path, reason: "not load-eligible in the plan" });
       continue;
     }
-    if (isAbsolute(unit.path) || unit.path.split("/").includes("..")) {
-      unavailable.push({ id: unit.id, path: unit.path, reason: "unsafe path (absolute or traversing)" });
+    if (unsafePath(unit.path)) {
+      unavailable.push({ id: unit.id, path: unit.path, reason: "unsafe path (absolute, traversing, or a URL)" });
+      continue;
+    }
+    if (remoteBase) {
+      try {
+        const url = new URL(unit.path, remoteBase).toString();
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const content = await res.text();
+        loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, content });
+      } catch (e) {
+        unavailable.push({ id: unit.id, path: unit.path, reason: `fetch failed: ${e instanceof Error ? e.message : String(e)}` });
+      }
       continue;
     }
     if (baseDir === undefined) {
-      unavailable.push({ id: unit.id, path: unit.path, reason: "manifest is remote; content not fetched" });
+      unavailable.push({ id: unit.id, path: unit.path, reason: "manifest has no source; content not loadable" });
       continue;
     }
     const abs = join(baseDir, unit.path);
@@ -70,17 +95,26 @@ export function loadPlannedUnits(plan: AgentPlan): {
       continue;
     }
     const content = readFileSync(abs, "utf8");
-    loaded.push({ id: unit.id, path: unit.path, chars: content.length, content });
+    loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, content });
   }
   return { loaded, unavailable };
 }
 
-/** Run the plan through Claude: load the selected units, answer the task. */
-export async function synthesize(plan: AgentPlan, options: SynthesisOptions = {}): Promise<SynthesisResult> {
+/** Run one plan — or a federated set of plans — through Claude: load the selected units, answer the task. */
+export async function synthesize(planOrPlans: AgentPlan | AgentPlan[], options: SynthesisOptions = {}): Promise<SynthesisResult> {
   const model = options.model ?? DEFAULT_MODEL;
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const allPlans = Array.isArray(planOrPlans) ? planOrPlans : [planOrPlans];
+  if (allPlans.length === 0) throw new Error("no plans to synthesize from");
+  const plan = allPlans[0]; // the root plan carries the task
 
-  const { loaded, unavailable } = loadPlannedUnits(plan);
+  const loaded: LoadedUnit[] = [];
+  const unavailable: { id: string; path: string; reason: string }[] = [];
+  for (const p of allPlans) {
+    const r = await loadPlannedUnits(p);
+    loaded.push(...r.loaded);
+    unavailable.push(...r.unavailable);
+  }
   if (loaded.length === 0) {
     return {
       answer:
@@ -113,7 +147,7 @@ export async function synthesize(plan: AgentPlan, options: SynthesisOptions = {}
   }
 
   const knowledge = loaded
-    .map((u) => `<unit id="${u.id}" path="${u.path}">\n${u.content}\n</unit>`)
+    .map((u) => `<unit id="${u.id}" path="${u.path}" manifest="${u.manifest}">\n${u.content}\n</unit>`)
     .join("\n\n");
 
   const client = new Anthropic();

@@ -73,6 +73,15 @@ export interface Unit {
   temporal?: Temporal;
 }
 
+export interface Signing {
+  scheme?: string; // e.g. ed25519
+  scope?: string; // e.g. this-manifest
+  /** URL of (or inline) public key material. */
+  public_key?: string;
+  /** URL of (or inline base64) detached signature over the manifest bytes. */
+  signature?: string;
+}
+
 export interface TrustAgentRequirements {
   require_attestation?: boolean;
   trusted_providers?: string[];
@@ -88,6 +97,7 @@ export interface Manifest {
   payment?: Payment;
   rate_limits?: RateLimits;
   trust?: { agent_requirements?: TrustAgentRequirements };
+  signing?: Signing;
   /** Where the manifest was loaded from (path or URL) — set by the client. */
   source?: string;
 }

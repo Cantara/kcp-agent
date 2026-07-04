@@ -8,6 +8,7 @@
 // principle ("audit before action") extended to the whole agent loop.
 
 import type { Manifest, Unit, PaymentMethod } from "./model.js";
+import type { SignatureResult } from "./verify.js";
 
 export interface AgentCapabilities {
   /** Role the agent presents (default "agent"). Units target audiences. */
@@ -88,6 +89,8 @@ export interface AgentPlan {
   federation: FederationPlan[];
   budget: BudgetPlan;
   warnings: string[];
+  /** Signature verification result — attached by the loading layer, never by the pure planner. */
+  signature?: SignatureResult;
 }
 
 const STOPWORDS = new Set([

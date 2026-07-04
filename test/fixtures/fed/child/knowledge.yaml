@@ -1,0 +1,13 @@
+kcp_version: "0.25"
+project: fed-child
+version: 1.0.0
+units:
+  - id: child-deploy
+    path: docs/deploy.md
+    intent: "Child deploy runbook"
+    audience: [agent]
+    triggers: [deploy]
+manifests:
+  - id: back-to-hub
+    url: "../hub/knowledge.yaml"
+    relationship: parent
