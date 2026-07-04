@@ -151,6 +151,22 @@ function temporalStatus(unit: Unit, asOf: string): "active" | "future" | "expire
   return "active";
 }
 
+/**
+ * Supersession precedence (spec §4.22, v0.25.1): validity windows may overlap
+ * during transitions, and `superseded_by` disambiguates the overlap — a unit
+ * whose declared successor is itself selectable SHOULD NOT be selected.
+ * Returns the successor id when it is active as of `asOf` and audience-eligible.
+ */
+function selectableSuccessor(unit: Unit, manifest: Manifest, asOf: string, role: string): string | undefined {
+  const succId = unit.temporal?.superseded_by;
+  if (!succId) return undefined;
+  const succ = manifest.units.find((u) => u.id === succId);
+  if (!succ || succ.deprecated) return undefined;
+  if (temporalStatus(succ, asOf) !== "active") return undefined;
+  if (succ.audience.length > 0 && !succ.audience.includes(role)) return undefined;
+  return succId;
+}
+
 /** Choose the first payment method the agent supports, from a unit/root payment block. */
 function planPayment(payment: Unit["payment"], caps: AgentCapabilities): PaymentPlan {
   const methods = payment?.methods;
@@ -255,6 +271,13 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       continue;
     }
     if (unit.deprecated) { skipped.push({ id: unit.id, reason: "deprecated" }); continue; }
+
+    // supersession precedence over temporal overlap (spec §4.22, v0.25.1)
+    const successor = selectableSuccessor(unit, manifest, asOf, caps.role);
+    if (successor) {
+      skipped.push({ id: unit.id, reason: `superseded by ${successor} (successor active)` });
+      continue;
+    }
 
     // relevance
     const { score, reasons } = scoreUnit(unit, taskTerms);
