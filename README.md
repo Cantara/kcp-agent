@@ -24,6 +24,18 @@ npm install
 npm run build
 ```
 
+### Native executables
+
+CI cross-compiles self-contained binaries (no Node/Deno required on the target) for
+Linux x64/arm64, macOS x64/arm64, and Windows x64 — grab them from a release or from the
+`kcp-agent-natives` artifact on any CI run. To build one yourself:
+
+```bash
+npm ci && npm run build
+deno compile --allow-read --allow-env --allow-net --node-modules-dir=auto \
+  --output kcp-agent dist/cli.js
+```
+
 ## Use
 
 ### `plan` — the inspectable load plan (no API key)

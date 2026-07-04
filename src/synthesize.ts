@@ -96,10 +96,20 @@ export async function synthesize(plan: AgentPlan, options: SynthesisOptions = {}
   try {
     ({ default: Anthropic } = await import("@anthropic-ai/sdk"));
   } catch {
-    throw new Error(
-      "The `ask` command needs the Claude SDK. Install it:  npm install @anthropic-ai/sdk\n" +
-        "and set ANTHROPIC_API_KEY (or run `ant auth login`). The `plan` command needs neither."
-    );
+    try {
+      // Deno does not resolve bare specifiers from optionalDependencies; the
+      // npm: form also lets `deno compile` embed the SDK in native binaries.
+      // Keep the version range in sync with package.json.
+      ({ default: Anthropic } = (await import(
+        // @ts-expect-error npm: specifier — resolvable by Deno, not by tsc
+        "npm:@anthropic-ai/sdk@^0.68.0"
+      )) as typeof import("@anthropic-ai/sdk"));
+    } catch {
+      throw new Error(
+        "The `ask` command needs the Claude SDK. Install it:  npm install @anthropic-ai/sdk\n" +
+          "and set ANTHROPIC_API_KEY (or run `ant auth login`). The `plan` command needs neither."
+      );
+    }
   }
 
   const knowledge = loaded
