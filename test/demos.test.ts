@@ -74,6 +74,14 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("committed 0.2/0.3 USDC");
   });
 
+  it("seal: the signature verifies, and tampered bytes fail closed before planning", () => {
+    const out = demo("seal");
+    expect(out).toContain("ed25519 signature verified (envelope key) · key sealed-2026");
+    expect(out).toMatch(/● 1\. provenance-ledger/);
+    expect(out).toContain("signature invalid: ed25519 signature does not match manifest bytes");
+    expect(out).toContain("exit 1 — fail-closed: no plan, no load, no spend");
+  });
+
   it("dogfood: the repo manifest validates and routes to the planner source", () => {
     const out = demo("dogfood");
     expect(out).toContain("✓ valid");

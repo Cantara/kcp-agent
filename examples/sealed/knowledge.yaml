@@ -1,0 +1,34 @@
+# The Sealed Ledger — a manifest whose bytes are load-bearing.
+#
+# `signing` points at a detached ed25519 signature over the EXACT bytes of
+# this file (a JSON envelope with the public key embedded). The agent
+# verifies before planning: change one character below and every plan
+# against this directory fails closed — the poisoned manifest never reaches
+# the planner. Re-seal after editing: node scripts/seal-example.mjs
+#
+# NOTE: `units` must stay the last top-level key — the Seal demo tampers a
+# copy by appending a unit, which must remain syntactically valid YAML so
+# that only the signature (not the parser) is what catches it.
+
+kcp_version: "0.25"
+project: sealed-ledger
+version: 1.0.0
+updated: "2026-07-04"
+language: en
+
+trust:
+  provenance:
+    publisher: "Sealed Ledger Example AS"
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  signature: knowledge.yaml.sig
+
+units:
+  - id: provenance-ledger
+    path: ledger.md
+    intent: "The provenance ledger: what was recorded, when, and under which key"
+    scope: global
+    audience: [agent, human]
+    triggers: [provenance, ledger, record, integrity]

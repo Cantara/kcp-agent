@@ -116,7 +116,7 @@ units:
 
   - id: demo-suite
     path: examples/demos.js
-    intent: "Seven narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, dogfood — each CI-asserted"
+    intent: "Eight narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, the signature seal, dogfood — each CI-asserted"
     scope: project
     audience: [agent, developer]
     triggers: [demos, scenarios, showcase, newsstand, vault, audit]
