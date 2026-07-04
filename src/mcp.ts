@@ -20,7 +20,7 @@ import { validateLocation } from "./validate.js";
 import type { PlanOptions } from "./planner.js";
 
 export const PROTOCOL_VERSION = "2025-06-18";
-export const SERVER_INFO = { name: "kcp-agent", version: "0.1.0" };
+export const SERVER_INFO = { name: "kcp-agent", version: "0.2.0" };
 
 interface JsonRpcRequest {
   jsonrpc?: string;
