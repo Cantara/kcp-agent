@@ -71,6 +71,13 @@ units:
     scope: project
     audience: [agent]
     triggers: [sales, revenue]
+  - id: eu-datasheet
+    path: eu.md
+    intent: "EU data residency and GDPR datasheet"
+    scope: project
+    audience: [agent]
+    triggers: [gdpr, residency]
+    not_for: [medical advice]
 `;
 
 describe("plan()", () => {
@@ -88,6 +95,15 @@ describe("plan()", () => {
     expect(skipById["human-notes"]).toMatch(/audience/);
     expect(skipById["old-policy"]).toMatch(/expired.*superseded/);
     expect(skipById["sales-deck"]).toMatch(/no task-relevance/);
+  });
+
+  it("not_for negative targeting skips a unit its publisher scoped out (spec §4)", () => {
+    const covered = plan(m, "gdpr data residency", { capabilities: { role: "agent" } });
+    expect(covered.selected.map((u) => u.id)).toContain("eu-datasheet");
+    const excluded = plan(m, "gdpr medical advice", { capabilities: { role: "agent" } });
+    expect(excluded.selected.map((u) => u.id)).not.toContain("eu-datasheet");
+    const skip = excluded.skipped.find((s) => s.id === "eu-datasheet");
+    expect(skip?.reason).toBe("not_for declares it does not serve 'medical advice'");
   });
 
   it("gates a restricted unit when the agent cannot attest", () => {

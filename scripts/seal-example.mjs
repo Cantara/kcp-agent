@@ -2,7 +2,7 @@
 // Seal examples/sealed: generate an ed25519 keypair, sign the EXACT bytes of
 // knowledge.yaml, and write knowledge.yaml.sig as a JSON envelope with the
 // public key embedded (the Cantara convention — self-attesting: strong for
-// integrity, weak for identity; pin with --trusted-key to bind identity).
+// integrity, weak for identity; pin with --trust-key to bind identity).
 // The private key lives only in this process — re-running re-seals with a
 // fresh key.
 //

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { plan as srcPlan } from "../src/planner.js";
@@ -68,6 +69,13 @@ describe("site bundle — the arena's left pane is really the planner", () => {
     expect(findings).toContainEqual({ level: "error", where: "unit 'a'", message: "path must be relative, not absolute" });
     expect(findings).toContainEqual({ level: "error", where: "unit 'a'", message: "path must not traverse with '..'" });
     expect(findings).toContainEqual({ level: "error", where: "unit 'a'", message: "duplicate unit id" });
+  });
+
+  it("publishes the bundle's real sha256 (the Receipts hash is not decorative)", () => {
+    const info = JSON.parse(readFileSync(path.join(ROOT, "docs", "js", "bundle-info.json"), "utf8"));
+    const digest = createHash("sha256").update(readFileSync(BUNDLE)).digest("hex");
+    expect(info.sha256).toBe(digest);
+    expect(info.file).toBe("js/kcp-agent.js");
   });
 
   it("formatPlan renders without a TTY (browser conditions)", () => {

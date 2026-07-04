@@ -3,10 +3,13 @@
 //      browser (ESM, from site/entry.ts). Node builtins are stubbed; the
 //      Claude SDK stays external (the site never synthesizes).
 //   2. docs/examples/ — a copy of the example manifests the arena plans over.
-// Both outputs are gitignored and rebuilt by CI and the Pages deploy.
+//   3. docs/js/bundle-info.json — the bundle's sha256, surfaced on the site's
+//      Receipts section so anyone can reproduce the hash from source.
+// All outputs are gitignored and rebuilt by CI and the Pages deploy.
 
 import { build } from "esbuild";
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,10 +37,17 @@ await build({
   logLevel: "info",
 });
 
+const bundlePath = path.join(ROOT, "docs", "js", "kcp-agent.js");
+const sha256 = createHash("sha256").update(readFileSync(bundlePath)).digest("hex");
+writeFileSync(
+  path.join(ROOT, "docs", "js", "bundle-info.json"),
+  JSON.stringify({ file: "js/kcp-agent.js", sha256 }, null, 2) + "\n"
+);
+
 const dest = path.join(ROOT, "docs", "examples");
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
 for (const ex of ["fjordwire", "vault"]) {
   cpSync(path.join(ROOT, "examples", ex), path.join(dest, ex), { recursive: true });
 }
-console.log("site built: docs/js/kcp-agent.js + docs/examples/{fjordwire,vault}");
+console.log(`site built: docs/js/kcp-agent.js (sha256 ${sha256.slice(0, 12)}…) + docs/examples/{fjordwire,vault}`);

@@ -173,6 +173,12 @@ planning sensibly.
 | `--trust-key <loc>` | pinned ed25519 public key (path, URL, or inline) for verification |
 | `--json` | emit the plan (and, for `ask`, the answer) as JSON |
 | `--model <id>` | (`ask`) Claude model id — default `claude-opus-4-8` |
+| `--loop` | (`ask`) audited critique loop: plan → LLM gap critique → term gate → re-plan |
+| `--max-rounds <n>` | (`ask --loop`) max critique rounds (default 3) |
+| `--loop-model <id>` | (`ask --loop`) critic model — default `claude-haiku-4-5` |
+
+`test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
+and in the `cli.ts` header, and vice versa.
 
 ### `validate` — lint a knowledge.yaml
 
@@ -265,6 +271,7 @@ manifest currently declares `kcp_version: 0.21` — the manifests are compatible
 |------------|---------|-------|
 | Query scoring (intent / triggers / id+path) | §15 | `planner.ts` `scoreUnit` |
 | Audience & `not_for` targeting | §4 | `planner.ts` audience/negative gates |
+| Access is the auth axis — payment never substitutes | §4.11 | `planner.ts` access gate |
 | Temporal validity & supersession | §4.22 | `planner.ts` `temporalStatus` |
 | Agent attestation requirements | §3.2 | `planner.ts` trust gate |
 | Federation `context` + `agent_identity` | §3.6 | `planner.ts` + `follow.ts` |
@@ -273,7 +280,21 @@ manifest currently declares `kcp_version: 0.21` — the manifests are compatible
 | Manifest signing (ed25519) | signing block | `verify.ts` |
 | Discovery (`knowledge.yaml`, `.well-known/`) | §2 | `client.ts` |
 
+Every row is pinned to the CI tests that enforce it in
+[`docs/conformance.json`](docs/conformance.json) — rendered as
+[the Receipts](https://cantara.github.io/kcp-agent/#receipts) on the site — and
+`test/docs.test.ts` fails the build if a referenced test disappears or is renamed.
+
 Not yet consumed: dependency chains between units, `hints.load_strategy`, compliance/audit blocks.
+
+## Guides
+
+- [Make your repo navigable in 10 minutes](guides/make-your-repo-navigable.md) — from nothing to a
+  manifest real plans run against, kept honest in CI.
+- [Sign your manifest](guides/sign-your-manifest.md) — ed25519 over exact bytes, envelopes, key
+  pinning, and the fail-closed lifecycle.
+- [Wire the planner into Claude Code](guides/wire-mcp-into-claude-code.md) — `kcp_plan` /
+  `kcp_load` / `kcp_validate` over MCP, no API key needed.
 
 ## License
 

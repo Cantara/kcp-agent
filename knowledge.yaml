@@ -128,6 +128,34 @@ units:
     audience: [agent, developer]
     triggers: [site, arena, gh-pages, browser, bundle, showcase]
 
+  - id: guide-navigable
+    path: guides/make-your-repo-navigable.md
+    intent: "Make any repository navigable by agents in ten minutes — author a first knowledge.yaml, lint it, and test it with real plans"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, tutorial, authoring, first manifest, navigable, publish]
+
+  - id: guide-signing
+    path: guides/sign-your-manifest.md
+    intent: "Sign a knowledge.yaml with ed25519 so agents can verify provenance — envelopes, key pinning, and the fail-closed lifecycle"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, signing, sign manifest, provenance, envelope, trust key]
+
+  - id: guide-mcp
+    path: guides/wire-mcp-into-claude-code.md
+    intent: "Serve the deterministic planner to Claude Code or any MCP client — register kcp-agent mcp and use kcp_plan, kcp_load, kcp_validate"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, mcp, claude code, register, wire, integrate]
+
+  - id: conformance-matrix
+    path: docs/conformance.json
+    intent: "The spec conformance matrix — every KCP layer the agent implements mapped to its implementation file and the CI tests that enforce it"
+    scope: project
+    audience: [agent, developer]
+    triggers: [conformance, matrix, receipts, coverage, spec layers, proof]
+
   - id: ci-natives
     path: .github/workflows/ci.yml
     intent: "How CI tests the agent and cross-compiles self-contained native executables with Deno"
