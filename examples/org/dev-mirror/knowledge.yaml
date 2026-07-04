@@ -1,0 +1,19 @@
+# The Org — dev/test mirror sub-manifest (credential-free).
+
+kcp_version: "0.25"
+project: org-dev-mirror
+version: 1.0.0
+updated: "2026-07-04"
+language: en
+
+trust:
+  provenance:
+    publisher: "Org Example AS — Dev"
+
+units:
+  - id: sandbox-deploy
+    path: docs/deploy.md
+    intent: "How to deploy a release to the dev sandbox"
+    scope: project
+    audience: [agent, developer]
+    triggers: [deploy, release, sandbox, dev]
