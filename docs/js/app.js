@@ -3,7 +3,7 @@
 // shipping code, live. Right pane: an honest simulation whose numbers are
 // computed from the same real manifest.
 
-import { parseManifest, plan, formatPlan, gateTerms } from "./kcp-agent.js";
+import { parseManifest, plan, formatPlan, gateTerms, validateManifest } from "./kcp-agent.js";
 
 const esc = (s) =>
   String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -315,6 +315,105 @@ const SCENARIOS = [
   },
 ];
 
+/* ---------- the playground: bring your own manifest ---------- */
+
+const STARTER_YAML = `# Edit me — the plan on the right re-computes as you type.
+kcp_version: "0.25"
+project: my-docs
+version: 1.0.0
+
+units:
+  - id: getting-started
+    path: docs/getting-started.md
+    intent: "Install, configure, and run your first sync"
+    audience: [agent, human]
+    triggers: [install, setup, quickstart]
+
+  - id: pricing-2025
+    path: docs/pricing-2025.md
+    intent: "The 2025 price list"
+    audience: [agent]
+    triggers: [pricing, price list]
+    temporal:
+      valid_until: "2025-12-31"
+      superseded_by: pricing-2026
+
+  - id: pricing-2026
+    path: docs/pricing-2026.md
+    intent: "The 2026 price list"
+    audience: [agent]
+    triggers: [pricing, price list]
+    temporal:
+      valid_from: "2026-01-01"
+
+  - id: internal-roadmap
+    path: internal/roadmap.md
+    intent: "Unreleased roadmap — requires a credential"
+    audience: [agent]
+    triggers: [roadmap, benchmarks, upcoming]
+    access: restricted
+
+  - id: premium-benchmarks
+    path: premium/benchmarks.md
+    intent: "Paid benchmark report, anonymous pay-per-read"
+    audience: [agent]
+    triggers: [benchmarks, performance]
+    payment:
+      methods:
+        - {type: x402, currency: USDC, price_per_request: "0.25"}
+`;
+
+function renderPlayground() {
+  const out = $("pg-out");
+  let manifest;
+  try {
+    manifest = parseManifest($("pg-yaml").value, "playground.yaml");
+  } catch (e) {
+    out.innerHTML = red(`✗ does not parse: ${e.message}`);
+    return;
+  }
+  // validateManifest without a baseDir: everything except path existence.
+  const findings = validateManifest(manifest);
+  const fLines = findings.length
+    ? findings.map((f) =>
+        f.level === "error" ? red(`  ✗ ${f.where}: ${f.message}`) : yellow(`  ⚠ ${f.where}: ${f.message}`))
+    : [green("  ✓ valid — no findings")];
+  const budget = parseFloat($("pg-budget").value);
+  const p = plan(manifest, $("pg-task").value, {
+    asOf: $("pg-asof").value || undefined,
+    capabilities: {
+      paymentMethods: $("pg-x402").checked ? ["free", "x402"] : ["free"],
+      credentials: $("pg-oauth2").checked ? ["oauth2"] : [],
+    },
+    ...(Number.isFinite(budget) && budget > 0 ? { budget: { amount: budget } } : {}),
+  });
+  out.innerHTML = [bold(`Validate: ${manifest.units.length} unit(s)`), ...fLines, "", renderPlan(p)].join("\n");
+}
+
+function initPlayground() {
+  if (!$("pg-yaml")) return;
+  $("pg-yaml").value = STARTER_YAML;
+  for (const id of ["pg-yaml", "pg-task", "pg-asof", "pg-x402", "pg-oauth2", "pg-budget"]) {
+    $(id).addEventListener("input", renderPlayground);
+  }
+  const load = (key, path, task) => async () => {
+    const res = await fetch(path);
+    $("pg-yaml").value = res.ok ? await res.text() : `# fetch ${path}: ${res.status}`;
+    if (task) $("pg-task").value = task;
+    renderPlayground();
+  };
+  $("pg-load-fjordwire").addEventListener("click",
+    load("fjordwire", "examples/fjordwire/knowledge.yaml", "sovereign compute award"));
+  $("pg-load-vault").addEventListener("click",
+    load("vault", "examples/vault/knowledge.yaml", "merger deal terms"));
+  $("pg-load-starter").addEventListener("click", () => {
+    $("pg-yaml").value = STARTER_YAML;
+    $("pg-task").value = "current pricing and benchmarks";
+    renderPlayground();
+  });
+  renderPlayground();
+}
+
 /* ---------- wiring ---------- */
 
 const $ = (id) => document.getElementById(id);
@@ -362,4 +461,7 @@ loadManifests()
     $("pane-kcp").textContent =
       `Could not load the example manifests (${e.message}). ` +
       "If you opened this file directly, serve the docs/ directory instead: npx serve docs";
-  });
+  })
+  // The playground has no manifest dependency — it runs even if the arena's
+  // example fetch fails.
+  .finally(initPlayground);

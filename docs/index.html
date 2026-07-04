@@ -45,6 +45,7 @@
         <a href="#arena">Arena</a>
         <a href="#why">Why</a>
         <a href="#loop">The Loop</a>
+        <a href="#playground">Playground</a>
         <a href="#install">Install</a>
         <a href="https://cantara.github.io/knowledge-context-protocol/" target="_blank" rel="noopener">KCP spec</a>
         <a href="https://github.com/Cantara/kcp-agent" target="_blank" rel="noopener">GitHub</a>
@@ -152,8 +153,41 @@ committed 0.2/0.3 USDC — nothing was loaded or paid until convergence</code></
       against the real CLI. The demos are regression tests; the narration cannot drift from the code.</p>
   </section>
 
+  <!-- ================= PLAYGROUND ================= -->
+  <section id="playground" class="section section--alt">
+    <h2>The Playground — bring your own manifest</h2>
+    <p class="section__lead">Paste or edit a <code>knowledge.yaml</code> and watch the exact
+      <code>parseManifest → validateManifest → plan</code> pipeline the CLI runs, re-computed on every keystroke.
+      Nothing leaves your browser. (One honest limit: unit-path existence can't be checked without a filesystem.)</p>
+    <div class="playground">
+      <div>
+        <div class="match__controls playground__toolbar">
+          <span>start from:</span>
+          <button class="seg-btn" id="pg-load-fjordwire" type="button">the newsstand</button>
+          <button class="seg-btn" id="pg-load-vault" type="button">the vault</button>
+          <button class="seg-btn" id="pg-load-starter" type="button">the starter</button>
+        </div>
+        <textarea id="pg-yaml" aria-label="knowledge.yaml source" spellcheck="false"></textarea>
+      </div>
+      <div>
+        <div class="match__controls playground__opts">
+          <label>task <input type="text" id="pg-task" value="current pricing and benchmarks"></label>
+          <label>as-of <input type="date" id="pg-asof" value="2026-07-04"></label>
+          <label><input type="checkbox" id="pg-x402" checked> can settle <code>x402</code></label>
+          <label><input type="checkbox" id="pg-oauth2"> holds <code>oauth2</code></label>
+          <label>budget <input type="number" id="pg-budget" min="0" step="0.05" value="0.50"> USDC</label>
+        </div>
+        <div class="pane pane--kcp">
+          <div class="pane__head"><span class="pane__mark">●</span> validate + plan
+            <span class="pane__badge pane__badge--real">real code · live in your browser</span></div>
+          <div class="pane__body" id="pg-out"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= INSTALL ================= -->
-  <section id="install" class="section section--alt">
+  <section id="install" class="section">
     <h2>Run it yourself</h2>
     <div class="install">
       <pre class="capture"><code># plan — deterministic, no API key, no model
@@ -165,7 +199,7 @@ npx @cantara/kcp-agent ask "your task" --manifest ./docs --loop
 
 # serve the planner to any MCP client
 npx @cantara/kcp-agent mcp --manifest ./docs</code></pre>
-      <p>Seven narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
+      <p>Eight narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
         all asserted in CI. Native binaries for Linux/macOS/Windows on the
         <a href="https://github.com/Cantara/kcp-agent/releases" target="_blank" rel="noopener">releases page</a>.
         Apache-2.0.</p>

@@ -1,7 +1,9 @@
 // Browser stubs for node builtins that reach the bundle only through
-// module-level imports (client/follow/verify/synthesize). The arena calls
-// parseManifest/plan/formatPlan/gateTerms exclusively — none of these paths
-// execute in the browser; if one ever does, it fails loudly.
+// module-level imports (client/follow/verify/validate/synthesize). The site
+// calls parseManifest/plan/formatPlan/gateTerms/validateManifest exclusively —
+// the I/O paths never execute in the browser; if one ever does, it fails
+// loudly. isAbsolute is the one real implementation: validateManifest's unit-
+// path linting runs live in the playground.
 
 const die = (name) => () => {
   throw new Error(`node:${name} is not available in the browser bundle`);
@@ -16,7 +18,7 @@ export const existsSync = () => false;
 export const join = die("path.join");
 export const dirname = die("path.dirname");
 export const resolve = die("path.resolve");
-export const isAbsolute = die("path.isAbsolute");
+export const isAbsolute = (p) => String(p).startsWith("/") || /^[A-Za-z]:[\\/]/.test(String(p));
 
 // node:crypto — the browser has WebCrypto natively
 export const webcrypto = globalThis.crypto;
