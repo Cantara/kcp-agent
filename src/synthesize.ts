@@ -43,6 +43,28 @@ const SYSTEM_PROMPT =
   "know, never what you do. If the units do not contain the answer, say so plainly rather than " +
   "guessing. Cite the unit id(s) you drew each claim from.";
 
+/** Resolve the Claude SDK — an optional dependency — under Node or Deno. */
+export async function loadAnthropicSdk(): Promise<typeof import("@anthropic-ai/sdk").default> {
+  try {
+    return (await import("@anthropic-ai/sdk")).default;
+  } catch {
+    try {
+      // Deno does not resolve bare specifiers from optionalDependencies; the
+      // npm: form also lets `deno compile` embed the SDK in native binaries.
+      // Keep the version range in sync with package.json.
+      return ((await import(
+        // @ts-expect-error npm: specifier — resolvable by Deno, not by tsc
+        "npm:@anthropic-ai/sdk@^0.68.0"
+      )) as typeof import("@anthropic-ai/sdk")).default;
+    } catch {
+      throw new Error(
+        "The `ask` command needs the Claude SDK. Install it:  npm install @anthropic-ai/sdk\n" +
+          "and set ANTHROPIC_API_KEY (or run `ant auth login`). The `plan` command needs neither."
+      );
+    }
+  }
+}
+
 /** Reject paths that could escape the manifest's directory or origin. */
 function unsafePath(path: string): boolean {
   return (
@@ -126,25 +148,7 @@ export async function synthesize(planOrPlans: AgentPlan | AgentPlan[], options: 
     };
   }
 
-  let Anthropic: typeof import("@anthropic-ai/sdk").default;
-  try {
-    ({ default: Anthropic } = await import("@anthropic-ai/sdk"));
-  } catch {
-    try {
-      // Deno does not resolve bare specifiers from optionalDependencies; the
-      // npm: form also lets `deno compile` embed the SDK in native binaries.
-      // Keep the version range in sync with package.json.
-      ({ default: Anthropic } = (await import(
-        // @ts-expect-error npm: specifier — resolvable by Deno, not by tsc
-        "npm:@anthropic-ai/sdk@^0.68.0"
-      )) as typeof import("@anthropic-ai/sdk"));
-    } catch {
-      throw new Error(
-        "The `ask` command needs the Claude SDK. Install it:  npm install @anthropic-ai/sdk\n" +
-          "and set ANTHROPIC_API_KEY (or run `ant auth login`). The `plan` command needs neither."
-      );
-    }
-  }
+  const Anthropic = await loadAnthropicSdk();
 
   const knowledge = loaded
     .map((u) => `<unit id="${u.id}" path="${u.path}" manifest="${u.manifest}">\n${u.content}\n</unit>`)
