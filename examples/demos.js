@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — seven narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — eight narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all seven in CI as regression tests.
+// all eight in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -14,6 +14,7 @@
 // fully offline and need no API key.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,6 +25,7 @@ const EX = path.dirname(fileURLToPath(import.meta.url));
 const FJORDWIRE = path.join(EX, 'fjordwire');
 const VAULT = path.join(EX, 'vault');
 const ORG_HUB = path.join(EX, 'org', 'hub');
+const SEALED = path.join(EX, 'sealed');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -293,6 +295,51 @@ const SCENARIOS = [
       'and found the infrastructure units; the budget then re-allocated the spend — the newly ' +
       'discovered, better-scoring coverage fit and the 0.25 exclusive was skipped with the ' +
       'arithmetic. Every round is a recorded plan artifact: the chain IS the audit log.',
+  },
+  {
+    id: 'seal',
+    title: 'The Seal — tampered bytes never reach the planner',
+    useCase:
+      'examples/sealed ships a detached ed25519 signature over the exact manifest bytes (a ' +
+      'JSON envelope with the public key embedded — see scripts/seal-example.mjs). The agent ' +
+      'verifies before planning. Here it plans the pristine manifest, then a copy with one ' +
+      'unit appended after signing — the classic supply-chain move — and fails closed.',
+    run() {
+      const pristine = agent(['plan', 'provenance ledger record', '--manifest', SEALED]);
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kcp-seal-'));
+      let tampered;
+      try {
+        fs.cpSync(SEALED, tmp, { recursive: true });
+        fs.appendFileSync(
+          path.join(tmp, 'knowledge.yaml'),
+          '  - id: poisoned\n    path: evil.md\n    intent: "Injected after signing"\n' +
+          '    triggers: [provenance, ledger, record]\n'
+        );
+        const r = spawnSync('node', [CLI, 'plan', 'provenance ledger record', '--manifest', tmp], { encoding: 'utf8' });
+        tampered = {
+          stderr: stripAnsi((r.stderr || '').toString()).replaceAll(tmp, 'examples/sealed-tampered').trim(),
+          exit: r.status ?? 0,
+        };
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+      return { blocks: [
+        { command: pristine.command, lines:
+          pick(pristine.stdout, ['Signature:', '●', '○']).map((l) => '  ' + l.trim()) },
+        { command:
+            'kcp-agent plan "provenance ledger record" --manifest examples/sealed-tampered' +
+            '   # one unit appended after signing',
+          lines: [
+            ...tampered.stderr.split('\n').map((l) => c.yellow('  ' + l.trim())),
+            c.bold(`  exit ${tampered.exit}`) + c.dim(' — fail-closed: no plan, no load, no spend'),
+          ] },
+      ] };
+    },
+    verdict:
+      'Verification covers the exact published bytes, not the parsed structure — the poisoned ' +
+      'unit never reaches the planner, so nothing downstream (scoring, budget, the LLM loop) ' +
+      'ever sees it. --trusted-key pins the publisher key when envelope self-attestation is not ' +
+      'enough; --require-signature refuses unsigned manifests outright.',
   },
   {
     id: 'dogfood',
