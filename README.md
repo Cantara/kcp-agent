@@ -110,11 +110,11 @@ The same loop is available as a library (`runLoop` / `askLoop`, with an injectab
 [`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
 portable skill for agents that drive the CLI themselves.
 
-### Demos — six scenarios, no mocks
+### Demos — seven scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all six, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · dogfood
+node examples/demos.js            # all seven, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -125,11 +125,12 @@ node examples/demos.js vault      # one at a time
 | **The Vault** | payment never opens an auth gate — x402 in hand, still fail-closed | §4.11/§4.14 |
 | **The Org** | federation `context` slices by env; `agent_identity` plans credentials pre-fetch | §3.6 |
 | **The Audit** | two `--json` plans diffed: exactly which gate a capability flip moves, and its price | — |
+| **The Loop** | the audited critique loop with a scripted critic: injection bounces, terms re-plan, budget holds | — |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
-Every fact each demo narrates is parsed or computed from the shipping CLI's real output —
-nothing is hardcoded — and `test/demos.test.ts` runs all six in CI, so the narration is itself
-a regression suite. `plan` and `validate` are offline; no API key needed.
+Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
+output — nothing is hardcoded — and `test/demos.test.ts` runs all seven in CI, so the narration is
+itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
 
