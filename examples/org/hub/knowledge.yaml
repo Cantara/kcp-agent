@@ -1,0 +1,41 @@
+# The Org — a federation front door (RFC-0011 shape, local so --follow works).
+#
+# Two sub-manifests tagged with `context`: the prod platform hub (which also
+# declares agent_identity — bring a GitHub PAT *before* you fetch) and a
+# credential-free dev mirror. An agent takes only its environment's slice.
+
+kcp_version: "0.25"
+project: org-hub
+version: 1.0.0
+updated: "2026-07-04"
+language: en
+
+network:
+  role: hub
+
+trust:
+  provenance:
+    publisher: "Org Example AS"
+
+units:
+  - id: welcome
+    path: docs/welcome.md
+    intent: "Front door: what the org publishes and how an agent gets started"
+    scope: global
+    audience: [agent, human]
+    triggers: [overview, getting started, deploy]
+    hints: {load_strategy: eager}
+
+manifests:
+  - id: platform
+    url: "../platform/knowledge.yaml"
+    relationship: foundation
+    context: ["prod", "staging"]
+    agent_identity:
+      required: true
+      credential_hint: github_pat
+      docs_url: "https://org.example/agent-auth"
+  - id: dev-mirror
+    url: "../dev-mirror/knowledge.yaml"
+    relationship: peer
+    context: ["dev", "test"]

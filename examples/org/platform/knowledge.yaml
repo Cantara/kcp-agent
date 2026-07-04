@@ -1,0 +1,19 @@
+# The Org — production platform sub-manifest (reached from hub via --follow).
+
+kcp_version: "0.25"
+project: org-platform
+version: 1.0.0
+updated: "2026-07-04"
+language: en
+
+trust:
+  provenance:
+    publisher: "Org Example AS — Platform"
+
+units:
+  - id: deploy-pipeline
+    path: docs/deploy.md
+    intent: "How releases are deployed to production through the platform pipeline"
+    scope: project
+    audience: [agent, developer]
+    triggers: [deploy, release, production, pipeline]

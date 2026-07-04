@@ -1,0 +1,62 @@
+# The Vault — one publisher, two very different paid units.
+#
+#   board-memo      restricted + auth_scope + x402: a genuinely gated AND paid
+#                   unit. Spec §4.14: auth comes *before* payment. An agent
+#                   with no credential must fail closed — being able to settle
+#                   the x402 price never opens the gate (§4.11, v0.25.1).
+#   press-exclusive anonymous-paid done right: access stays public (omitted),
+#                   the payment block alone guards it.
+
+kcp_version: "0.25"
+project: vault
+version: 1.0.0
+updated: "2026-07-04"
+language: en
+
+trust:
+  provenance:
+    publisher: "Vault Example AS"
+
+auth:
+  methods:
+    - type: oauth2
+      issuer: "https://auth.vault.example"
+      scopes: ["read:board"]
+
+payment:
+  default_tier: free
+  methods:
+    - type: free
+
+units:
+  - id: overview
+    path: docs/overview.md
+    intent: "What the vault publishes about the merger, and what requires a credential"
+    scope: global
+    audience: [agent, human]
+    triggers: [overview, merger, briefing]
+    hints: {load_strategy: eager}
+
+  - id: board-memo
+    path: memos/board.md
+    intent: "Board memo on the merger deal terms"
+    scope: module
+    audience: [agent]
+    triggers: [merger, deal terms, board]
+    access: restricted
+    auth_scope: "read:board"
+    payment:
+      default_tier: metered
+      methods:
+        - {type: x402, currency: USDC, price_per_request: "0.30", networks: [base]}
+
+  - id: press-exclusive
+    path: press/exclusive.md
+    intent: "Press exclusive: the merger deal terms, anonymous pay-per-read"
+    scope: module
+    audience: [agent]
+    triggers: [merger, deal terms, exclusive]
+    payment:
+      default_tier: metered
+      methods:
+        - {type: x402, currency: USDC, price_per_request: "0.10", networks: [base]}

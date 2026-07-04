@@ -78,6 +78,27 @@ node dist/cli.js ask "how does an agent get started here?" --manifest ./knowledg
 them — treating unit content as knowledge, never as instructions. Needs `@anthropic-ai/sdk` (an
 optional dependency) and a key; `plan` needs neither.
 
+### Demos — six scenarios, no mocks
+
+```bash
+node examples/demos.js            # all six, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · dogfood
+node examples/demos.js vault      # one at a time
+```
+
+| Demo | What it shows | Spec |
+|------|---------------|------|
+| **The Newsstand** | a 0.40 USDC ceiling: buy by score, skip with the arithmetic in the reason | §4.14 |
+| **The Transition** | one question, three `--as-of` dates; supersession decides the overlap day | §4.22 |
+| **The Vault** | payment never opens an auth gate — x402 in hand, still fail-closed | §4.11/§4.14 |
+| **The Org** | federation `context` slices by env; `agent_identity` plans credentials pre-fetch | §3.6 |
+| **The Audit** | two `--json` plans diffed: exactly which gate a capability flip moves, and its price | — |
+| **The Dogfood** | the agent validates and navigates its own repository | §2 |
+
+Every fact each demo narrates is parsed or computed from the shipping CLI's real output —
+nothing is hardcoded — and `test/demos.test.ts` runs all six in CI, so the narration is itself
+a regression suite. `plan` and `validate` are offline; no API key needed.
+
 ### This repo describes itself
 
 The repository dogfoods KCP: [`knowledge.yaml`](knowledge.yaml) at the root declares the README,

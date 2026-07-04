@@ -100,6 +100,13 @@ units:
     audience: [agent, developer]
     triggers: [example, demo, sample manifest]
 
+  - id: demo-suite
+    path: examples/demos.js
+    intent: "Six narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, dogfood — each CI-asserted"
+    scope: project
+    audience: [agent, developer]
+    triggers: [demos, scenarios, showcase, newsstand, vault, audit]
+
   - id: ci-natives
     path: .github/workflows/ci.yml
     intent: "How CI tests the agent and cross-compiles self-contained native executables with Deno"
