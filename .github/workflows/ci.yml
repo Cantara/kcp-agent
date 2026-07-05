@@ -100,25 +100,22 @@ jobs:
         with:
           files: dist-bin/*
 
-  # Publishes kcp-agent to npm on v* tags. Requires either the
-  # NPM_TOKEN repository secret or npm Trusted Publishing configured for
-  # this repo+workflow (in which case the token line is ignored).
+  # Publishes kcp-agent to npm on v* tags via npm Trusted Publishing
+  # (OIDC — no token secret). Requires npm >= 11.5.1, hence Node 24.
   publish:
     needs: [test, natives]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # npm provenance attestation
+      id-token: write # OIDC for trusted publishing + provenance attestation
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run build
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
