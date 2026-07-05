@@ -2,7 +2,7 @@
 
 A signed `knowledge.yaml` lets any KCP agent verify that the manifest it plans from is the
 one you published — byte for byte. kcp-agent verifies **before planning** and fails closed:
-an invalid signature means no plan, no load, no spend. The repo's eighth demo
+an invalid signature means no plan, no load, no spend. The repo's Seal demo
 (`node examples/demos.js seal`) shows the whole lifecycle, including the tamper.
 
 ## 1. Declare the signing block

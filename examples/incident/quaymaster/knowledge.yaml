@@ -1,0 +1,30 @@
+# Quaymaster Systems — the vendor (fictional). One security bulletin, free
+# and public, and a marketing unit that declares its own negative space:
+# `not_for` tells agents what it does NOT serve, so incident-response tasks
+# never waste a load on a brochure.
+
+kcp_version: "0.25"
+project: quaymaster-broker
+version: 1.0.0
+updated: "2026-07-08"
+language: en
+
+trust:
+  provenance:
+    publisher: "Quaymaster Systems Ltd (example)"
+
+units:
+  - id: security-bulletin
+    path: security/qsb-2026-04.md
+    intent: "QSB-2026-04: remote code execution in the Quaymaster Broker management listener — affected versions, detection guidance, fixed in 4.8.2"
+    scope: global
+    audience: [agent, human]
+    triggers: [security, bulletin, rce, zero-day, versions, patch, broker]
+
+  - id: product-overview
+    path: sales/overview.md
+    intent: "Why teams choose Quaymaster Broker: features, editions, and pricing"
+    scope: global
+    audience: [agent, human]
+    triggers: [quaymaster, broker, features, pricing, editions]
+    not_for: ["active incident response", "zero-day mitigation guidance"]

@@ -1,0 +1,50 @@
+# Ravnwatch — commercial threat intelligence (fictional). TLP:AMBER is not a
+# label here; it is a GATE the planner enforces: the manifest requires
+# attestation from a trusted provider, the actor profile is `access:
+# restricted` (credential required — payment never substitutes for identity,
+# spec §4.11), and both units price per request over x402. An agent that
+# cannot satisfy a gate gets a written reason, not the content.
+
+kcp_version: "0.25"
+project: ravnwatch-intel
+version: 1.0.0
+updated: "2026-07-08"
+language: en
+
+trust:
+  provenance:
+    publisher: "Ravnwatch Intelligence AS (example)"
+  agent_requirements:
+    require_attestation: true
+    trusted_providers: ["soc.nordlys.example", "cert.fjell.example"]
+
+units:
+  - id: ioc-quicklist
+    path: intel/ioc-quicklist.md
+    intent: "Indicators of compromise for active exploitation of the Quaymaster Broker zero-day: addresses, domains, file hashes"
+    scope: global
+    audience: [agent]
+    triggers: [ioc, indicators, exploitation, zero-day, quaymaster, hashes]
+    payment:
+      default_tier: metered
+      methods:
+        - type: x402
+          currency: USDC
+          price_per_request: "0.05"
+          networks: [base]
+
+  - id: actor-profile
+    path: intel/actor-profile.md
+    intent: "TLP:AMBER — the actor behind the Quaymaster Broker campaign: tradecraft, victimology, energy-sector targeting"
+    scope: global
+    audience: [agent]
+    triggers: [actor, tlp, amber, campaign, tradecraft, energy, quaymaster]
+    access: restricted
+    auth_scope: "read:tlp-amber"
+    payment:
+      default_tier: metered
+      methods:
+        - type: x402
+          currency: USDC
+          price_per_request: "0.35"
+          networks: [base]

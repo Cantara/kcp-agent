@@ -74,6 +74,24 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("committed 0.2/0.3 USDC");
   });
 
+  it("incident: attestation, signature, supersession, payment and budget in one federated story", () => {
+    const out = demo("incident");
+    // 03:00 — unprovisioned: every closed gate has a written reason
+    expect(out).toContain("attestation required — agent cannot present it");
+    expect(out).toContain("restricted: requires attestation the agent cannot present");
+    expect(out).toContain("access 'restricted': agent holds no credentials");
+    expect(out).toContain("unaffordable: needs x402");
+    expect(out).toContain("not_for declares it does not serve 'active incident response'");
+    expect(out).toContain("not active until 2026-07-09");
+    // the provisioned responder: gates open, provenance verified, spend committed
+    expect(out).toContain("attestation required — agent can present it");
+    expect(out).toContain("ed25519 signature verified (envelope key) · key fjellcert-2026");
+    expect(out).toContain("superseded by advisory-patch (successor active)");
+    expect(out).toMatch(/● 1\. incident-runbook/);
+    expect(out).toMatch(/● 2\. actor-profile .* 0\.35 USDC\/request/);
+    expect(out).toContain("0.4/0.5 USDC (0.1 remaining)");
+  });
+
   it("seal: the signature verifies, and tampered bytes fail closed before planning", () => {
     const out = demo("seal");
     expect(out).toContain("ed25519 signature verified (envelope key) · key sealed-2026");

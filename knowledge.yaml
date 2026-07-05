@@ -116,10 +116,17 @@ units:
 
   - id: demo-suite
     path: examples/demos.js
-    intent: "Eight narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, the signature seal, dogfood — each CI-asserted"
+    intent: "Nine narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, the signature seal, the incident page, dogfood — each CI-asserted"
     scope: project
     audience: [agent, developer]
     triggers: [demos, scenarios, showcase, newsstand, vault, audit]
+
+  - id: incident-world
+    path: examples/incident/README.md
+    intent: "The 03:00 incident-response world — four federated parties (internal hub, signed national CERT, vendor, paid threat intel) exercising attestation, signatures, supersession, payment, and budget in one story"
+    scope: project
+    audience: [agent, developer]
+    triggers: [incident, zero-day, cert, threat intel, tlp, response, use case]
 
   - id: arena-site
     path: docs/js/app.js

@@ -1,0 +1,51 @@
+# Nordlys Energi — the internal hub an on-call agent starts from at 03:00.
+#
+# The restricted runbook is double-gated: the manifest requires attestation
+# from the company's own SOC provider, and `access: restricted` requires a
+# credential. The hub federates outward to the national CERT, the vendor,
+# and a commercial intel feed — the agent's whole incident landscape hangs
+# off this one entry point.
+
+kcp_version: "0.25"
+project: nordlys-energi-hub
+version: 1.0.0
+updated: "2026-07-08"
+language: en
+
+network:
+  role: hub
+
+trust:
+  provenance:
+    publisher: "Nordlys Energi AS — Platform Security (example)"
+  agent_requirements:
+    require_attestation: true
+    trusted_providers: ["soc.nordlys.example"]
+
+units:
+  - id: broker-inventory
+    path: docs/broker-inventory.md
+    intent: "Which Nordlys systems run Quaymaster Broker, their versions, network exposure, and owning teams"
+    scope: project
+    audience: [agent, developer]
+    triggers: [quaymaster, broker, inventory, versions, exposure, owners]
+
+  - id: incident-runbook
+    path: docs/runbook.md
+    intent: "Sev-1 incident runbook for active exploitation: isolate, contain, escalate, communicate"
+    scope: project
+    audience: [agent]
+    triggers: [incident, zero-day, exploitation, isolate, contain, escalate, runbook]
+    access: restricted
+    auth_scope: "read:incident"
+
+manifests:
+  - id: fjellcert
+    url: "../fjellcert/knowledge.yaml"
+    relationship: authority
+  - id: quaymaster
+    url: "../quaymaster/knowledge.yaml"
+    relationship: vendor
+  - id: ravnwatch
+    url: "../ravnwatch/knowledge.yaml"
+    relationship: intel
