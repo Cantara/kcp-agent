@@ -125,7 +125,8 @@ const STOPWORDS = new Set([
   "this", "that", "with", "my", "our", "can", "should", "will", "be", "get", "getting",
 ]);
 
-function terms(task: string): string[] {
+/** Tokenize a task/text into matchable terms — shared with `validate` so the lint sees exactly what the planner sees. */
+export function terms(task: string): string[] {
   return task
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u) // any-script letters/digits — "strømnett" is one term, not two fragments

@@ -97,6 +97,39 @@ units:
     expect(level(validateManifest(m), "error").some((e) => e.includes("no agent can ever qualify"))).toBe(true);
   });
 
+  it("warns when not_for contains the unit's own vocabulary (self-sabotaging gate)", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: eu-ai-act
+    path: a.md
+    intent: "EU AI Act requirements for high-risk AI systems"
+    audience: [agent]
+    triggers: [ai-act, high-risk]
+    not_for: ["questions about non-AI software systems"]
+`);
+    const warnings = level(validateManifest(m), "warning");
+    const hit = warnings.find((w) => w.includes("own vocabulary"));
+    expect(hit).toBeDefined();
+    expect(hit).toContain("systems");
+  });
+
+  it("does not warn when not_for names the excluded topic in its own words", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: eu-ai-act
+    path: a.md
+    intent: "EU AI Act requirements for high-risk AI systems"
+    audience: [agent]
+    triggers: [ai-act, high-risk]
+    not_for: ["CCPA", "accounting"]
+`);
+    expect(level(validateManifest(m), "warning").some((w) => w.includes("own vocabulary"))).toBe(false);
+  });
+
   it("checks unit paths exist when given a baseDir", async () => {
     const report = await validateLocation("examples/demo-hub");
     expect(report.ok).toBe(true); // demo hub must always validate clean
