@@ -9,7 +9,7 @@ calls a model here and needs **no API key**: the calling agent's own model synth
 
 ```bash
 # from npm
-claude mcp add kcp -- npx -y @cantara/kcp-agent mcp
+claude mcp add kcp -- npx -y kcp-agent mcp
 
 # or from a checkout / native binary
 claude mcp add kcp -- node /path/to/kcp-agent/dist/cli.js mcp

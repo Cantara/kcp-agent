@@ -1,10 +1,10 @@
 {
-  "name": "@cantara/kcp-agent",
-  "version": "0.1.0",
+  "name": "kcp-agent",
+  "version": "0.1.1",
   "description": "Reference agent that consumes the Knowledge Context Protocol end-to-end — a deterministic, fail-closed navigation planner plus optional LLM synthesis.",
   "type": "module",
   "bin": {
-    "kcp-agent": "./dist/cli.js"
+    "kcp-agent": "dist/cli.js"
   },
   "exports": {
     ".": "./dist/index.js"
@@ -33,7 +33,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Cantara/kcp-agent.git"
+    "url": "git+https://github.com/Cantara/kcp-agent.git"
   },
   "dependencies": {
     "js-yaml": "^4.1.0"

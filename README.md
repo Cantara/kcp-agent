@@ -241,7 +241,7 @@ the planner:
 ## Library
 
 ```ts
-import { loadManifest, plan, synthesize } from "@cantara/kcp-agent";
+import { loadManifest, plan, synthesize } from "kcp-agent";
 
 const manifest = await loadManifest("./knowledge.yaml");
 const p = plan(manifest, "how do I deploy?", { env: "prod", capabilities: { paymentMethods: ["free", "x402"] } });

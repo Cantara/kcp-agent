@@ -64,7 +64,7 @@
     </p>
     <div class="hero__cta">
       <a class="btn btn--primary" href="#arena">Enter the arena</a>
-      <code class="btn btn--code">npm i -g @cantara/kcp-agent</code>
+      <code class="btn btn--code">npm i -g kcp-agent</code>
     </div>
     <p class="hero__proof">
       What follows is not a demo video. The left half of every match below is the shipping planner —
@@ -217,14 +217,14 @@ final plan: datacenter-power, subsea-cable-feature
     <h2>Run it yourself</h2>
     <div class="install">
       <pre class="capture"><code># plan — deterministic, no API key, no model
-npx @cantara/kcp-agent plan "your task" --manifest https://example.com/knowledge.yaml
+npx kcp-agent plan "your task" --manifest https://example.com/knowledge.yaml
 
 # ask — plan, then synthesize with Claude from exactly the planned units
 export ANTHROPIC_API_KEY=...
-npx @cantara/kcp-agent ask "your task" --manifest ./docs --loop
+npx kcp-agent ask "your task" --manifest ./docs --loop
 
 # serve the planner to any MCP client (manifest is passed per tool call)
-npx @cantara/kcp-agent mcp</code></pre>
+npx kcp-agent mcp</code></pre>
       <p>Eight narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
         all asserted in CI. Native binaries for Linux/macOS/Windows on the
         <a href="https://github.com/Cantara/kcp-agent/releases" target="_blank" rel="noopener">releases page</a>.

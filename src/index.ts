@@ -1,4 +1,4 @@
-// @cantara/kcp-agent — public API.
+// kcp-agent — public API.
 //
 // A reference agent that consumes the Knowledge Context Protocol end-to-end.
 // The deterministic planner is the core; LLM synthesis is an optional layer.

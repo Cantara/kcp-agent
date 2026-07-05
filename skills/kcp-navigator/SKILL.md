@@ -14,7 +14,7 @@ deterministic part; you do the judgement between plans.
 Any one of these provides the CLI:
 
 ```bash
-npx @cantara/kcp-agent --help          # npm
+npx kcp-agent --help          # npm
 kcp-agent --help                       # native binary from a GitHub release
 node /path/to/kcp-agent/dist/cli.js    # checkout (npm install && npm run build)
 ```

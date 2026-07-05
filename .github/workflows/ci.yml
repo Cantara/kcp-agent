@@ -100,7 +100,7 @@ jobs:
         with:
           files: dist-bin/*
 
-  # Publishes @cantara/kcp-agent to npm on v* tags. Requires either the
+  # Publishes kcp-agent to npm on v* tags. Requires either the
   # NPM_TOKEN repository secret or npm Trusted Publishing configured for
   # this repo+workflow (in which case the token line is ignored).
   publish:

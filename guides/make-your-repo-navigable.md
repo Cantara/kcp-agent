@@ -37,7 +37,7 @@ Rules that matter:
 ## 2. Lint it (1 minute)
 
 ```bash
-npx @cantara/kcp-agent validate .
+npx kcp-agent validate .
 ```
 
 Errors (duplicate ids, unsafe or missing paths, `superseded_by` pointing nowhere) exit 1;
@@ -48,8 +48,8 @@ warnings flag declarations that weaken navigation (no triggers, expired units wi
 Run the tasks you expect agents to bring, and read the skip reasons:
 
 ```bash
-npx @cantara/kcp-agent plan "how do I deploy to production?" --manifest .
-npx @cantara/kcp-agent plan "how do I get started?" --manifest .
+npx kcp-agent plan "how do I deploy to production?" --manifest .
+npx kcp-agent plan "how do I get started?" --manifest .
 ```
 
 A unit you expected showing `no task-relevance match` means zero lexical overlap between the
@@ -70,7 +70,7 @@ You can also iterate in the browser: paste your manifest into the
 - Add the linter to CI so a broken manifest fails the build:
 
 ```yaml
-- run: npx @cantara/kcp-agent validate .
+- run: npx kcp-agent validate .
 ```
 
 This repository dogfoods the pattern: its own [`knowledge.yaml`](../knowledge.yaml) declares

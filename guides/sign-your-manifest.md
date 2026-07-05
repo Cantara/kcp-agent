@@ -49,7 +49,7 @@ in PEM, SPKI-DER, or raw-32-byte form.
 ## 3. Verify like an agent would
 
 ```bash
-npx @cantara/kcp-agent plan "some task" --manifest .
+npx kcp-agent plan "some task" --manifest .
 ```
 
 The plan header reports one of four statuses:
@@ -65,10 +65,10 @@ Harden it:
 
 ```bash
 # refuse anything without a *verified* signature (federation hops included)
-npx @cantara/kcp-agent plan "task" --manifest https://example.com/knowledge.yaml --require-signature
+npx kcp-agent plan "task" --manifest https://example.com/knowledge.yaml --require-signature
 
 # pin the publisher's key so the manifest can't attest for itself
-npx @cantara/kcp-agent plan "task" --manifest … --trust-key ./publisher.pub
+npx kcp-agent plan "task" --manifest … --trust-key ./publisher.pub
 ```
 
 An embedded key proves **integrity** (these bytes weren't altered since signing), not
