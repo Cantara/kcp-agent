@@ -114,11 +114,11 @@ The same loop is available as a library (`runLoop` / `askLoop`, with an injectab
 [`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
 portable skill for agents that drive the CLI themselves.
 
-### Demos — ten scenarios, no mocks
+### Demos — eleven scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all ten, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · dogfood
+node examples/demos.js            # all eleven, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · summer · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -133,10 +133,11 @@ node examples/demos.js vault      # one at a time
 | **The 03:00 Page** | a zero-day across four federated parties — attestation, a signed CERT, supersession, TLP:AMBER as an enforced gate, an intel budget ([`examples/incident/`](examples/incident/)) | all of it |
 | **The Borrowed Leash** | a scripted foreign MCP client replans the incident over stdio — same gates, same ledger — then `kcp_replay` catches its falsified artifact | — |
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
+| **The Summer Plan** | a family vacation across four federated parties — a signed hub, timetable supersession, an identity-gated accessibility registry, x402 tour detail, and the `not_for` footgun caught by the validate lint ([`examples/summer/`](examples/summer/)) | §3.6/§4.11/§4.22 |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all ten in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all eleven in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself

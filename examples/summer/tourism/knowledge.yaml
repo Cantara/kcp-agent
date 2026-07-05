@@ -1,0 +1,59 @@
+# Fjordholm Tourism Board — the regional hub a family's travel agent starts
+# from. This manifest is SIGNED (detached ed25519 over the exact bytes); the
+# hub federates outward to the county ferry authority, the national
+# accessibility registry (registered agents only), and a commercial tour
+# operator. Re-seal after editing:
+#
+#   node scripts/seal-example.mjs examples/summer/tourism/knowledge.yaml tourism-2026
+
+kcp_version: "0.25"
+project: fjordholm-tourism
+version: 1.0.0
+updated: "2026-07-05"
+language: en
+
+network:
+  role: hub
+
+trust:
+  provenance:
+    publisher: "Fjordholm Tourism Board (example)"
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  signature: knowledge.yaml.sig
+
+units:
+  - id: family-guide
+    path: docs/family-guide.md
+    intent: "Family itineraries around Fjordholm: beaches, museums, rainy-day plans, and travel times between the villages"
+    scope: global
+    audience: [agent, human]
+    triggers: [family, itinerary, beach, museum, kids, villages]
+
+  - id: allergen-dining
+    path: docs/allergen-dining.md
+    intent: "Allergen-aware dining around Fjordholm: restaurants with certified nut-free kitchens and full vegan menus"
+    scope: global
+    audience: [agent, human]
+    triggers: [allergy, nut, allergen, vegan, dining, restaurant]
+    # Negative space done right (linted by `kcp-agent validate` since 0.4.0):
+    # the excluded topics are named in their own words — never as a negation
+    # of this unit's own topic, which would gate it against its natural questions.
+    not_for: ["pollen forecasts", "pet hair in rental cars"]
+
+manifests:
+  - id: ferries
+    url: "../ferries/knowledge.yaml"
+    relationship: authority
+  - id: registry
+    url: "../registry/knowledge.yaml"
+    relationship: authority
+    agent_identity:
+      required: true
+      credential_hint: registry_pat
+      docs_url: "https://access-registry.example/agent-access"
+  - id: safari
+    url: "../safari/knowledge.yaml"
+    relationship: vendor

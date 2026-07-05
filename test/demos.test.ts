@@ -118,6 +118,27 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("exit 1 — fail-closed: no plan, no load, no spend");
   });
 
+  it("summer: family-safety gates — signature, supersession, identity, budget, and the not_for footgun", () => {
+    const out = demo("summer");
+    // signed hub verifies before planning
+    expect(out).toContain("ed25519 signature verified (envelope key) · key tourism-2026");
+    // the allergy unit is top-ranked and NOT gated by its well-written not_for
+    expect(out).toContain("● 1. allergen-dining");
+    // timetable supersession: winter skipped with a written reason
+    expect(out).toContain("winter-timetable: expired 2026-06-20 (superseded by summer-timetable)");
+    // identity-gated federation edge: selected but not fetched without the credential
+    expect(out).toContain("registry needs registry_pat before fetch [acquire registry_pat]");
+    // budget arithmetic in the skip reason, then the paid unit bought under a higher ceiling
+    expect(out).toContain("family-safari: over budget: 0.3 would exceed remaining 0.1 of 0.1 USDC");
+    expect(out).toContain("pay-per-request: family-safari → 0.30 USDC/request");
+    // with the credential the registry is followed and the accessibility unit selected
+    expect(out).toContain("federated: registry");
+    expect(out).toContain("● 1. cabin-accessibility");
+    // the negated-draft footgun: gated at plan time AND caught by the 0.4.0 lint
+    expect(out).toContain("allergen-dining: not_for declares it does not serve");
+    expect(out).toContain("contains the unit's own vocabulary (allergen, dining, free, nut)");
+  });
+
   it("dogfood: the repo manifest validates and routes to the planner source", () => {
     const out = demo("dogfood");
     expect(out).toContain("✓ valid");

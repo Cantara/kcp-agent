@@ -1,0 +1,31 @@
+# Fjordholm County Ferries — the timetable authority. The two timetables are
+# a live supersession pair (spec §4.22): the winter timetable expired in June
+# and declares the summer timetable as its successor. An agent planning a
+# July crossing gets the summer sailings — and the skip is written down.
+
+kcp_version: "0.25"
+project: fjordholm-ferries
+version: 1.0.0
+updated: "2026-07-05"
+language: en
+
+trust:
+  provenance:
+    publisher: "Fjordholm County Ferries (example)"
+
+units:
+  - id: winter-timetable
+    path: timetables/winter-2025.md
+    intent: "Winter timetable for the Fjordholm ferry: hourly crossings, last sailing 20:30, reduced Sunday service"
+    scope: global
+    audience: [agent, human]
+    triggers: [ferry, timetable, crossing, sailing, winter]
+    temporal: {valid_until: "2026-06-20", superseded_by: summer-timetable}
+
+  - id: summer-timetable
+    path: timetables/summer-2026.md
+    intent: "Summer timetable for the Fjordholm ferry: half-hourly crossings, evening sailings to 23:00, wheelchair ramp on every departure"
+    scope: global
+    audience: [agent, human]
+    triggers: [ferry, timetable, crossing, sailing, wheelchair, summer]
+    temporal: {valid_from: "2026-06-21", valid_until: "2026-08-15"}

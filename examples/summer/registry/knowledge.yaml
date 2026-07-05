@@ -1,0 +1,30 @@
+# The National Accessibility Registry (fictional). The hub's manifest ref
+# declares agent_identity.required, so only registered agents fetch this
+# manifest at all. What's inside are verified declarations, not marketing
+# adjectives — and if a cabin has no entry here, that absence IS the answer
+# a careful planner reports.
+
+kcp_version: "0.25"
+project: access-registry
+version: 1.0.0
+updated: "2026-07-05"
+language: en
+
+trust:
+  provenance:
+    publisher: "National Accessibility Registry (example)"
+
+units:
+  - id: cabin-accessibility
+    path: registry/cabins.md
+    intent: "Verified accessibility declarations for cabins and hotels around Fjordholm: step-free entry, roll-in showers, measured ramp gradients"
+    scope: global
+    audience: [agent]
+    triggers: [wheelchair, accessible, step-free, cabin, hotel, ramp]
+
+  - id: registry-coverage
+    path: registry/coverage.md
+    intent: "What the registry covers, how operators get verified, and what the absence of a declaration means"
+    scope: global
+    audience: [agent, human]
+    triggers: [registry, verified, coverage, declaration]

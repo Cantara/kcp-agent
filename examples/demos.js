@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — ten narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — eleven narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all ten in CI as regression tests.
+// all eleven in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -27,6 +27,7 @@ const VAULT = path.join(EX, 'vault');
 const ORG_HUB = path.join(EX, 'org', 'hub');
 const SEALED = path.join(EX, 'sealed');
 const INCIDENT = path.join(EX, 'incident');
+const SUMMER = path.join(EX, 'summer', 'tourism');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -55,6 +56,7 @@ function agent(args) {
     .replaceAll(VAULT, 'examples/vault')
     .replaceAll(ORG_HUB, 'examples/org/hub')
     .replaceAll(INCIDENT, 'examples/incident')
+    .replaceAll(SUMMER, 'examples/summer/tourism')
     .replaceAll(ROOT, '.');
   return {
     stdout: stripAnsi((r.stdout || '').toString()).replaceAll(ROOT + path.sep, ''),
@@ -478,6 +480,74 @@ const SCENARIOS = [
       'gets the same attestation gates, skip reasons and spend ledger as the CLI — and the ' +
       'artifact it gets back can be cross-examined later by kcp_replay, which catches both ' +
       'drifted knowledge and a client that edits its own evidence. Determinism as a service.',
+  },
+  {
+    id: 'summer',
+    title: 'The Summer Plan — a family vacation the agent can defend',
+    useCase:
+      'A family books a week on Fjordholm: a kid with a nut allergy, a grandmother in a ' +
+      'wheelchair, a teenager gone vegan, and a hard budget. The signed tourism hub federates ' +
+      'to the ferry authority (a live timetable supersession), the accessibility registry ' +
+      '(registered agents only), and a tour operator selling detail over x402. Safety-critical ' +
+      'knowledge is exactly where vibes-based planning is least acceptable.',
+    run() {
+      const task = 'wheelchair accessible cabin near the ferry, nut allergy safe dining, and a fjord safari for the kids';
+      const base = ['plan', task, '--manifest', SUMMER, '--follow', '--as-of', '2026-07-12', '--methods', 'free,x402'];
+      const tight = agent([...base, '--budget', '0.10']);
+      const funded = agent([...base, '--budget', '0.60', '--credentials', 'registry_pat']);
+      const blocks = [
+        { command: tight.command, lines: [
+          'no registry credential, 0.10 USDC ceiling:',
+          ...pick(tight.stdout, [
+            'Signature: ✓', 'allergen-dining (', 'summer-timetable (',
+            'winter-timetable:', 'family-safari:', 'needs registry_pat',
+          ]).map((l) => '  ' + l.trim()),
+        ]},
+        { command: funded.command, lines: [
+          'registry credential in hand, 0.60 USDC ceiling:',
+          ...pick(funded.stdout, [
+            'federated: registry', 'cabin-accessibility (', 'family-safari (', 'pay-per-request',
+          ]).map((l) => '  ' + l.trim()),
+        ]},
+      ];
+      // The footgun: the same manifest as a pre-publish draft (no signature yet)
+      // with not_for rewritten as a negation of the unit's own topic — the
+      // authoring bug that deterministically hides the allergy unit from
+      // exactly the family that needs it.
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kcp-summer-'));
+      let gated, lint;
+      try {
+        fs.cpSync(SUMMER, tmp, { recursive: true });
+        const manifest = path.join(tmp, 'knowledge.yaml');
+        fs.writeFileSync(manifest, fs.readFileSync(manifest, 'utf8')
+          .replace('not_for: ["pollen forecasts", "pet hair in rental cars"]',
+                   'not_for: ["questions not about nut-free or allergen dining"]')
+          .replace(/signing:\n(  .*\n)+/, ''));
+        const p = spawnSync('node', [CLI, 'plan', 'nut allergy safe dining for the kids', '--manifest', tmp], { encoding: 'utf8' });
+        gated = stripAnsi((p.stdout || '').toString());
+        const v = spawnSync('node', [CLI, 'validate', tmp], { encoding: 'utf8' });
+        lint = stripAnsi((v.stdout || '').toString());
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+      blocks.push({
+        command:
+          'kcp-agent plan "nut allergy safe dining for the kids" --manifest examples/summer/tourism-draft' +
+          '   # draft: not_for rewritten as a negation',
+        lines: [
+          ...pick(gated, ['allergen-dining:']).map((l) => c.yellow('  ' + l.trim())),
+          '',
+          'kcp-agent validate examples/summer/tourism-draft   # the 0.4.0 lint catches it pre-publish:',
+          ...pick(lint, ['own vocabulary']).map((l) => c.yellow('  ' + l.trim())),
+        ],
+      });
+      return { blocks };
+    },
+    verdict:
+      'The dangerous knowledge — allergy, accessibility, timetables — travels with signatures, ' +
+      'credentials, validity windows and prices the planner enforces deterministically. And the ' +
+      'one authoring mistake that would silently hide the allergy unit from its own audience is ' +
+      'caught twice: as a written skip reason at plan time, and by validate before it ships.',
   },
   {
     id: 'dogfood',
