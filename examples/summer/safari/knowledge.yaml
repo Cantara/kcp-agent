@@ -1,0 +1,37 @@
+# Fjord Safari Co. — a commercial tour operator selling detail per-request
+# over x402 (spec §4.11 anonymous-paid: access stays public, the payment
+# block guards the unit). The free overview is the shop window; the family
+# fact sheet — child seats, wheelchair boarding, the allergy-aware picnic —
+# costs 0.30 USDC per request.
+
+kcp_version: "0.25"
+project: fjord-safari-co
+version: 1.0.0
+updated: "2026-07-05"
+language: en
+
+trust:
+  provenance:
+    publisher: "Fjord Safari Co. (example)"
+
+units:
+  - id: safari-overview
+    path: tours/overview.md
+    intent: "Which fjord safaris run this season, departure points, and family suitability at a glance"
+    scope: global
+    audience: [agent, human]
+    triggers: [safari, fjord, tours, season, departure]
+
+  - id: family-safari
+    path: tours/family-tour.md
+    intent: "The family fjord safari in full: sailing times, child seats and minimum ages, wheelchair boarding, allergy-aware picnic"
+    scope: global
+    audience: [agent, human]
+    triggers: [safari, fjord, family, boarding, picnic, booking]
+    payment:
+      default_tier: metered
+      methods:
+        - type: x402
+          currency: USDC
+          price_per_request: "0.30"
+          networks: [base]
