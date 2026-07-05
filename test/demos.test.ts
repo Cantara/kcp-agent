@@ -92,6 +92,24 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("0.4/0.5 USDC (0.1 remaining)");
   });
 
+  it("leash: a foreign MCP client gets the same gates, and replay cross-examines over the wire", () => {
+    const out = demo("leash");
+    expect(out).toContain("tools: kcp_plan, kcp_load, kcp_validate, kcp_replay");
+    // unprovisioned over MCP: the same written reasons as the CLI
+    expect(out).toContain("○ incident-runbook — restricted: requires attestation the agent cannot present; access 'restricted': agent holds no credentials");
+    // provisioned over MCP: gate open, ledger committed
+    expect(out).toContain("● incident-runbook");
+    expect(out).toContain("committed 0.4/0.5 USDC");
+    // cross-examination: all four manifests reproduce…
+    for (const p of ["nordlys-energi-hub", "fjellcert-advisories", "quaymaster-broker", "ravnwatch-intel"]) {
+      expect(out).toContain(`✓ ${p}: identical`);
+    }
+    expect(out).toContain("ok: true");
+    // …and the falsified spend ledger is caught
+    expect(out).toContain("✗ ravnwatch-intel: drifted — plan differs in: budget");
+    expect(out).toContain("ok: false");
+  });
+
   it("seal: the signature verifies, and tampered bytes fail closed before planning", () => {
     const out = demo("seal");
     expect(out).toContain("ed25519 signature verified (envelope key) · key sealed-2026");

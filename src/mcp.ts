@@ -1,13 +1,20 @@
 // MCP server mode — expose the planner to MCP clients over stdio.
 //
 // "KCP is to knowledge what MCP is to tools"; this is where they meet. Any
-// MCP client (Claude Code, an IDE, another agent) gets three tools:
+// MCP client (Claude Code, an IDE, another agent) gets four tools:
 //
 //   kcp_plan     — the inspectable load plan (optionally following federation)
 //   kcp_load     — the plan plus the *content* of load-eligible units, so the
 //                  calling agent's own model synthesizes; kcp-agent never
 //                  spends the caller's tokens or needs its own API key
 //   kcp_validate — lint a knowledge.yaml
+//   kcp_replay   — cross-examine a saved plan artifact: manifest bytes, then
+//                  a byte-for-byte re-plan from the echoed inputs
+//
+// kcp_plan/kcp_load take the CLI's full capability surface (role, methods,
+// credentials, attest), so attestation and credential gates answer over MCP
+// exactly as they do on the command line. The borrowing agent doesn't have
+// to be deterministic — it just has to ask someone who is.
 //
 // The transport is newline-delimited JSON-RPC 2.0 (the MCP stdio framing),
 // implemented directly — no SDK dependency, so the native binary carries it
@@ -17,9 +24,12 @@ import { createInterface } from "node:readline";
 import { planTree, plans, type FollowOptions } from "./follow.js";
 import { loadPlannedUnits } from "./synthesize.js";
 import { validateLocation } from "./validate.js";
+import { replayArtifact } from "./replay.js";
 import type { PlanOptions } from "./planner.js";
 
 export const PROTOCOL_VERSION = "2025-06-18";
+// Version must match package.json — test/mcp.test.ts pins them together
+// (a runtime read wouldn't survive `deno compile`, which embeds only the module graph).
 export const SERVER_INFO = { name: "kcp-agent", version: "0.2.0" };
 
 interface JsonRpcRequest {
@@ -54,6 +64,21 @@ const PLAN_ARGS = {
     currency: { type: "string", description: "Budget currency (default USDC)" },
     follow: { type: "boolean", description: "Follow eligible federation refs (default false)" },
     max_depth: { type: "number", description: "Federation hops to follow when follow=true (default 1)" },
+    role: { type: "string", description: "Agent role for audience targeting (default: agent)" },
+    methods: {
+      type: "array",
+      items: { type: "string" },
+      description: 'Payment methods the agent can settle, e.g. ["free","x402"] (default: free only)',
+    },
+    credentials: {
+      type: "array",
+      items: { type: "string" },
+      description: 'Credential kinds the agent holds, e.g. ["mtls","api_key"] — opens access-gated units',
+    },
+    attest: {
+      type: "string",
+      description: "Attestation provider the agent can present, matched against the manifest's trusted_providers",
+    },
   },
   required: ["task", "manifest"],
 } as const;
@@ -84,9 +109,35 @@ export const TOOLS = [
       required: ["manifest"],
     },
   },
+  {
+    name: "kcp_replay",
+    description:
+      "Cross-examine a saved plan artifact (the JSON returned by kcp_plan): re-fetch each manifest, " +
+      "compare its sha256 to the pinned one, re-run the pure planner from the echoed inputs, and " +
+      "report identical or drifted per manifest — with the fields that moved. " +
+      "A plan is evidence; replay is the cross-examination.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        artifact: {
+          description: "The plan artifact: the JSON object returned by kcp_plan, or that JSON as a string",
+        },
+      },
+      required: ["artifact"],
+    },
+  },
 ];
 
+/** Accept a JSON array or a comma-separated string — MCP callers send both. */
+function toList(v: unknown): string[] | undefined {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+  return undefined;
+}
+
 function toFollowOptions(args: Record<string, unknown>): FollowOptions {
+  const methods = toList(args["methods"]);
+  const credentials = toList(args["credentials"]);
   const planOptions: PlanOptions = {
     env: args["env"] === undefined ? undefined : String(args["env"]),
     asOf: args["as_of"] === undefined ? undefined : String(args["as_of"]),
@@ -96,6 +147,12 @@ function toFollowOptions(args: Record<string, unknown>): FollowOptions {
       args["budget"] === undefined
         ? undefined
         : { amount: Number(args["budget"]), currency: args["currency"] === undefined ? undefined : String(args["currency"]) },
+    capabilities: {
+      ...(args["role"] === undefined ? {} : { role: String(args["role"]) }),
+      ...(methods ? { paymentMethods: methods } : {}),
+      ...(credentials ? { credentials } : {}),
+      ...(args["attest"] === undefined ? {} : { attestationProvider: String(args["attest"]) }),
+    },
   };
   return {
     planOptions,
@@ -124,6 +181,12 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<st
     }
     case "kcp_validate": {
       const report = await validateLocation(String(args["manifest"] ?? ""));
+      return JSON.stringify(report, null, 2);
+    }
+    case "kcp_replay": {
+      const raw = args["artifact"];
+      const artifact: unknown = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const report = await replayArtifact(artifact, "mcp:artifact");
       return JSON.stringify(report, null, 2);
     }
     default:
