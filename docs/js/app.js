@@ -23,6 +23,10 @@ async function loadManifests() {
   for (const [key, path] of [
     ["fjordwire", "examples/fjordwire/knowledge.yaml"],
     ["vault", "examples/vault/knowledge.yaml"],
+    ["nordlys", "examples/incident/nordlys/knowledge.yaml"],
+    ["fjellcert", "examples/incident/fjellcert/knowledge.yaml"],
+    ["quaymaster", "examples/incident/quaymaster/knowledge.yaml"],
+    ["ravnwatch", "examples/incident/ravnwatch/knowledge.yaml"],
   ]) {
     const res = await fetch(path);
     if (!res.ok) throw new Error(`fetch ${path}: ${res.status}`);
@@ -310,6 +314,126 @@ const SCENARIOS = [
           "The critic — you — can steer discovery but cannot move a gate: proposals are vocabulary, never " +
           "instructions. Rejected shrapnel never touches the task string, and everything the re-plan added " +
           "still passed the same eligibility, temporal, and budget checks as the base plan.",
+      };
+    },
+  },
+  {
+    id: "incident",
+    tab: "⑤ The 03:00 Page",
+    foe: "the Grab-Everything Responder",
+    intro:
+      "A zero-day in Quaymaster Broker is being exploited and the pager goes off at 03:00. The on-call " +
+      "agent starts from the internal Nordlys hub and federates to the national CERT, the vendor, and a " +
+      "paid intel feed where TLP:AMBER is a gate, not a label. Provision the responder and cross the " +
+      "patch-day handover — every gate that opens or closes writes its reason down. (The CLI walk also " +
+      "verifies FjellCERT's ed25519 signature; here the same pure planner plans each federated manifest " +
+      "in walk order, threading committed spend exactly as the walker does.)",
+    controls(state, rerender) {
+      const seg = document.createElement("div");
+      seg.className = "seg";
+      seg.setAttribute("role", "group");
+      for (const d of ["2026-07-08", "2026-07-09"]) {
+        const b = document.createElement("button");
+        b.textContent = d;
+        b.setAttribute("aria-pressed", String(d === state.date));
+        b.addEventListener("click", () => {
+          state.date = d;
+          seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.textContent === d)));
+          rerender();
+        });
+        seg.appendChild(b);
+      }
+      seg.setAttribute("aria-label", "as-of date");
+      const lbl = document.createElement("div");
+      lbl.style.display = "flex";
+      lbl.style.alignItems = "center";
+      lbl.style.gap = "0.55rem";
+      lbl.style.fontWeight = "500";
+      lbl.append("as-of date ", seg);
+      const prov = document.createElement("label");
+      prov.innerHTML = `<input type="checkbox" ${state.provisioned ? "checked" : ""}> provision the responder
+        <span style="font-weight:400">(attestation <code>soc.nordlys.example</code> + <code>mtls</code> + x402 wallet + 0.50 USDC budget)</span>`;
+      prov.querySelector("input").addEventListener("change", (e) => { state.provisioned = e.target.checked; rerender(); });
+      return [lbl, prov];
+    },
+    state: { date: "2026-07-08", provisioned: false },
+    run(state) {
+      const task = "quaymaster broker zero-day active exploitation - what do we do right now?";
+      const caps = state.provisioned
+        ? { paymentMethods: ["free", "x402"], credentials: ["mtls"], attestationProvider: "soc.nordlys.example" }
+        : { paymentMethods: ["free"] };
+      const walk = [
+        ["nordlys", "hub — the agent's entry point"],
+        ["fjellcert", "authority — national CERT (manifest signed, ed25519)"],
+        ["quaymaster", "vendor"],
+        ["ravnwatch", "intel — TLP:AMBER as a gate"],
+      ];
+      // the same budget threading planTree does: spend committed upstream
+      // counts against every downstream manifest — one ceiling for the walk.
+      const round6 = (n) => Number(n.toFixed(6));
+      let committed = 0;
+      const out = [];
+      for (const [key, role] of walk) {
+        const opts = {
+          asOf: state.date,
+          capabilities: caps,
+          ...(state.provisioned
+            ? { budget: { amount: 0.5, ...(committed > 0 ? { spent: round6(committed) } : {}) } }
+            : {}),
+        };
+        const p = plan(manifests[key], task, opts);
+        committed = round6(committed + (p.budget.projectedSpend ?? 0));
+        out.push(bold(`═ ${p.manifest.project}`) + dim(`  (${role})`));
+        if (p.trust.requiresAttestation) {
+          out.push((p.trust.agentCanAttest ? green : yellow)(`  trust: ${p.trust.agentCanAttest ? "✓" : "⚠"} ${p.trust.note}`));
+        }
+        p.selected.forEach((u, i) => {
+          const mark = u.loadEligible ? green("●") : red("○");
+          out.push(`  ${mark} ${bold(`${i + 1}. ${u.id}`)} ${dim(`(score ${u.score})`)}  ${cyan(costLabel(u))}`);
+          out.push(dim(`     why: ${u.reasons.join("; ")}`));
+        });
+        for (const s of p.skipped) out.push(yellow(`  · ${s.id}: ${s.reason}`));
+        const b = p.budget;
+        if (b.ceiling !== undefined && (b.projectedSpend > 0 || (b.alreadyCommitted ?? 0) > 0)) {
+          out.push(
+            dim("  budget: ") + cyan(`${b.projectedSpend}/${b.ceiling} ${b.currency}`) +
+            dim(` (${b.remaining} remaining${b.alreadyCommitted ? `, ${b.alreadyCommitted} committed upstream` : ""})`)
+          );
+        }
+        out.push("");
+      }
+      // the archetype: ingest all four parties' units, pay every price, respect no gate
+      const foeLines = [dim("03:00 strategy: pull everything from everyone, sort it out later")];
+      let foeSpend = 0;
+      for (const [key] of walk) {
+        for (const u of manifests[key].units) {
+          const pr = priceOf(u);
+          if (pr) foeSpend += pr.n;
+          let flag = "";
+          if (u.id === "product-overview") flag = "  " + red("← sales brochure ingested mid-incident (not_for ignored)");
+          if (u.id === "advisory-mitigate" && state.date >= "2026-07-09")
+            flag = "  " + red("← superseded 03:00 workaround still applied — listener disabled instead of patching");
+          if (u.id === "actor-profile")
+            flag = "  " + red("← TLP:AMBER pasted into the incident channel — payment mistaken for entitlement");
+          foeLines.push(`  ${dim("✓")} ${esc(u.id.padEnd(18))} ${cyan(pr ? `${pr.n} ${pr.cur}` : "free")}${flag}`);
+        }
+      }
+      foeLines.push("");
+      foeLines.push(bold(`intel spend: ${foeSpend.toFixed(2)} USDC`) + dim(" · entitlement checks: ") + red("none"));
+      foeLines.push(dim("postmortem evidence produced: ") + red("a chat log"));
+      return {
+        kcp: out.join("\n"),
+        foe: foeLines.join("\n"),
+        verdict: !state.provisioned
+          ? "The unprovisioned agent still gets a plan — attestation it cannot present, credentials it does not " +
+            "hold, intel it cannot pay for, each written down. Nothing is spent, nothing leaks, and the gaps in " +
+            "the plan are exactly the provisioning ticket to file."
+          : state.date === "2026-07-08"
+            ? "Provisioned, the runbook and the intel open — but the CERT still serves the 03:00 workaround, " +
+              "because the patch advisory is not valid until tomorrow. The plan is right for its date, and says so."
+            : "The full response: restricted runbook ●, the patch advisory retires the workaround with the " +
+              "supersession in writing, and 0.40 of the 0.50 USDC intel ceiling is committed across the " +
+              "federation — one budget for the whole walk. Paste this plan into the postmortem: it IS the audit trail.",
       };
     },
   },

@@ -71,6 +71,34 @@ describe("site bundle — the arena's left pane is really the planner", () => {
     expect(findings).toContainEqual({ level: "error", where: "unit 'a'", message: "duplicate unit id" });
   });
 
+  it("ships the incident world to the arena and the bundle plans its gates like the source", () => {
+    // the build must copy the incident manifests the ⑤ scenario fetches
+    const copied = (p: string) => readFileSync(path.join(ROOT, "docs", "examples", "incident", p), "utf8");
+    for (const m of ["nordlys", "fjellcert", "quaymaster", "ravnwatch"]) {
+      expect(copied(`${m}/knowledge.yaml`)).toBe(
+        readFileSync(path.join(ROOT, "examples", "incident", m, "knowledge.yaml"), "utf8")
+      );
+    }
+    // and the bundled planner flips the attestation gate exactly like the source
+    const task = "quaymaster broker zero-day active exploitation - what do we do right now?";
+    const text = copied("nordlys/knowledge.yaml");
+    const unprovisioned = { asOf: "2026-07-08", capabilities: { paymentMethods: ["free"] } };
+    const provisioned = {
+      asOf: "2026-07-09",
+      capabilities: { paymentMethods: ["free", "x402"], credentials: ["mtls"], attestationProvider: "soc.nordlys.example" },
+    };
+    for (const opts of [unprovisioned, provisioned]) {
+      const a = bundle.plan(bundle.parseManifest(text), task, opts);
+      const b = srcPlan(srcParse(text), task, opts);
+      expect(a.selected).toEqual(b.selected);
+      expect(a.trust).toEqual(b.trust);
+    }
+    const runbook = (o: object) =>
+      bundle.plan(bundle.parseManifest(text), task, o).selected.find((u) => u.id === "incident-runbook");
+    expect(runbook(unprovisioned)?.loadEligible).toBe(false);
+    expect(runbook(provisioned)?.loadEligible).toBe(true);
+  });
+
   it("publishes the bundle's real sha256 (the Receipts hash is not decorative)", () => {
     const info = JSON.parse(readFileSync(path.join(ROOT, "docs", "js", "bundle-info.json"), "utf8"));
     const digest = createHash("sha256").update(readFileSync(BUNDLE)).digest("hex");
