@@ -114,11 +114,11 @@ The same loop is available as a library (`runLoop` / `askLoop`, with an injectab
 [`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
 portable skill for agents that drive the CLI themselves.
 
-### Demos — nine scenarios, no mocks
+### Demos — ten scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all nine, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · incident · seal · dogfood
+node examples/demos.js            # all ten, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -131,11 +131,12 @@ node examples/demos.js vault      # one at a time
 | **The Audit** | two `--json` plans diffed: exactly which gate a capability flip moves, and its price | — |
 | **The Loop** | the audited critique loop with a scripted critic: injection bounces, terms re-plan, budget holds | — |
 | **The 03:00 Page** | a zero-day across four federated parties — attestation, a signed CERT, supersession, TLP:AMBER as an enforced gate, an intel budget ([`examples/incident/`](examples/incident/)) | all of it |
+| **The Borrowed Leash** | a scripted foreign MCP client replans the incident over stdio — same gates, same ledger — then `kcp_replay` catches its falsified artifact | — |
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all nine in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all ten in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
@@ -211,9 +212,13 @@ artifact by hand is also drift: the recomputed plan won't match it.
 node dist/cli.js mcp                   # stdio transport
 ```
 
-Exposes three tools: `kcp_plan` (the inspectable load plan), `kcp_load` (the plan **plus the
+Exposes four tools: `kcp_plan` (the inspectable load plan), `kcp_load` (the plan **plus the
 content** of load-eligible units, so the calling agent's own model synthesizes — kcp-agent never
-needs an API key here), and `kcp_validate`. Register it in e.g. Claude Code:
+needs an API key here), `kcp_validate`, and `kcp_replay` (cross-examine a saved plan artifact
+over the wire). `kcp_plan`/`kcp_load` take the CLI's full capability surface — `role`,
+`methods`, `credentials`, `attest`, `budget` — so attestation and credential gates answer for
+any MCP client exactly as they do on the command line. The borrowing agent doesn't have to be
+deterministic; it just has to ask someone who is. Register it in e.g. Claude Code:
 
 ```bash
 claude mcp add kcp -- node /path/to/kcp-agent/dist/cli.js mcp

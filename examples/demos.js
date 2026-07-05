@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — nine narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — ten narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all nine in CI as regression tests.
+// all ten in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -385,6 +385,99 @@ const SCENARIOS = [
       'workaround (verified against FjellCERT\u2019s signature), and 0.40 of a 0.50 USDC intel ' +
       'budget committed — all decided before a single byte was loaded. Paste either plan into ' +
       'the postmortem: it IS the audit trail.',
+  },
+  {
+    id: 'leash',
+    title: 'The Borrowed Leash — any MCP agent gets the same gates',
+    useCase:
+      'kcp-agent is also an MCP server: `kcp-agent mcp` speaks JSON-RPC 2.0 over stdio — no ' +
+      'SDK, no API key. Here a scripted foreign client (standing in for Claude Code, an IDE, ' +
+      'any MCP-capable agent) replays the 03:00 incident over the wire: unprovisioned, then ' +
+      'provisioned, then hands the returned artifact to kcp_replay for cross-examination — ' +
+      'and finally tampers with it. The borrowing agent does not have to be deterministic; ' +
+      'it just has to ask someone who is.',
+    run() {
+      const TASK = 'quaymaster broker zero-day active exploitation - what do we do right now?';
+      const HUB = path.join(INCIDENT, 'nordlys');
+      const rpc = (id, method, params) => ({ jsonrpc: '2.0', id, method, params });
+      const toolCall = (id, name, args) => rpc(id, 'tools/call', { name, arguments: args });
+      // One MCP session: newline-delimited requests in, newline-delimited responses out.
+      const session = (requests) => {
+        const r = spawnSync('node', [CLI, 'mcp'], {
+          encoding: 'utf8',
+          input: requests.map((m) => JSON.stringify(m)).join('\n') + '\n',
+        });
+        const byId = new Map();
+        for (const line of r.stdout.split('\n')) {
+          if (line.trim()) { const msg = JSON.parse(line); byId.set(msg.id, msg); }
+        }
+        return byId;
+      };
+      const text = (byId, id) => byId.get(id).result.content[0].text;
+
+      const base = { task: TASK, manifest: HUB, follow: true };
+      const first = session([
+        rpc(0, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'borrowed-leash', version: '1.0.0' } }),
+        { jsonrpc: '2.0', method: 'notifications/initialized' },
+        rpc(1, 'tools/list'),
+        toolCall(2, 'kcp_plan', { ...base, as_of: '2026-07-08' }),
+        toolCall(3, 'kcp_plan', {
+          ...base, as_of: '2026-07-09',
+          attest: 'soc.nordlys.example', credentials: ['mtls'], methods: ['free', 'x402'], budget: 0.5,
+        }),
+      ]);
+      const info = first.get(0).result.serverInfo;
+      const tools = first.get(1).result.tools.map((t) => t.name);
+      const cold = JSON.parse(text(first, 2));
+      const warm = JSON.parse(text(first, 3));
+
+      const allPlans = (n) => (n.plan ? [n.plan, ...(n.children ?? []).flatMap(allPlans)] : []);
+      const findUnit = (tree, uid) => allPlans(tree).flatMap((p) => p.selected).find((u) => u.id === uid);
+      const coldRunbook = findUnit(cold, 'incident-runbook');
+      const warmRunbook = findUnit(warm, 'incident-runbook');
+      const warmBudget = allPlans(warm).map((p) => p.budget).find((b) => b && b.projectedSpend > 0);
+
+      // A second, later session cross-examines the artifact — and a tampered copy.
+      const tampered = JSON.parse(text(first, 3));
+      const ledger = allPlans(tampered).map((p) => p.budget).find((b) => b && b.projectedSpend > 0);
+      ledger.projectedSpend = 0; // the borrowing agent claims it spent nothing
+      const second = session([
+        rpc(0, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'borrowed-leash', version: '1.0.0' } }),
+        { jsonrpc: '2.0', method: 'notifications/initialized' },
+        toolCall(1, 'kcp_replay', { artifact: text(first, 3) }),
+        toolCall(2, 'kcp_replay', { artifact: tampered }),
+      ]);
+      const verified = JSON.parse(text(second, 1));
+      const caught = JSON.parse(text(second, 2));
+      const checkLine = (chk) =>
+        (chk.status === 'identical' ? c.green(`  ✓ ${chk.project}: ${chk.status}`) : c.yellow(`  ✗ ${chk.project}: ${chk.status} — ${chk.detail}`));
+
+      return { blocks: [
+        { command: 'kcp-agent mcp   # a foreign agent connects over stdio', lines: [
+          `server: ${info.name} ${info.version} · tools: ${tools.join(', ')}`,
+        ]},
+        { command: 'tools/call kcp_plan {as_of: 2026-07-08}   # 03:00 — the borrowing agent is unprovisioned', lines: [
+          `  ${mark(coldRunbook.loadEligible)} incident-runbook — ${coldRunbook.reasons.filter((s) => s.includes('attestation') || s.includes('credentials')).join('; ')}`,
+        ]},
+        { command: 'tools/call kcp_plan {as_of: 2026-07-09, attest, credentials: [mtls], methods: [free,x402], budget: 0.5}', lines: [
+          `  ${mark(warmRunbook.loadEligible)} incident-runbook — gates open, same reasons ledger`,
+          c.bold(`  committed ${warmBudget.projectedSpend}/${warmBudget.ceiling} ${warmBudget.currency}`) + c.dim(` · ${warmBudget.remaining} remaining`),
+        ]},
+        { command: 'tools/call kcp_replay {artifact}   # a second session, later — cross-examination', lines: [
+          ...verified.checks.map(checkLine),
+          c.bold(`  ok: ${verified.ok}`),
+        ]},
+        { command: 'tools/call kcp_replay {artifact*}   # * the client zeroed its own spend ledger', lines: [
+          ...caught.checks.filter((chk) => chk.status !== 'identical').map(checkLine),
+          c.bold(`  ok: ${caught.ok}`),
+        ]},
+      ] };
+    },
+    verdict:
+      'Four manifests planned, gated and budgeted across a process boundary: any MCP client ' +
+      'gets the same attestation gates, skip reasons and spend ledger as the CLI — and the ' +
+      'artifact it gets back can be cross-examined later by kcp_replay, which catches both ' +
+      'drifted knowledge and a client that edits its own evidence. Determinism as a service.',
   },
   {
     id: 'dogfood',

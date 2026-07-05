@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { handleMessage, TOOLS, SERVER_INFO } from "../src/mcp.js";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 type Rpc = { jsonrpc: string; id: number | string | null; result?: any; error?: any };
 
@@ -17,10 +22,17 @@ describe("MCP server", () => {
     expect(await handleMessage({ jsonrpc: "2.0", method: "notifications/initialized" })).toBeNull();
   });
 
-  it("lists the three tools", async () => {
+  it("lists the four tools", async () => {
     const r = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" })) as Rpc;
-    expect(r.result.tools.map((t: { name: string }) => t.name)).toEqual(["kcp_plan", "kcp_load", "kcp_validate"]);
+    expect(r.result.tools.map((t: { name: string }) => t.name)).toEqual([
+      "kcp_plan", "kcp_load", "kcp_validate", "kcp_replay",
+    ]);
     for (const t of TOOLS) expect(t.inputSchema).toBeDefined();
+  });
+
+  it("SERVER_INFO.version matches package.json (release drift fails here, not in the field)", () => {
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
+    expect(SERVER_INFO.version).toBe(pkg.version);
   });
 
   it("kcp_plan returns a plan tree as JSON", async () => {
@@ -48,6 +60,56 @@ describe("MCP server", () => {
   it("tool errors are isError results, not protocol failures", async () => {
     const r = await call("kcp_plan", { task: "x", manifest: "does/not/exist" });
     expect(r.result.isError).toBe(true);
+  });
+
+  it("capability args reach the planner: attestation + credential gates answer over MCP", async () => {
+    const base = {
+      task: "quaymaster broker zero-day active exploitation - what do we do right now?",
+      manifest: "examples/incident/nordlys",
+    };
+    const runbook = (tree: any) =>
+      tree.plan.selected.find((u: { id: string }) => u.id === "incident-runbook");
+
+    const cold = await call("kcp_plan", { ...base, as_of: "2026-07-08" });
+    const coldRunbook = runbook(JSON.parse(cold.result.content[0].text));
+    expect(coldRunbook.loadEligible).toBe(false);
+    expect(coldRunbook.reasons).toContain("restricted: requires attestation the agent cannot present");
+
+    const warm = await call("kcp_plan", {
+      ...base,
+      as_of: "2026-07-09",
+      attest: "soc.nordlys.example",
+      credentials: ["mtls"],
+      methods: "free,x402", // CSV form — both list shapes are accepted
+      budget: 0.5,
+    });
+    expect(runbook(JSON.parse(warm.result.content[0].text)).loadEligible).toBe(true);
+  });
+
+  it("kcp_replay verifies a kcp_plan artifact and catches a tampered one", async () => {
+    const planned = await call("kcp_plan", {
+      task: "quaymaster broker zero-day active exploitation - what do we do right now?",
+      manifest: "examples/incident/nordlys",
+      as_of: "2026-07-09",
+      attest: "soc.nordlys.example",
+      credentials: ["mtls"],
+      methods: ["free", "x402"],
+      budget: 0.5,
+    });
+    const artifact = planned.result.content[0].text;
+
+    const ok = await call("kcp_replay", { artifact });
+    const report = JSON.parse(ok.result.content[0].text);
+    expect(report.ok).toBe(true);
+    expect(report.checks.every((c: { status: string }) => c.status === "identical")).toBe(true);
+
+    const tampered = JSON.parse(artifact);
+    tampered.plan.budget.projectedSpend = 9.9; // the borrowing agent edits the ledger
+    const caught = await call("kcp_replay", { artifact: tampered }); // object form is accepted too
+    const drift = JSON.parse(caught.result.content[0].text);
+    expect(drift.ok).toBe(false);
+    expect(drift.checks[0].status).toBe("drifted");
+    expect(drift.checks[0].fields).toContain("budget");
   });
 
   it("unknown methods get a JSON-RPC error", async () => {
