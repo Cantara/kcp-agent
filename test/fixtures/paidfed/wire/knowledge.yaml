@@ -1,0 +1,12 @@
+kcp_version: "0.25"
+project: paid-wire
+version: 1.0.0
+units:
+  - id: wire-story
+    path: wire.md
+    intent: "Feature: compute award wire coverage"
+    audience: [agent]
+    triggers: [compute, award]
+    payment:
+      methods:
+        - {type: x402, currency: USDC, price_per_request: "0.15"}

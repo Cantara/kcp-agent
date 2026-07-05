@@ -11,6 +11,7 @@ import { loadManifestText, parseManifest } from "./client.js";
 import { plan, type PlanOptions, type AgentPlan } from "./planner.js";
 import { verifyManifestText, resolveLocation, type SignatureResult, type VerifyOptions } from "./verify.js";
 import { resolve as resolvePath, isAbsolute } from "node:path";
+import { createHash } from "node:crypto";
 
 export interface FollowOptions {
   planOptions?: PlanOptions;
@@ -50,6 +51,11 @@ function normalize(location: string): string {
 export async function planTree(location: string, task: string, options: FollowOptions = {}): Promise<PlanNode> {
   const maxDepth = options.maxDepth ?? 0;
   const visited = new Set<string>();
+  const baseBudget = options.planOptions?.budget;
+  // Tree-wide budget ledger: spend committed by earlier nodes counts against
+  // every later node's ceiling — one --budget is one ceiling, not one per hop.
+  let committed = baseBudget?.spent ?? 0;
+  const round6 = (n: number): number => Number(n.toFixed(6));
 
   async function visit(loc: string, refId: string | undefined, depth: number): Promise<PlanNode> {
     const node: PlanNode = { refId, location: loc, notFollowed: [], children: [] };
@@ -85,7 +91,12 @@ export async function planTree(location: string, task: string, options: FollowOp
       }
     }
 
-    const p = plan(manifest, task, options.planOptions);
+    const planOptions: PlanOptions | undefined = baseBudget
+      ? { ...options.planOptions, budget: { ...baseBudget, ...(committed > 0 ? { spent: round6(committed) } : {}) } }
+      : options.planOptions;
+    const p = plan(manifest, task, planOptions);
+    if (baseBudget) committed = round6(committed + (p.budget.projectedSpend ?? 0));
+    p.manifest.sha256 = createHash("sha256").update(text, "utf8").digest("hex");
     p.signature = node.signature;
     node.plan = p;
 

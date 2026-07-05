@@ -67,3 +67,39 @@ describe("planTree", () => {
     expect(result.answer).toContain("nothing to answer from");
   });
 });
+
+describe("tree-wide budget ceiling", () => {
+  const PAID = "test/fixtures/paidfed/hub";
+  const CAPS = { capabilities: { role: "agent", paymentMethods: ["free", "x402"] } };
+
+  it("spend committed upstream counts against downstream manifests — one ceiling for the whole walk", async () => {
+    const tree = await planTree(PAID, "compute award coverage", {
+      maxDepth: 1,
+      planOptions: { ...CAPS, budget: { amount: 0.3 } },
+    });
+    const [hub, wire] = plans(tree);
+    // the hub buys its 0.25 exclusive…
+    expect(hub.selected.map((u) => u.id)).toContain("hub-story");
+    expect(hub.budget.projectedSpend).toBe(0.25);
+    // …so the wire's 0.15 story no longer fits the SAME 0.3 ceiling
+    const skip = wire.skipped.find((s) => s.id === "wire-story");
+    expect(skip?.reason).toBe("over budget: 0.15 would exceed remaining 0.05 of 0.3 USDC");
+    expect(wire.budget.alreadyCommitted).toBe(0.25);
+    expect(wire.budget.remaining).toBe(0.05);
+    // invariant: total projected spend across the tree never exceeds the ceiling
+    const total = plans(tree).reduce((s, p) => s + (p.budget.projectedSpend ?? 0), 0);
+    expect(total).toBeLessThanOrEqual(0.3);
+  });
+
+  it("a ceiling big enough for both is spent across both, with the ledger visible", async () => {
+    const tree = await planTree(PAID, "compute award coverage", {
+      maxDepth: 1,
+      planOptions: { ...CAPS, budget: { amount: 0.5 } },
+    });
+    const [hub, wire] = plans(tree);
+    expect(hub.selected.map((u) => u.id)).toContain("hub-story");
+    expect(wire.selected.map((u) => u.id)).toContain("wire-story");
+    expect(wire.budget.alreadyCommitted).toBe(0.25);
+    expect(wire.budget.remaining).toBe(0.1);
+  });
+});

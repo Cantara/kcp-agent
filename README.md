@@ -157,7 +157,7 @@ planning sensibly.
 | Flag | Meaning |
 |------|---------|
 | `--manifest <loc>` | path, directory, or HTTPS URL of a `knowledge.yaml` (required) |
-| `--env <name>` | runtime environment for federation `context` selection (`dev`/`test`/`staging`/`prod`) |
+| `--env <name>` | runtime environment for federation `context` selection (`dev`/`test`/`staging`/`prod`). Fail-closed: without it, context-tagged refs are never followed |
 | `--as-of <date>` | ISO date for temporal evaluation (default: today, UTC) |
 | `--max-units <n>` | cap on selected units (default 5) |
 | `--strict` | fail-closed: drop non-eligible units instead of listing them |
@@ -165,7 +165,7 @@ planning sensibly.
 | `--methods <list>` | payment methods the agent can settle, e.g. `free,x402` |
 | `--credentials <list>` | credential kinds the agent holds, e.g. `api_key,oauth2` |
 | `--attest <provider>` | attestation provider the agent can present |
-| `--budget <amount>` | spend ceiling for pay-per-request units — greedy by score, skips (with arithmetic) what would blow it |
+| `--budget <amount>` | spend ceiling for pay-per-request units — greedy by score, skips (with arithmetic) what would blow it. One ceiling for the whole federated walk, not per manifest |
 | `--currency <code>` | budget currency (default `USDC`) |
 | `--follow` | fetch and plan eligible federation refs too (fail-closed: gated/excluded refs are never fetched) |
 | `--max-depth <n>` | federation hops to follow (default 1; implies `--follow`) |
@@ -191,6 +191,19 @@ Errors are structural problems that mislead or fail an agent (duplicate ids, uns
 paths, `superseded_by` pointing nowhere, attestation requirements no agent can ever satisfy);
 warnings are declarations that weaken navigation (no triggers, expired units with no successor).
 Exit code 1 on errors — run it in the CI of any repo that publishes a manifest.
+
+### `replay` — re-verify a saved plan artifact
+
+```bash
+node dist/cli.js plan "task" --manifest . --json > plan.json
+node dist/cli.js replay plan.json       # exit 0 identical · exit 1 drifted
+```
+
+A `plan --json` artifact pins the manifest's sha256 and echoes every planner input. `replay`
+re-fetches each manifest (every node of a `--follow` tree), compares the bytes, re-runs the
+pure planner with the saved inputs, and reports **identical** or **drifted** — per manifest,
+with the fields that moved. A plan is evidence; replay is the cross-examination. Editing the
+artifact by hand is also drift: the recomputed plan won't match it.
 
 ### `mcp` — serve the planner to any MCP client
 

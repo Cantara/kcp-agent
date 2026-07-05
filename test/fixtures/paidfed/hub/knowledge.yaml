@@ -1,0 +1,16 @@
+kcp_version: "0.25"
+project: paid-hub
+version: 1.0.0
+units:
+  - id: hub-story
+    path: hub.md
+    intent: "Exclusive: the compute award decision"
+    audience: [agent]
+    triggers: [compute, award]
+    payment:
+      methods:
+        - {type: x402, currency: USDC, price_per_request: "0.25"}
+manifests:
+  - id: wire
+    url: "../wire/knowledge.yaml"
+    relationship: peer

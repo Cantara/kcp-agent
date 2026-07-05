@@ -4,6 +4,7 @@
 //   kcp-agent plan     "<task>" --manifest <path|dir|url> [options]   inspect the load plan (no API key)
 //   kcp-agent ask      "<task>" --manifest <path|dir|url> [options]   plan + answer via Claude
 //   kcp-agent validate <path|dir|url>                                 lint a knowledge.yaml
+//   kcp-agent replay   <plan.json>                                    re-verify a saved plan artifact (exit 1 on drift)
 //   kcp-agent mcp                                                     serve the planner over MCP stdio
 //
 // Options (plan/ask):
@@ -30,12 +31,14 @@
 //   --max-rounds <n>      max critique rounds for --loop (default 3)
 //   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
 
+import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
-import { formatPlan, formatPlanTree, formatValidation } from "./format.js";
+import { formatPlan, formatPlanTree, formatValidation, formatReplay } from "./format.js";
 import { synthesize, type SynthesisResult } from "./synthesize.js";
 import { askLoop } from "./loop.js";
 import { validateLocation } from "./validate.js";
+import { replayArtifact } from "./replay.js";
 import { serveMcp } from "./mcp.js";
 
 interface Args {
@@ -133,6 +136,7 @@ const USAGE =
   '  kcp-agent plan     "<task>" --manifest <path|dir|url> [options]\n' +
   '  kcp-agent ask      "<task>" --manifest <path|dir|url> [options]\n' +
   '  kcp-agent validate <path|dir|url> [--json]\n' +
+  '  kcp-agent replay   <plan.json> [--json]\n' +
   '  kcp-agent mcp\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
@@ -154,6 +158,15 @@ async function main() {
     if (!location) { console.error("Missing manifest location.\n\n" + USAGE); process.exit(2); }
     const report = await validateLocation(location);
     console.log(a.json ? JSON.stringify(report, null, 2) : formatValidation(report));
+    process.exit(report.ok ? 0 : 1);
+  }
+
+  if (a.command === "replay") {
+    const file = a.manifest ?? a.task;
+    if (!file) { console.error("Missing plan artifact path.\n\n" + USAGE); process.exit(2); }
+    const artifact = JSON.parse(readFileSync(file, "utf8"));
+    const report = await replayArtifact(artifact, file);
+    console.log(a.json ? JSON.stringify(report, null, 2) : formatReplay(report));
     process.exit(report.ok ? 0 : 1);
   }
 
