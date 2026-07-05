@@ -47,7 +47,7 @@ writeFileSync(
 const dest = path.join(ROOT, "docs", "examples");
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
-for (const ex of ["fjordwire", "vault", "incident"]) {
+for (const ex of ["fjordwire", "vault", "incident", "summer"]) {
   cpSync(path.join(ROOT, "examples", ex), path.join(dest, ex), { recursive: true });
 }
-console.log(`site built: docs/js/kcp-agent.js (sha256 ${sha256.slice(0, 12)}…) + docs/examples/{fjordwire,vault,incident}`);
+console.log(`site built: docs/js/kcp-agent.js (sha256 ${sha256.slice(0, 12)}…) + docs/examples/{fjordwire,vault,incident,summer}`);
