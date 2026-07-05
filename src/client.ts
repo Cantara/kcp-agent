@@ -114,14 +114,29 @@ export function parseManifest(text: string, source?: string): Manifest {
   if (!isObj(raw)) throw new Error("manifest is not a YAML mapping");
   const trustRaw = isObj(raw["trust"]) ? raw["trust"] : undefined;
   const signingRaw = isObj(raw["signing"]) ? raw["signing"] : undefined;
-  const signing: Signing | undefined = signingRaw
+  let signing: Signing | undefined = signingRaw
     ? {
         scheme: asStr(signingRaw["scheme"]),
         scope: asStr(signingRaw["scope"]),
         public_key: asStr(signingRaw["public_key"]),
         signature: asStr(signingRaw["signature"]),
+        key_id: asStr(signingRaw["key_id"]),
       }
     : undefined;
+  // KCP ≤0.20 declared signing under trust.content_integrity with
+  // {signing: {algorithm, key_id, public_key}, signature_file}. Map it so a
+  // newer agent verifies old manifests instead of silently downgrading trust
+  // to "unsigned" — version skew must never fail open.
+  const ciRaw = trustRaw && isObj(trustRaw["content_integrity"]) ? trustRaw["content_integrity"] : undefined;
+  const ciSigningRaw = ciRaw && isObj(ciRaw["signing"]) ? ciRaw["signing"] : undefined;
+  if (!signing && ciRaw && ciSigningRaw) {
+    signing = {
+      scheme: asStr(ciSigningRaw["algorithm"]) ?? asStr(ciSigningRaw["scheme"]),
+      public_key: asStr(ciSigningRaw["public_key"]),
+      signature: asStr(ciRaw["signature_file"]) ?? asStr(ciSigningRaw["signature"]),
+      key_id: asStr(ciSigningRaw["key_id"]),
+    };
+  }
   const ar = trustRaw && isObj(trustRaw["agent_requirements"]) ? trustRaw["agent_requirements"] : undefined;
   return {
     project: String(raw["project"] ?? "(unnamed)"),

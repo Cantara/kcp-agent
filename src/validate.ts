@@ -8,6 +8,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { loadManifestText, parseManifest } from "./client.js";
+import { terms } from "./planner.js";
 import type { Manifest, Unit } from "./model.js";
 
 export interface Finding {
@@ -66,6 +67,7 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
       warn(where, `unknown access '${unit.access}' (expected public/authenticated/restricted)`);
     }
     validateTemporal(unit, where, findings);
+    validateNotFor(unit, where, findings);
     for (const m of unit.payment?.methods ?? []) {
       if (!m.type) err(where, "payment method missing 'type'");
       if (m.type === "x402" && (!m.price_per_request || !m.currency)) {
@@ -104,6 +106,35 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
   }
 
   return findings;
+}
+
+/**
+ * The self-sabotaging gate: at plan time a `not_for` entry gates the unit
+ * whenever any task term appears inside it. The most natural questions for a
+ * unit are phrased in the unit's own vocabulary — so a `not_for` written as a
+ * natural-language negation ("questions about non-AI software systems") that
+ * contains the unit's own intent/trigger terms deterministically locks the
+ * gate on exactly the audience the unit exists to serve. Found live in a
+ * production regulatory manifest; a machine can flag it at publish time.
+ */
+function validateNotFor(unit: Unit, where: string, findings: Finding[]) {
+  const notFor = unit.not_for ?? [];
+  if (notFor.length === 0) return;
+  const vocabulary = new Set<string>([...terms(unit.intent), ...unit.triggers.flatMap((t) => terms(t))]);
+  for (const nf of notFor) {
+    const entry = nf.toLowerCase();
+    const hits = [...vocabulary].filter((v) => entry.includes(v)).sort();
+    if (hits.length > 0) {
+      findings.push({
+        level: "warning",
+        where,
+        message:
+          `not_for '${nf}' contains the unit's own vocabulary (${hits.join(", ")}) — ` +
+          `term matching will gate this unit against its most natural questions; ` +
+          `name the excluded topic in its own words (e.g. "CCPA", "accounting"), never as a negation of this unit's topic ("non-X", "outside X")`,
+      });
+    }
+  }
 }
 
 function validateTemporal(unit: Unit, where: string, findings: Finding[]) {

@@ -86,16 +86,26 @@ export async function verifyManifestText(
   source: string | undefined,
   options: VerifyOptions = {}
 ): Promise<SignatureResult> {
-  if (!signing || !signing.signature) return { status: "unsigned", detail: "manifest declares no signature" };
+  if (!signing) return { status: "unsigned", detail: "manifest declares no signature" };
+  // A signing block without a locatable signature is a *declaration we cannot
+  // act on*, not an unsigned manifest — report it loudly so --require-signature
+  // and strict callers refuse instead of quietly downgrading trust (fail-closed).
+  if (!signing.signature) {
+    return {
+      status: "unverifiable",
+      detail: "manifest declares a signing block but no signature location — treating as unverified",
+      keyId: signing.key_id,
+    };
+  }
   if (signing.scheme && !/^(ed25519|eddsa)$/i.test(signing.scheme)) {
-    return { status: "unverifiable", detail: `unsupported signing scheme '${signing.scheme}'` };
+    return { status: "unverifiable", detail: `unsupported signing scheme '${signing.scheme}'`, keyId: signing.key_id };
   }
   const fetchText = options.fetchText ?? defaultFetchText;
 
   // Locate the signature (and possibly an embedded key + key id).
   let signatureMaterial: string;
   let embeddedKey: string | undefined;
-  let keyId: string | undefined;
+  let keyId: string | undefined = signing.key_id;
   try {
     const rawSig = looksInline(signing.signature)
       ? signing.signature
@@ -104,7 +114,7 @@ export async function verifyManifestText(
       const envelope = JSON.parse(rawSig) as Record<string, unknown>;
       signatureMaterial = String(envelope["signature"] ?? "");
       embeddedKey = envelope["public_key"] === undefined ? undefined : String(envelope["public_key"]);
-      keyId = envelope["key_id"] === undefined ? undefined : String(envelope["key_id"]);
+      keyId = envelope["key_id"] === undefined ? keyId : String(envelope["key_id"]);
       const alg = envelope["algorithm"] === undefined ? undefined : String(envelope["algorithm"]);
       if (alg && !/^(ed25519|eddsa)$/i.test(alg)) {
         return { status: "unverifiable", detail: `unsupported signature algorithm '${alg}'`, keyId };

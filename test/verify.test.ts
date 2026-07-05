@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { generateKeyPairSync, sign as edSign } from "node:crypto";
 import { verifyManifestText } from "../src/verify.js";
+import { parseManifest } from "../src/client.js";
 import type { Signing } from "../src/model.js";
 
 const MANIFEST_TEXT = `project: signed\nversion: 1.0.0\nunits: []\n`;
@@ -21,6 +22,12 @@ const files = (map: Record<string, string>) => async (loc: string) => {
   if (loc in map) return map[loc];
   throw new Error(`not found: ${loc}`);
 };
+
+// Separate keypair for the legacy-layout test so its manifest can embed the
+// public key inline (the key must exist before the manifest text is built).
+const legacyPair = generateKeyPairSync("ed25519");
+const legacyPrivateKey = legacyPair.privateKey;
+const legacyPublicKeyB64 = () => legacyPair.publicKey.export({ type: "spki", format: "der" }).toString("base64");
 
 describe("verifyManifestText", () => {
   it("reports unsigned when there is no signing block", async () => {
@@ -107,5 +114,39 @@ describe("verifyManifestText", () => {
     const signing: Signing = { scheme: "rsa-4096", signature: "sig" };
     const r = await verifyManifestText(MANIFEST_TEXT, signing, undefined, { fetchText: files({}) });
     expect(r.status).toBe("unverifiable");
+  });
+
+  it("reports unverifiable (not unsigned) for a signing block with no signature location", async () => {
+    // Fail-closed on version skew: a declared-but-unactionable signing block
+    // must not silently downgrade to "unsigned" — --require-signature must refuse.
+    const signing: Signing = { scheme: "ed25519", key_id: "totto@exoreaction.com" };
+    const r = await verifyManifestText(MANIFEST_TEXT, signing, undefined, { fetchText: files({}) });
+    expect(r.status).toBe("unverifiable");
+    expect(r.keyId).toBe("totto@exoreaction.com");
+  });
+
+  it("verifies a KCP ≤0.20 manifest signed under trust.content_integrity", async () => {
+    // The legacy layout: signing nested in trust.content_integrity with
+    // {algorithm, key_id, public_key} and a sibling signature_file.
+    const legacyText =
+      `project: legacy\n` +
+      `version: 1.0.0\n` +
+      `kcp_version: "0.20"\n` +
+      `units: []\n` +
+      `trust:\n` +
+      `  content_integrity:\n` +
+      `    signature_file: knowledge.yaml.sig\n` +
+      `    signing:\n` +
+      `      algorithm: EdDSA\n` +
+      `      key_id: legacy-key\n` +
+      `      public_key: ${legacyPublicKeyB64()}\n`;
+    const manifest = parseManifest(legacyText, "https://x.example/knowledge.yaml");
+    expect(manifest.signing?.signature).toBe("knowledge.yaml.sig");
+    const sig = edSign(null, Buffer.from(legacyText, "utf8"), legacyPrivateKey).toString("base64");
+    const r = await verifyManifestText(legacyText, manifest.signing, manifest.source, {
+      fetchText: files({ "https://x.example/knowledge.yaml.sig": sig }),
+    });
+    expect(r.status).toBe("verified");
+    expect(r.keyId).toBe("legacy-key");
   });
 });

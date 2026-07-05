@@ -80,6 +80,8 @@ export interface Signing {
   public_key?: string;
   /** URL of (or inline base64) detached signature over the manifest bytes. */
   signature?: string;
+  /** Publisher's key identifier, when the manifest declares one (KCP ≤0.20 trust.content_integrity). */
+  key_id?: string;
 }
 
 export interface TrustAgentRequirements {
