@@ -115,7 +115,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
+          # NB: no registry-url here — setup-node would write an .npmrc with a
+          # placeholder NODE_AUTH_TOKEN, which takes precedence over OIDC and
+          # makes npm fail the PUT with a masked E404. Trusted Publishing is
+          # auto-detected by npm >= 11.5.1 when no token is configured.
       - run: npm ci
       - run: npm run build
       - run: npm publish --provenance --access public
