@@ -1,0 +1,42 @@
+# FjellCERT — the national CERT (fictional). This manifest is SIGNED: the
+# `signing` block points at a detached ed25519 signature over the exact bytes
+# of this file, so an agent verifies provenance before planning against it.
+# Re-seal after editing:
+#
+#   node scripts/seal-example.mjs examples/incident/fjellcert/knowledge.yaml fjellcert-2026
+#
+# The two advisories are a live supersession pair (spec §4.22): the 03:00
+# interim mitigation declares the patch advisory as its successor. On the
+# handover day both are temporally valid — precedence picks the successor.
+
+kcp_version: "0.25"
+project: fjellcert-advisories
+version: 1.0.0
+updated: "2026-07-08"
+language: en
+
+trust:
+  provenance:
+    publisher: "FjellCERT — nasjonal responsfunksjon (example)"
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  signature: knowledge.yaml.sig
+
+units:
+  - id: advisory-mitigate
+    path: advisories/fc-2026-017.md
+    intent: "FC-2026-017: Quaymaster Broker zero-day under active exploitation — interim mitigation: disable the management listener"
+    scope: global
+    audience: [agent, human]
+    triggers: [quaymaster, broker, zero-day, mitigation, workaround, listener]
+    temporal: {valid_until: "2026-07-09", superseded_by: advisory-patch}
+
+  - id: advisory-patch
+    path: advisories/fc-2026-017-rev2.md
+    intent: "FC-2026-017 rev2: vendor patch 4.8.2 closes the Quaymaster Broker zero-day — patch now, then rotate broker credentials"
+    scope: global
+    audience: [agent, human]
+    triggers: [quaymaster, broker, zero-day, patch, upgrade, rotate]
+    temporal: {valid_from: "2026-07-09"}

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — eight narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — nine narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all eight in CI as regression tests.
+// all nine in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -26,6 +26,7 @@ const FJORDWIRE = path.join(EX, 'fjordwire');
 const VAULT = path.join(EX, 'vault');
 const ORG_HUB = path.join(EX, 'org', 'hub');
 const SEALED = path.join(EX, 'sealed');
+const INCIDENT = path.join(EX, 'incident');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -53,6 +54,7 @@ function agent(args) {
     .replaceAll(FJORDWIRE, 'examples/fjordwire')
     .replaceAll(VAULT, 'examples/vault')
     .replaceAll(ORG_HUB, 'examples/org/hub')
+    .replaceAll(INCIDENT, 'examples/incident')
     .replaceAll(ROOT, '.');
   return {
     stdout: stripAnsi((r.stdout || '').toString()).replaceAll(ROOT + path.sep, ''),
@@ -340,6 +342,49 @@ const SCENARIOS = [
       'unit never reaches the planner, so nothing downstream (scoring, budget, the LLM loop) ' +
       'ever sees it. --trusted-key pins the publisher key when envelope self-attestation is not ' +
       'enough; --require-signature refuses unsigned manifests outright.',
+  },
+  {
+    id: 'incident',
+    title: 'The 03:00 Page — a zero-day, four parties, one auditable plan',
+    useCase:
+      'A zero-day in Quaymaster Broker is being exploited and the pager goes off at 03:00. ' +
+      'The on-call agent starts from the internal Nordlys hub, which federates to the national ' +
+      'CERT (signed manifest), the vendor, and a paid intel feed where TLP:AMBER is a gate, ' +
+      'not a label. First an unprovisioned agent; then the responder with attestation, an mTLS ' +
+      'credential, x402 in hand, and a 0.50 USDC intel budget.',
+    run() {
+      const TASK = 'quaymaster broker zero-day active exploitation - what do we do right now?';
+      const HUB = path.join(INCIDENT, 'nordlys');
+      const cold = agent(['plan', TASK, '--manifest', HUB, '--follow', '--as-of', '2026-07-08']);
+      const warm = agent([
+        'plan', TASK, '--manifest', HUB, '--follow', '--as-of', '2026-07-09',
+        '--attest', 'soc.nordlys.example', '--credentials', 'mtls',
+        '--methods', 'free,x402', '--budget', '0.50',
+      ]);
+      return { blocks: [
+        { command: cold.command + '   # 03:00 — nothing provisioned', lines: [
+          'every closed gate carries a written reason:',
+          ...pick(cold.stdout, [
+            'federated:', '● ', '○ ', 'attestation required', 'not active until',
+            'requires attestation', 'unaffordable', 'holds no credentials', 'not_for',
+          ]).map((l) => '  ' + l.trim()),
+        ]},
+        { command: warm.command + '   # the provisioned responder', lines: [
+          'same hub, same question — attestation, credential, wallet, budget:',
+          ...pick(warm.stdout, [
+            'federated:', '● ', '○ ', 'attestation required', 'signature verified',
+            'superseded by', '0.4/0.5 USDC',
+          ]).map((l) => '  ' + l.trim()),
+        ]},
+      ] };
+    },
+    verdict:
+      'The unprovisioned agent still gets a plan — with attestation it cannot present, ' +
+      'credentials it does not hold, and intel it cannot pay for, each written down. The ' +
+      'responder gets the restricted runbook, the CERT advisory that superseded the 03:00 ' +
+      'workaround (verified against FjellCERT\u2019s signature), and 0.40 of a 0.50 USDC intel ' +
+      'budget committed — all decided before a single byte was loaded. Paste either plan into ' +
+      'the postmortem: it IS the audit trail.',
   },
   {
     id: 'dogfood',
