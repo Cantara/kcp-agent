@@ -38,8 +38,13 @@ export interface PlanOptions {
   maxUnits?: number;
   /** Fail-closed: gate any unit that is not load-eligible instead of listing it. */
   strict?: boolean;
-  /** Spend ceiling for pay-per-request units. Selection stays greedy by score; units that would blow the ceiling are skipped with the arithmetic. */
-  budget?: { amount: number; currency?: string };
+  /**
+   * Spend ceiling for pay-per-request units. Selection stays greedy by score;
+   * units that would blow the ceiling are skipped with the arithmetic.
+   * `spent` is what upstream manifests in a federated walk already committed —
+   * the ceiling is tree-wide, not per manifest.
+   */
+  budget?: { amount: number; currency?: string; spent?: number };
 }
 
 export interface PaymentPlan {
@@ -82,6 +87,8 @@ export interface BudgetPlan {
   /** Spend ceiling, when the agent planned with one. */
   ceiling?: number;
   currency?: string;
+  /** Spend already committed by upstream manifests in this federated walk (omitted when zero). */
+  alreadyCommitted?: number;
   /** Total per-request cost of the selected units. */
   projectedSpend?: number;
   remaining?: number;
@@ -90,10 +97,19 @@ export interface BudgetPlan {
 
 export interface AgentPlan {
   task: string;
-  manifest: { project: string; version: string; kcpVersion?: string; source?: string };
+  manifest: {
+    project: string;
+    version: string;
+    kcpVersion?: string;
+    source?: string;
+    /** sha256 of the exact manifest text — attached by the loading layer, so a saved plan pins the bytes it was computed from. */
+    sha256?: string;
+  };
   trust: { requiresAttestation: boolean; agentCanAttest: boolean; note: string };
   environment?: string;
   asOf: string;
+  /** The planner inputs echoed into the artifact — everything `kcp-agent replay` needs to recompute this plan. */
+  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number } };
   selected: PlannedUnit[];
   skipped: SkippedUnit[];
   federation: FederationPlan[];
@@ -112,7 +128,7 @@ const STOPWORDS = new Set([
 function terms(task: string): string[] {
   return task
     .toLowerCase()
-    .split(/[^a-z0-9]+/)
+    .split(/[^\p{L}\p{N}]+/u) // any-script letters/digits — "strømnett" is one term, not two fragments
     .filter((t) => t.length > 2 && !STOPWORDS.has(t));
 }
 
@@ -200,7 +216,7 @@ function planBudget(
   manifest: Manifest,
   caps: AgentCapabilities,
   selected: PlannedUnit[],
-  budget?: { amount: number; currency?: string }
+  budget?: { amount: number; currency?: string; spent?: number }
 ): BudgetPlan {
   const rl = manifest.rate_limits;
   let tier = "default";
@@ -217,15 +233,23 @@ function planBudget(
     loadable.reduce((sum, u) => sum + (u.payment.pricePerRequest ?? 0), 0)
   );
   const currency = budget?.currency ?? "USDC";
+  const spent = money(budget?.spent ?? 0);
+  const remaining = budget ? money(budget.amount - spent - projectedSpend) : undefined;
   return {
     rateTier: tier,
     requestsPerMinute: tierBlock?.requests_per_minute,
     perRequestCosts,
     ...(budget
-      ? { ceiling: budget.amount, currency, projectedSpend, remaining: money(budget.amount - projectedSpend) }
+      ? {
+          ceiling: budget.amount,
+          currency,
+          ...(spent > 0 ? { alreadyCommitted: spent } : {}),
+          projectedSpend,
+          remaining,
+        }
       : {}),
     note: budget
-      ? `projected spend ${projectedSpend} of ${budget.amount} ${currency}; ${money(budget.amount - projectedSpend)} remaining.`
+      ? `projected spend ${projectedSpend}${spent > 0 ? ` (+${spent} committed upstream)` : ""} of ${budget.amount} ${currency}; ${remaining} remaining.`
       : perRequestCosts.length > 0
         ? `${perRequestCosts.length} selected unit(s) are pay-per-request; budget before loading.`
         : "all selected units are free to load at the resolved tier.",
@@ -325,6 +349,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
   // unit may still fit (deterministic, explainable; no knapsack cleverness).
   const budget = options.budget;
   const budgetCurrency = budget?.currency ?? "USDC";
+  const upstreamSpent = budget?.spent ?? 0; // committed by earlier manifests in a federated walk — the ceiling is tree-wide
   let spend = 0;
   let beyondMax = 0;
   const capped: PlannedUnit[] = [];
@@ -336,10 +361,10 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
         skipped.push({ id: u.id, reason: `over budget: costs ${u.payment.cost}, budget is in ${budgetCurrency}` });
         continue;
       }
-      if (spend + price > budget.amount + 1e-9) {
+      if (upstreamSpent + spend + price > budget.amount + 1e-9) {
         skipped.push({
           id: u.id,
-          reason: `over budget: ${price} would exceed remaining ${money(budget.amount - spend)} of ${budget.amount} ${budgetCurrency}`,
+          reason: `over budget: ${price} would exceed remaining ${money(budget.amount - upstreamSpent - spend)} of ${budget.amount} ${budgetCurrency}`,
         });
         continue;
       }
@@ -351,16 +376,20 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     warnings.push(`${beyondMax} relevant unit(s) beyond maxUnits=${maxUnits} not selected`);
   }
 
-  // federation: select sub-manifests by env context, note credential planning
+  // federation: select sub-manifests by env context, note credential planning.
+  // Fail-closed: a context-tagged ref is only eligible when the agent declares
+  // an env it matches — no env declared means no context-tagged ref is followed.
   const federation = manifest.manifests.map((ref) => {
-    const inEnv = !ref.context || (options.env ? ref.context.includes(options.env) : true);
+    const inEnv = !ref.context || (options.env !== undefined && ref.context.includes(options.env));
     const ai = ref.agent_identity;
     let credentialNeeded: string | undefined;
     if (ai?.required && ai.credential_hint && !caps.credentials.includes(ai.credential_hint)) {
       credentialNeeded = ai.credential_hint;
     }
     const reason = !inEnv
-      ? `context ${JSON.stringify(ref.context)} excludes env '${options.env}'`
+      ? options.env !== undefined
+        ? `context ${JSON.stringify(ref.context)} excludes env '${options.env}'`
+        : `context ${JSON.stringify(ref.context)} requires a declared env; none given (fail-closed)`
       : credentialNeeded
         ? `needs ${credentialNeeded} before fetch`
         : "eligible";
@@ -383,6 +412,12 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     },
     environment: options.env,
     asOf,
+    options: {
+      capabilities: caps,
+      maxUnits,
+      strict: !!options.strict,
+      ...(budget ? { budget } : {}),
+    },
     selected: capped,
     skipped,
     federation,

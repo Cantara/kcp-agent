@@ -3,6 +3,7 @@
 import type { AgentPlan } from "./planner.js";
 import type { PlanNode } from "./follow.js";
 import type { ValidationReport } from "./validate.js";
+import type { ReplayReport } from "./replay.js";
 
 const useColor = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const c = {
@@ -125,6 +126,29 @@ export function formatPlanTree(node: PlanNode): string {
     for (const child of n.children) walk(child, depth + 1);
   };
   walk(node, 0);
+  return out.join("\n");
+}
+
+/** Render a replay report: per-manifest verdicts, then the single-line judgment. */
+export function formatReplay(r: ReplayReport): string {
+  const out: string[] = [];
+  out.push("");
+  out.push(c.bold(`Replay: ${r.artifact}`));
+  for (const ch of r.checks) {
+    const mark = ch.status === "identical" ? c.green("✓") : ch.status === "drifted" ? c.red("✗") : c.yellow("⚠");
+    out.push(`  ${mark} ${c.bold(ch.project)} ${c.dim(ch.source)}`);
+    out.push(
+      "     " +
+        (ch.status === "identical" ? c.dim(ch.detail) : ch.status === "drifted" ? c.red(`drifted: ${ch.detail}`) : c.yellow(`error: ${ch.detail}`))
+    );
+  }
+  out.push("");
+  out.push(
+    r.ok
+      ? c.green("✓ deterministic: every saved plan reproduced byte-identically")
+      : c.red("✗ drift detected — the saved artifact no longer matches the world")
+  );
+  out.push("");
   return out.join("\n");
 }
 

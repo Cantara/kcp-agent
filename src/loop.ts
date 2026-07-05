@@ -81,15 +81,19 @@ const DEFAULT_LOOP_MODEL = "claude-haiku-4-5";
 const DEFAULT_MAX_ROUNDS = 3;
 const DEFAULT_MAX_TERMS = 6;
 
-/** Sanitize one proposed term: lowercase words/short phrases only. */
-const TERM_RE = /^[a-z0-9][a-z0-9 -]{0,39}$/;
+/**
+ * Sanitize one proposed term: lowercase words/short phrases only. Letters and
+ * digits in any script — "strømnett" is vocabulary; `$(curl …)` is not. The
+ * gate passes only word-shaped strings, by construction.
+ */
+const TERM_RE = /^[\p{L}\p{N}][\p{L}\p{N} -]{0,39}$/u; // input is lowercased before the test
 
 /** The deterministic gate on critic output: sanitize, drop known vocabulary, dedupe, cap. */
 export function gateTerms(proposed: string[], alreadyKnown: string, maxTerms: number): {
   accepted: string[];
   rejected: string[];
 } {
-  const known = new Set(alreadyKnown.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const known = new Set(alreadyKnown.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean));
   const accepted: string[] = [];
   const rejected: string[] = [];
   const seen = new Set<string>();
@@ -97,7 +101,7 @@ export function gateTerms(proposed: string[], alreadyKnown: string, maxTerms: nu
     const t = String(raw).toLowerCase().trim().replace(/\s+/g, " ");
     if (!TERM_RE.test(t) || seen.has(t)) { rejected.push(String(raw)); continue; }
     seen.add(t);
-    const words = t.split(/[^a-z0-9]+/).filter(Boolean);
+    const words = t.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
     if (words.every((w) => known.has(w))) { rejected.push(String(raw)); continue; }
     if (accepted.length >= maxTerms) { rejected.push(String(raw)); continue; }
     accepted.push(t);

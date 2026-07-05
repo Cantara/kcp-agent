@@ -9,6 +9,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
+import { createHash } from "node:crypto";
 import type { AgentPlan } from "./planner.js";
 
 export interface SynthesisOptions {
@@ -23,6 +24,8 @@ export interface LoadedUnit {
   /** Project of the manifest the unit came from. */
   manifest: string;
   chars: number;
+  /** sha256 of the exact content bytes — the answer's citations are tied to these. */
+  sha256: string;
   content: string;
 }
 
@@ -65,6 +68,25 @@ export async function loadAnthropicSdk(): Promise<typeof import("@anthropic-ai/s
   }
 }
 
+const sha256 = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
+
+/** Escape a value for a `<unit>` attribute position. */
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+/**
+ * Neutralize unit-envelope forgeries in loaded content. A document containing
+ * `</unit>` followed by its own `<unit id="…">` could otherwise close the real
+ * envelope and impersonate another unit — forging the citation trail the
+ * synthesis is asked to keep. Escaping the tag sigil keeps the text readable
+ * to the model while making it unparseable as an envelope: the boundary holds
+ * by construction, not by detection.
+ */
+export function escapeUnitBoundaries(content: string): string {
+  return content.replace(/<(\/?)(unit)\b/gi, "&lt;$1$2");
+}
+
 /** Reject paths that could escape the manifest's directory or origin. */
 function unsafePath(path: string): boolean {
   return (
@@ -101,7 +123,7 @@ export async function loadPlannedUnits(plan: AgentPlan): Promise<{
         const res = await fetch(url);
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         const content = await res.text();
-        loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, content });
+        loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, sha256: sha256(content), content });
       } catch (e) {
         unavailable.push({ id: unit.id, path: unit.path, reason: `fetch failed: ${e instanceof Error ? e.message : String(e)}` });
       }
@@ -117,7 +139,7 @@ export async function loadPlannedUnits(plan: AgentPlan): Promise<{
       continue;
     }
     const content = readFileSync(abs, "utf8");
-    loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, content });
+    loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, sha256: sha256(content), content });
   }
   return { loaded, unavailable };
 }
@@ -151,7 +173,11 @@ export async function synthesize(planOrPlans: AgentPlan | AgentPlan[], options: 
   const Anthropic = await loadAnthropicSdk();
 
   const knowledge = loaded
-    .map((u) => `<unit id="${u.id}" path="${u.path}" manifest="${u.manifest}">\n${u.content}\n</unit>`)
+    .map(
+      (u) =>
+        `<unit id="${escapeAttr(u.id)}" path="${escapeAttr(u.path)}" manifest="${escapeAttr(u.manifest)}" sha256="${u.sha256}">\n` +
+        `${escapeUnitBoundaries(u.content)}\n</unit>`
+    )
     .join("\n\n");
 
   const client = new Anthropic();

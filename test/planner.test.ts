@@ -147,6 +147,28 @@ describe("plan()", () => {
     expect(fed["platform-dev"].selected).toBe(false);
   });
 
+  it("fails closed on context-tagged refs when the agent declares no env", () => {
+    const p = plan(m, "deploy", { capabilities: { role: "agent" } });
+    const fed = Object.fromEntries(p.federation.map((f) => [f.id, f]));
+    expect(fed["platform-prod"].selected).toBe(false);
+    expect(fed["platform-dev"].selected).toBe(false);
+    expect(fed["platform-prod"].reason).toContain("fail-closed");
+  });
+
+  it("context-free refs stay eligible without a declared env", () => {
+    const m2 = parseManifest(`
+project: p
+version: 1.0.0
+units: []
+manifests:
+  - id: open
+    url: "https://example.com/knowledge.yaml"
+`);
+    const p = plan(m2, "anything", {});
+    expect(p.federation[0].selected).toBe(true);
+    expect(p.federation[0].reason).toBe("eligible");
+  });
+
   it("resolves the rate-limit tier from agent credentials", () => {
     const anon = plan(m, "deploy", { capabilities: { role: "agent" } });
     expect(anon.budget.rateTier).toBe("default");
@@ -242,5 +264,63 @@ units:
 `);
     const p = plan(m2, "compute award", { asOf: "2026-07-05" });
     expect(p.selected.map((u) => u.id)).toContain("old");
+  });
+});
+
+// Red-team follow-ups: unicode vocabulary and the trigger-stuffing bound.
+
+describe("unicode task terms", () => {
+  const NORSK = parseManifest(`
+project: norsk
+version: 1.0.0
+units:
+  - id: omstilling
+    path: omstilling.md
+    intent: "Grønn omstilling av kraftnettet"
+    audience: [agent]
+    triggers: [grønn, kraftnett]
+`);
+
+  it("scores non-ASCII vocabulary as whole terms — 'grønn' matches, not its ASCII shards", () => {
+    const p = plan(NORSK, "grønn energi", {});
+    const hit = p.selected.find((u) => u.id === "omstilling");
+    expect(hit).toBeDefined();
+    expect(hit?.reasons.join(" ")).toMatch(/triggers match/);
+  });
+
+  it("a task in the publisher's language finds the intent too", () => {
+    const p = plan(NORSK, "omstilling av kraftnettet", {});
+    expect(p.selected[0]?.id).toBe("omstilling");
+  });
+});
+
+describe("trigger stuffing captures rank, never gates (characterization)", () => {
+  it("a stuffed restricted unit may outrank an honest one but stays load-ineligible", () => {
+    const m2 = parseManifest(`
+project: stuffing
+version: 1.0.0
+trust:
+  agent_requirements:
+    require_attestation: true
+    trusted_providers: [good.example]
+units:
+  - id: honest
+    path: honest.md
+    intent: "How to deploy a release"
+    audience: [agent]
+    triggers: [deploy]
+  - id: stuffed
+    path: stuffed.md
+    intent: "deploy deploy release release production rollout ship"
+    audience: [agent]
+    triggers: [deploy, release, production, rollout, ship, pipeline]
+    access: restricted
+`);
+    const p = plan(m2, "how to deploy a release to production", { capabilities: { role: "agent" } });
+    // Documented limitation: lexical stuffing can capture the *ranking*…
+    expect(p.selected[0]?.id).toBe("stuffed");
+    // …but score is not authority: every gate is indifferent to it.
+    expect(p.selected.find((u) => u.id === "stuffed")?.loadEligible).toBe(false);
+    expect(p.selected.find((u) => u.id === "honest")?.loadEligible).toBe(true);
   });
 });

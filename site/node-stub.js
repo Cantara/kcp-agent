@@ -22,6 +22,8 @@ export const isAbsolute = (p) => String(p).startsWith("/") || /^[A-Za-z]:[\\/]/.
 
 // node:crypto — the browser has WebCrypto natively
 export const webcrypto = globalThis.crypto;
+// createHash is only reached via planTree/loadPlannedUnits (I/O paths the site never calls)
+export const createHash = die("crypto.createHash");
 
 // node:readline (mcp.ts — never bundled, but keep the stub total)
 export const createInterface = die("readline.createInterface");

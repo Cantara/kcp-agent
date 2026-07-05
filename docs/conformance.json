@@ -93,6 +93,17 @@
       ]
     },
     {
+      "layer": "Deterministic replay (plan artifacts re-verify against live manifests)",
+      "section": "RFC-0019",
+      "where": "replay.ts · replayArtifact",
+      "impl": ["src/replay.ts", "src/follow.ts"],
+      "proofs": [
+        { "file": "test/replay.test.ts", "test": "replays every node of a --follow tree artifact" },
+        { "file": "test/replay.test.ts", "test": "detects manifest drift by sha256 before re-planning" },
+        { "file": "test/replay.test.ts", "test": "detects a tampered artifact even when the manifest bytes still match" }
+      ]
+    },
+    {
       "layer": "Discovery (knowledge.yaml from path, directory, URL)",
       "section": "§2",
       "where": "client.ts",
