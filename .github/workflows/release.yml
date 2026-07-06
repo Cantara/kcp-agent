@@ -30,12 +30,19 @@ jobs:
           ref: ${{ inputs.target }}
           fetch-depth: 0
 
+      # Idempotent: if the tag already exists (e.g. re-running to retry a failed
+      # npm publish after the tag + GitHub release already succeeded), skip
+      # creating it and carry on to build/release/publish.
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ inputs.version }}" -m "kcp-agent ${{ inputs.version }}"
-          git push origin "refs/tags/${{ inputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "::notice::tag ${{ inputs.version }} already exists — skipping tag creation, continuing to build/release/publish"
+          else
+            git tag -a "${{ inputs.version }}" -m "kcp-agent ${{ inputs.version }}"
+            git push origin "refs/tags/${{ inputs.version }}"
+          fi
 
       - uses: actions/setup-node@v4
         with:
