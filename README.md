@@ -481,6 +481,8 @@ Not yet consumed: dependency chains between units, `hints.load_strategy`, compli
   byte-free episodes; recall by task, verify by replay, reuse only while they hold.
 - [Cut context cost with session dedup](guides/cut-context-cost-with-dedup.md) — how an MCP
   caller passes `known` units to `kcp_load` and stops re-spending its context window.
+- [Build a conformant implementation](guides/build-a-conformant-implementation.md) — the planner
+  pipeline as a spec, and how to validate a second (e.g. Go) implementation against the vectors.
 
 ## License
 
