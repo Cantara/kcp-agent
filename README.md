@@ -114,11 +114,49 @@ The same loop is available as a library (`runLoop` / `askLoop`, with an injectab
 [`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
 portable skill for agents that drive the CLI themselves.
 
-### Demos — twelve scenarios, no mocks
+### `ask --ground` — verify the answer, surface what it can't substantiate
 
 ```bash
-node examples/demos.js            # all twelve, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · summer · milky-way · dogfood
+node dist/cli.js ask "who won, and what does it mean?" --manifest ./knowledge.yaml --ground
+```
+
+The plan's fail-closed gates decide what may be *loaded*; grounding extends the same discipline to
+what may be *asserted*. After synthesis, each claim in the answer is checked by a **separate
+verifier** — a distinct model call from the generator — that must attribute the claim to one of the
+loaded units or return nothing. The result is a two-part artifact:
+
+```
+Grounded (2/3 claims):
+  ● The award went to the Nordic bid.
+     ↳ chipfab-exclusive · sha 9f2c1a0b7e34
+Unsubstantiated (1): — could not be grounded in a loaded unit
+  ○ The datacenter runs on hydro power.
+     no loaded unit supports this claim
+⚠ partial-unsupported — 1 claim(s) could not be substantiated
+```
+
+A claim grounds **only** if the cited unit was actually loaded and its content hash matches — so a
+verifier that mis-attributes (or is prompt-injected into) citing a unit that was never loaded can
+never ground a claim: attribution is a proposal, grounding is adjudicated. Unsupported claims are
+**surfaced, never silently dropped** — the honest half of "every decision defensible". Each surfaced
+gap is also a signal to the *publisher*: the task needed evidence the manifest didn't provide. The
+surfaced list is capped to guard against a compromised generator flooding it with spurious gaps.
+
+**`--ground-rounds <n>`** closes the loop: a surfaced gap seeds reformulation terms, the agent
+re-navigates to try to find the missing evidence, and re-grounds — up to `n` rounds. Termination is
+guaranteed by three independent bounds, any one of which halts: the term gate is **absorbing** (a
+term accepted once is known forever, so re-navigation can only add units from the finite eligible
+set), the **round cap**, and a **progress guard** (a round that adds no new unit halts). Oscillation
+is impossible — the loaded set grows monotonically or the loop stops. Every terminal state that
+isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) still **surfaces** the
+remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
+can never cross a gate, name a URL, or spend past the budget.
+
+### Demos — thirteen scenarios, no mocks
+
+```bash
+node examples/demos.js            # all thirteen, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -130,6 +168,7 @@ node examples/demos.js vault      # one at a time
 | **The Org** | federation `context` slices by env; `agent_identity` plans credentials pre-fetch | §3.6 |
 | **The Audit** | two `--json` plans diffed: exactly which gate a capability flip moves, and its price | — |
 | **The Loop** | the audited critique loop with a scripted critic: injection bounces, terms re-plan, budget holds | — |
+| **The Grounding** | `ask --ground`: a claim citing an unloaded unit fails closed; the closed loop re-navigates and grounds it against real bytes | — |
 | **The 03:00 Page** | a zero-day across four federated parties — attestation, a signed CERT, supersession, TLP:AMBER as an enforced gate, an intel budget ([`examples/incident/`](examples/incident/)) | all of it |
 | **The Borrowed Leash** | a scripted foreign MCP client replans the incident over stdio — same gates, same ledger — then `kcp_replay` catches its falsified artifact | — |
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
@@ -138,7 +177,7 @@ node examples/demos.js vault      # one at a time
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all twelve in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all thirteen in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
@@ -182,6 +221,9 @@ planning sensibly.
 | `--loop` | (`ask`) audited critique loop: plan → LLM gap critique → term gate → re-plan |
 | `--max-rounds <n>` | (`ask --loop`) max critique rounds (default 3) |
 | `--loop-model <id>` | (`ask --loop`) critic model — default `claude-haiku-4-5` |
+| `--ground` | (`ask`) verify each answer claim against a loaded unit; surface unsubstantiated ones |
+| `--ground-model <id>` | (`ask --ground`) verifier model — default `claude-haiku-4-5` |
+| `--ground-rounds <n>` | (`ask`) closed-loop grounding: a surfaced gap re-navigates for evidence (default 0) |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.

@@ -11,3 +11,5 @@ export { formatPlan } from "../src/format.js";
 export { gateTerms } from "../src/loop.js";
 export { validateManifest } from "../src/validate.js";
 export type { Finding, ValidationReport } from "../src/validate.js";
+export { groundAnswer, splitClaims } from "../src/ground.js";
+export type { GroundUnit, GroundedAnswer, Verifier } from "../src/ground.js";

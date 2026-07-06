@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — twelve narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — thirteen narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all twelve in CI as regression tests.
+// all thirteen in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -301,6 +301,77 @@ const SCENARIOS = [
       'and found the infrastructure units; the budget then re-allocated the spend — the newly ' +
       'discovered, better-scoring coverage fit and the 0.25 exclusive was skipped with the ' +
       'arithmetic. Every round is a recorded plan artifact: the chain IS the audit log.',
+  },
+  {
+    id: 'grounding',
+    title: 'The Grounding — the answer is defensible, or the gap is surfaced',
+    useCase:
+      'ask --ground extends the plan\'s fail-closed gates to the OUTPUT: each answer claim must be ' +
+      'attributed to a loaded, hash-pinned unit or it is surfaced as a gap — never silently dropped. ' +
+      '--ground-rounds closes the loop: a gap seeds terms, the agent re-navigates for the missing ' +
+      'evidence, and re-grounds. The units, their sha256, and the re-planning are REAL; the answer ' +
+      'and the verifier are scripted through the same injectable seam the tests use, so this runs ' +
+      'offline. Live, a fast Claude verifier does the attribution.',
+    async run() {
+      const { planTree, plans } = await import(pathToFileURL(path.join(ROOT, 'dist', 'follow.js')).href);
+      const { loadPlannedUnits } = await import(pathToFileURL(path.join(ROOT, 'dist', 'synthesize.js')).href);
+      const { groundAnswer } = await import(pathToFileURL(path.join(ROOT, 'dist', 'ground.js')).href);
+      const { groundingLoop } = await import(pathToFileURL(path.join(ROOT, 'dist', 'groundloop.js')).href);
+
+      const TASK = 'who won the exclusive story';
+      const opts = { planOptions: { asOf: '2026-07-06', capabilities: { role: 'agent', paymentMethods: ['free', 'x402'] } } };
+      // The generator's answer — scripted here; live it comes from synthesis.
+      const ANSWER = 'Nordfab AS won the exclusive award. Grid capacity in the compute regions is constrained.';
+      // Real navigation + real unit loading (content → real sha256); scripted answer.
+      const navigate = async (terms) => {
+        const expanded = terms.length ? `${TASK} ${terms.join(' ')}` : TASK;
+        const tree = await planTree(FJORDWIRE, expanded, opts);
+        const units = [];
+        for (const p of plans(tree)) units.push(...(await loadPlannedUnits(p)).loaded);
+        return { units, answer: ANSWER };
+      };
+      // The verifier — a SEPARATE judgment from the generator; scripted offline.
+      // Note it *proposes* datacenter-power for the grid claim even before that
+      // unit is loaded — the deterministic layer adjudicates whether it may.
+      const verifier = async ({ claim }) =>
+        /nordfab|exclusive/i.test(claim) ? { supportedBy: 'chipfab-exclusive' }
+        : /grid|capacity|constrain/i.test(claim) ? { supportedBy: 'datacenter-power', note: 'grid-capacity feed' }
+        : { supportedBy: null };
+
+      const base = await navigate([]);
+      const g0 = await groundAnswer(TASK, ANSWER, base.units, { verifier });
+      const r = await groundingLoop({ task: TASK, navigate, verifier, maxRounds: 2 });
+      const gridClaim = r.final.grounded.find((cl) => /grid/i.test(cl.claim));
+      const round1 = r.rounds[1];
+
+      const lines = [
+        `base plan loads: ${base.units.map((u) => u.id).join(', ')}`,
+        '',
+        c.bold('terminal grounding of the answer:'),
+        ...g0.claims.map((cl) =>
+          cl.grounded
+            ? c.green(`  ● ${cl.claim}`) + c.dim(`  ↳ ${cl.unitId} · sha ${cl.sha256.slice(0, 12)}`)
+            : c.yellow(`  ○ ${cl.claim}`) + c.dim(`  ↳ ${cl.reason}`)),
+        '',
+        `ground round 1 — gap seeded terms: ${round1.seededTerms.join(', ')}`,
+        `  re-navigation loaded: ${round1.addedUnitIds.join(', ')}`,
+        c.green(`  grid claim now grounds: ${gridClaim.unitId} · sha ${gridClaim.sha256.slice(0, 12)}`),
+        '',
+        c.bold(`status: ${r.status}`) + c.dim(' — every claim backed by a loaded, hash-pinned unit'),
+      ];
+      return { blocks: [{
+        command:
+          'kcp-agent ask "who won the exclusive story" --manifest examples/fjordwire ' +
+          '--ground-rounds 2 --methods free,x402   # verifier scripted here — offline',
+        lines,
+      }] };
+    },
+    verdict:
+      'The grid claim cited datacenter-power, but that unit was not loaded — so grounding refused it: ' +
+      'attribution is a proposal, grounding is adjudicated, and a verifier can never ground a claim ' +
+      'against a unit that was not actually loaded. The gap was SURFACED, then the closed loop seeded ' +
+      'terms, re-navigated, loaded the real feed, and grounded the claim against its real bytes. ' +
+      'An answer that can\'t be substantiated says so; one that can carries its receipts.',
   },
   {
     id: 'seal',

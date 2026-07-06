@@ -61,6 +61,29 @@
       ]
     },
     {
+      "layer": "Answer grounding — every asserted claim pinned to a loaded unit, or surfaced as a gap",
+      "section": "hardening",
+      "where": "ground.ts · groundAnswer",
+      "impl": ["src/ground.ts"],
+      "proofs": [
+        { "file": "test/ground.test.ts", "test": "FAIL-CLOSED: a verifier that cites a unit which was not loaded cannot ground the claim" },
+        { "file": "test/ground.test.ts", "test": "surfaces an unsupported claim as an explicit gap — never silently drops it" },
+        { "file": "test/ground.test.ts", "test": "caps surfaced gaps to guard against gap-flooding, and reports the truncation" }
+      ]
+    },
+    {
+      "layer": "Closed-loop grounding — a gap re-navigates for evidence, with a bounded convergence proof",
+      "section": "hardening",
+      "where": "groundloop.ts · groundingLoop",
+      "impl": ["src/groundloop.ts"],
+      "proofs": [
+        { "file": "test/groundloop.test.ts", "test": "progress guard: a round that adds no new unit halts instead of spinning" },
+        { "file": "test/groundloop.test.ts", "test": "absorbing gate: a term seeded in one round is never seeded again" },
+        { "file": "test/groundloop.test.ts", "test": "gate-dry: when every gap term is already in the task, it halts WITHOUT re-navigating" },
+        { "file": "test/groundloop.test.ts", "test": "budget-blocked with no new units is reported as partial-budget, distinctly" }
+      ]
+    },
+    {
       "layer": "Network boundary — SSRF, fan-out, and response-size guards on every remote fetch",
       "section": "hardening",
       "where": "fetch.ts + follow.ts",

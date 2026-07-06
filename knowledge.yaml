@@ -8,7 +8,7 @@
 
 kcp_version: "0.25"
 project: kcp-agent
-version: 0.6.0
+version: 0.7.0
 updated: "2026-07-06"
 language: en
 
@@ -95,10 +95,24 @@ units:
 
   - id: mcp-server
     path: src/mcp.ts
-    intent: "How the planner is served to MCP clients over stdio — kcp_plan, kcp_load, kcp_validate tools"
+    intent: "How the planner is served to MCP clients over stdio — kcp_plan, kcp_load, kcp_validate, kcp_replay tools"
     scope: project
     audience: [agent, developer]
     triggers: [mcp, server, tools, stdio, json-rpc]
+
+  - id: answer-grounding
+    path: src/ground.ts
+    intent: "How each answer claim is grounded — attributed to a loaded, hash-pinned unit by a separate verifier, or surfaced as a gap; fail-closed on a citation to a unit that was not loaded"
+    scope: project
+    audience: [agent, developer]
+    triggers: [ground, grounding, claim, verifier, citation, gap, unsubstantiated]
+
+  - id: grounding-loop
+    path: src/groundloop.ts
+    intent: "How closed-loop grounding re-navigates for missing evidence — absorbing term gate, round cap, progress guard; oscillation is impossible and gaps are always surfaced"
+    scope: project
+    audience: [agent, developer]
+    triggers: [ground rounds, closed loop, re-navigate, convergence, evidence]
 
   - id: demo-manifest
     path: examples/demo-hub/knowledge.yaml
@@ -123,7 +137,7 @@ units:
 
   - id: demo-suite
     path: examples/demos.js
-    intent: "Twelve narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, the signature seal, the incident page, the summer plan, the milky-way estate, dogfood — each CI-asserted"
+    intent: "Thirteen narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, answer grounding, the signature seal, the incident page, the summer plan, the milky-way estate, dogfood — each CI-asserted"
     scope: project
     audience: [agent, developer]
     triggers: [demos, scenarios, showcase, newsstand, vault, audit]

@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { plan as srcPlan } from "../src/planner.js";
 import { parseManifest as srcParse } from "../src/client.js";
 import { validateManifest as srcValidate } from "../src/validate.js";
+import { groundAnswer as srcGround } from "../src/ground.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BUNDLE = path.join(ROOT, "docs", "js", "kcp-agent.js");
@@ -21,6 +22,7 @@ let bundle: {
   gateTerms: (t: string[], k: string, m: number) => { accepted: string[]; rejected: string[] };
   formatPlan: (p: ReturnType<typeof srcPlan>) => string;
   validateManifest: typeof srcValidate;
+  groundAnswer: typeof import("../src/ground.js").groundAnswer;
 };
 
 beforeAll(async () => {
@@ -47,6 +49,17 @@ describe("site bundle — the arena's left pane is really the planner", () => {
     });
     const memo = p.selected.find((u) => u.id === "board-memo");
     expect(memo?.loadEligible).toBe(false);
+  });
+
+  it("the arena's grounding is the source groundAnswer — fail-closed on an unloaded citation", async () => {
+    const units = [{ id: "a", sha256: "sha-a", content: "Nordfab won the award" }];
+    // the verifier proposes a unit that was NOT loaded — the bundle must refuse it, like the source
+    const verifier = async () => ({ supportedBy: "ghost" });
+    const g = await bundle.groundAnswer("t", "A confident claim.", units, { verifier });
+    const src = await srcGround("t", "A confident claim.", units, { verifier });
+    expect(g).toEqual(src);
+    expect(g.status).toBe("partial-unsupported");
+    expect(g.gaps[0].reason).toMatch(/cited unit 'ghost' that was not loaded/);
   });
 
   it("the bundled term gate bounces injection like the source gate", () => {

@@ -168,6 +168,19 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toMatch(/● 1\. csrd-2026/);
   });
 
+  it("grounding: a claim citing an unloaded unit fails closed, then the loop re-navigates and grounds it", () => {
+    const out = demo("grounding");
+    expect(out).toContain("base plan loads: chipfab-exclusive");
+    // claim 1 grounds against the loaded, hash-pinned unit
+    expect(out).toMatch(/● Nordfab AS won the exclusive award\..*↳ chipfab-exclusive · sha /);
+    // claim 2 cites a unit that was not loaded — grounding refuses it (fail-closed)
+    expect(out).toContain("verifier cited unit 'datacenter-power' that was not loaded — fail-closed");
+    // the closed loop seeds terms from the gap and re-navigates to load the evidence
+    expect(out).toContain("re-navigation loaded: datacenter-power");
+    expect(out).toMatch(/grid claim now grounds: datacenter-power · sha /);
+    expect(out).toContain("status: grounded");
+  });
+
   it("dogfood: the repo manifest validates and routes to the planner source", () => {
     const out = demo("dogfood");
     expect(out).toContain("✓ valid");
