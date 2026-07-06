@@ -5,6 +5,7 @@ import type { PlanNode } from "./follow.js";
 import type { ValidationReport } from "./validate.js";
 import type { ReplayReport } from "./replay.js";
 import type { GroundedAnswer } from "./ground.js";
+import type { GroundedReplayReport } from "./replayground.js";
 
 const useColor = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const c = {
@@ -176,6 +177,34 @@ export function formatGrounded(g: GroundedAnswer): string {
     g.status === "grounded"
       ? c.green("✓ grounded — every claim is backed by a loaded, hash-pinned unit")
       : c.yellow(`⚠ partial-unsupported — ${g.gaps.length + g.gapsTruncated} claim(s) could not be substantiated`)
+  );
+  out.push("");
+  return out.join("\n");
+}
+
+/** Render a grounded-answer replay: per-claim re-verification, then the gap lifecycle. */
+export function formatGroundedReplay(r: GroundedReplayReport): string {
+  const out: string[] = [];
+  out.push("");
+  out.push(c.bold(`Replay (grounded answer): ${r.artifact}`));
+  for (const ch of r.claims) {
+    const mark = ch.status === "still-grounded" ? c.green("✓") : c.red("✗");
+    const label =
+      ch.status === "still-grounded" ? c.green(ch.status) : c.red(ch.status);
+    out.push(`  ${mark} ${label} ${c.bold(ch.unitId)} ${c.dim("· " + ch.claim)}`);
+    out.push(`     ${c.dim(ch.detail)}`);
+  }
+  for (const g of r.gaps) {
+    const mark = g.status === "gap-closes" ? c.green("↑") : c.dim("·");
+    const label = g.status === "gap-closes" ? c.green(g.status) : c.dim(g.status);
+    out.push(`  ${mark} ${label} ${c.dim(g.claim)}`);
+    out.push(`     ${c.dim(g.detail)}`);
+  }
+  out.push("");
+  out.push(
+    r.ok
+      ? c.green("✓ still grounded — every cited unit holds its pinned bytes")
+      : c.red("✗ stale — a cited unit drifted or is gone; re-run `ask --ground` against today's manifest")
   );
   out.push("");
   return out.join("\n");

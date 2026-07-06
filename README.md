@@ -224,6 +224,7 @@ planning sensibly.
 | `--ground` | (`ask`) verify each answer claim against a loaded unit; surface unsubstantiated ones |
 | `--ground-model <id>` | (`ask --ground`) verifier model — default `claude-haiku-4-5` |
 | `--ground-rounds <n>` | (`ask`) closed-loop grounding: a surfaced gap re-navigates for evidence (default 0) |
+| `--check-gaps` | (`replay`) re-navigate today's manifest to see if a grounded answer's surfaced gap now closes |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.
@@ -239,7 +240,7 @@ paths, `superseded_by` pointing nowhere, attestation requirements no agent can e
 warnings are declarations that weaken navigation (no triggers, expired units with no successor).
 Exit code 1 on errors — run it in the CI of any repo that publishes a manifest.
 
-### `replay` — re-verify a saved plan artifact
+### `replay` — re-verify a saved plan or grounded answer
 
 ```bash
 node dist/cli.js plan "task" --manifest . --json > plan.json
@@ -251,6 +252,14 @@ re-fetches each manifest (every node of a `--follow` tree), compares the bytes, 
 pure planner with the saved inputs, and reports **identical** or **drifted** — per manifest,
 with the fields that moved. A plan is evidence; replay is the cross-examination. Editing the
 artifact by hand is also drift: the recomputed plan won't match it.
+
+`replay` auto-detects a **grounded-answer** artifact (from `ask --ground --json`) and
+cross-examines it claim-by-claim instead: each grounded claim's cited unit is re-read and its
+`sha256` re-compared to the pinned one — **still-grounded**, **drifted** (bytes changed), or
+**gone** (unit removed) — exit 1 if any citation no longer holds, because a stale answer must
+not read as verified. With `--check-gaps` it re-navigates today's manifest to see whether a
+previously-surfaced gap now **closes** (the manifest grew the missing evidence since the answer)
+— gaps have a lifecycle, and a memory is a plan you can re-verify against a moved world.
 
 ### `mcp` — serve the planner to any MCP client
 
