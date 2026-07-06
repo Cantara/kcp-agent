@@ -172,6 +172,8 @@ planning sensibly.
 | `--currency <code>` | budget currency (default `USDC`) |
 | `--follow` | fetch and plan eligible federation refs too (fail-closed: gated/excluded refs are never fetched) |
 | `--max-depth <n>` | federation hops to follow (default 1; implies `--follow`) |
+| `--max-nodes <n>` | cap on total manifests fetched across the whole walk (default 64; fail-closed fan-out ceiling) |
+| `--allow-private-hosts` | permit fetches to loopback/private/link-local hosts and `http://` — off by default (blocks SSRF into internal/metadata addresses) |
 | `--no-verify` | skip manifest signature verification |
 | `--require-signature` | fail unless every manifest has a *verified* signature |
 | `--trust-key <loc>` | pinned ed25519 public key (path, URL, or inline) for verification |
@@ -235,6 +237,23 @@ an **invalid** signature always fails closed; an **unverifiable** one (key unrea
 warning unless `--require-signature`. Supported: JSON signature envelopes
 (`{algorithm, public_key, signature}`), raw base64/hex signatures, and PEM / SPKI-DER / raw-32-byte
 keys. Pin a publisher key with `--trust-key` so the manifest can't attest for itself.
+
+## The network boundary
+
+A manifest is untrusted input that *chooses* URLs the agent then fetches — federation refs,
+signature and key locations, remote unit content. Every remote read funnels through one guarded
+fetch (`src/fetch.ts`), fail-closed by default:
+
+- **SSRF / confused deputy** — `https://` only for remote; loopback, private, link-local, and
+  cloud-metadata addresses (e.g. `169.254.169.254`) are refused. Hostnames are DNS-resolved and
+  every address checked; redirects are followed manually so a public host can't bounce the agent
+  into a private one. `--allow-private-hosts` opts in for local/internal manifests.
+- **Fan-out** — depth and cycles were already bounded; `--max-nodes` (default 64) now caps the
+  *total* manifests a single `--follow` will fetch, so one hostile hub can't fan out to millions.
+- **Response size** — every read is streamed against an 8 MiB ceiling and aborted past it, with a
+  whole-exchange timeout, so a hostile endpoint can't exhaust memory.
+
+Over MCP the guard is on by default — a foreign client is exactly the untrusted-caller case.
 
 ## Writing triggers agents can find
 

@@ -10,19 +10,27 @@
 import { loadManifestText, parseManifest } from "./client.js";
 import { plan, type PlanOptions, type AgentPlan } from "./planner.js";
 import { verifyManifestText, resolveLocation, type SignatureResult, type VerifyOptions } from "./verify.js";
+import type { FetchGuard } from "./fetch.js";
 import { resolve as resolvePath, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
+
+/** Default ceiling on the total manifests fetched across a whole federated walk. */
+export const DEFAULT_MAX_NODES = 64;
 
 export interface FollowOptions {
   planOptions?: PlanOptions;
   /** Federation hops beyond the root manifest (0 = don't follow). */
   maxDepth?: number;
+  /** Total manifests fetched across the whole walk (root + every hop). Default 64. */
+  maxNodes?: number;
   /** Skip signature verification entirely. */
   noVerify?: boolean;
   /** Fail-closed unless every fetched manifest has a *verified* signature. */
   requireSignature?: boolean;
   /** Pinned public key (path/URL/inline) for verification. */
   trustedKey?: string;
+  /** Guard applied to every remote fetch (manifests, signatures, keys). */
+  fetchGuard?: FetchGuard;
 }
 
 export interface NotFollowedRef {
@@ -50,7 +58,13 @@ function normalize(location: string): string {
 /** Plan a manifest and, up to maxDepth hops, its eligible federation. */
 export async function planTree(location: string, task: string, options: FollowOptions = {}): Promise<PlanNode> {
   const maxDepth = options.maxDepth ?? 0;
+  const maxNodes = options.maxNodes ?? DEFAULT_MAX_NODES;
+  const fetchGuard = options.fetchGuard ?? {};
   const visited = new Set<string>();
+  // Total manifests fetched, tree-wide: depth and cycle detection bound the
+  // *shape* of the walk but not its breadth — one hostile hub can declare
+  // thousands of distinct refs. This is the fail-closed ceiling on fan-out.
+  let fetched = 0;
   const baseBudget = options.planOptions?.budget;
   // Tree-wide budget ledger: spend committed by earlier nodes counts against
   // every later node's ceiling — one --budget is one ceiling, not one per hop.
@@ -59,10 +73,11 @@ export async function planTree(location: string, task: string, options: FollowOp
 
   async function visit(loc: string, refId: string | undefined, depth: number): Promise<PlanNode> {
     const node: PlanNode = { refId, location: loc, notFollowed: [], children: [] };
+    fetched++;
     let text: string;
     let source: string;
     try {
-      ({ text, source } = await loadManifestText(loc));
+      ({ text, source } = await loadManifestText(loc, fetchGuard));
     } catch (e) {
       node.error = `fetch failed: ${e instanceof Error ? e.message : String(e)}`;
       return node;
@@ -79,7 +94,7 @@ export async function planTree(location: string, task: string, options: FollowOp
     }
 
     if (!options.noVerify) {
-      const verifyOpts: VerifyOptions = { trustedKey: options.trustedKey };
+      const verifyOpts: VerifyOptions = { trustedKey: options.trustedKey, fetchGuard };
       node.signature = await verifyManifestText(text, manifest.signing, source, verifyOpts);
       if (node.signature.status === "invalid") {
         node.error = `signature invalid: ${node.signature.detail}`;
@@ -116,6 +131,10 @@ export async function planTree(location: string, task: string, options: FollowOp
       const childLoc = resolveLocation(source, ref.url);
       if (visited.has(normalize(childLoc))) {
         node.notFollowed.push({ id: ref.id, url: ref.url, reason: "already visited (cycle)" });
+        continue;
+      }
+      if (fetched >= maxNodes) {
+        node.notFollowed.push({ id: ref.id, url: ref.url, reason: `beyond max nodes ${maxNodes} (fan-out cap)` });
         continue;
       }
       node.children.push(await visit(childLoc, ref.id, depth + 1));

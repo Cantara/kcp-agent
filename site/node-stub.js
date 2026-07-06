@@ -27,3 +27,13 @@ export const createHash = die("crypto.createHash");
 
 // node:readline (mcp.ts — never bundled, but keep the stub total)
 export const createInterface = die("readline.createInterface");
+
+// node:dns/promises + node:net (fetch.ts — reached only on remote I/O paths the
+// site never calls; isIP is a real impl so the guard's type checks stay honest)
+export const lookup = die("dns.lookup");
+export const isIP = (s) => {
+  const str = String(s);
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(str)) return 4;
+  if (str.includes(":")) return 6;
+  return 0;
+};

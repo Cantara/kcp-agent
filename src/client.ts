@@ -7,6 +7,7 @@
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
+import { guardedFetchText, type FetchGuard } from "./fetch.js";
 import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier, Signing } from "./model.js";
 
 type Raw = Record<string, unknown>;
@@ -161,11 +162,10 @@ export function parseManifest(text: string, source?: string): Manifest {
 }
 
 /** Resolve a location (file, directory, or HTTPS URL) to manifest text + source label. */
-export async function loadManifestText(location: string): Promise<{ text: string; source: string }> {
+export async function loadManifestText(location: string, fetchGuard: FetchGuard = {}): Promise<{ text: string; source: string }> {
   if (/^https?:\/\//.test(location)) {
-    const res = await fetch(location);
-    if (!res.ok) throw new Error(`failed to fetch manifest: ${res.status} ${res.statusText}`);
-    return { text: await res.text(), source: location };
+    const text = await guardedFetchText(location, fetchGuard);
+    return { text, source: location };
   }
   let path = location;
   if (existsSync(path) && statSync(path).isDirectory()) {
@@ -179,7 +179,7 @@ export async function loadManifestText(location: string): Promise<{ text: string
 }
 
 /** Load and parse a manifest from a path, directory, or URL. */
-export async function loadManifest(location: string): Promise<Manifest> {
-  const { text, source } = await loadManifestText(location);
+export async function loadManifest(location: string, fetchGuard: FetchGuard = {}): Promise<Manifest> {
+  const { text, source } = await loadManifestText(location, fetchGuard);
   return parseManifest(text, source);
 }

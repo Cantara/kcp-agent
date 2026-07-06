@@ -11,6 +11,7 @@
 import { createHash } from "node:crypto";
 import { loadManifestText, parseManifest } from "./client.js";
 import { plan, type AgentPlan } from "./planner.js";
+import type { FetchGuard } from "./fetch.js";
 
 export interface ReplayCheck {
   source: string;
@@ -61,7 +62,7 @@ function comparable(p: AgentPlan): Record<string, unknown> {
 }
 
 /** Replay every plan in a saved artifact against the live manifests. */
-export async function replayArtifact(artifactJson: unknown, artifactName = "plan.json"): Promise<ReplayReport> {
+export async function replayArtifact(artifactJson: unknown, artifactName = "plan.json", fetchGuard: FetchGuard = {}): Promise<ReplayReport> {
   const saved = collectSavedPlans(artifactJson);
   const checks: ReplayCheck[] = [];
 
@@ -83,7 +84,7 @@ export async function replayArtifact(artifactJson: unknown, artifactName = "plan
     let text: string;
     let resolvedSource: string;
     try {
-      ({ text, source: resolvedSource } = await loadManifestText(source));
+      ({ text, source: resolvedSource } = await loadManifestText(source, fetchGuard));
     } catch (e) {
       checks.push({ source, project, status: "error", detail: `fetch failed: ${e instanceof Error ? e.message : String(e)}` });
       continue;

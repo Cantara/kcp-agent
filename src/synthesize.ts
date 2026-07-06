@@ -10,12 +10,15 @@
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
+import { guardedFetchText, type FetchGuard } from "./fetch.js";
 import type { AgentPlan } from "./planner.js";
 
 export interface SynthesisOptions {
   /** Claude model id. Defaults to the current most-capable Opus. */
   model?: string;
   maxTokens?: number;
+  /** Guard applied to remote unit-content fetches. */
+  fetchGuard?: FetchGuard;
 }
 
 export interface LoadedUnit {
@@ -98,7 +101,7 @@ function unsafePath(path: string): boolean {
 }
 
 /** Load the content of a plan's load-eligible units — from disk, or over HTTPS for remote manifests. */
-export async function loadPlannedUnits(plan: AgentPlan): Promise<{
+export async function loadPlannedUnits(plan: AgentPlan, fetchGuard: FetchGuard = {}): Promise<{
   loaded: LoadedUnit[];
   unavailable: { id: string; path: string; reason: string }[];
 }> {
@@ -120,9 +123,7 @@ export async function loadPlannedUnits(plan: AgentPlan): Promise<{
     if (remoteBase) {
       try {
         const url = new URL(unit.path, remoteBase).toString();
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const content = await res.text();
+        const content = await guardedFetchText(url, fetchGuard);
         loaded.push({ id: unit.id, path: unit.path, manifest: plan.manifest.project, chars: content.length, sha256: sha256(content), content });
       } catch (e) {
         unavailable.push({ id: unit.id, path: unit.path, reason: `fetch failed: ${e instanceof Error ? e.message : String(e)}` });
@@ -155,7 +156,7 @@ export async function synthesize(planOrPlans: AgentPlan | AgentPlan[], options: 
   const loaded: LoadedUnit[] = [];
   const unavailable: { id: string; path: string; reason: string }[] = [];
   for (const p of allPlans) {
-    const r = await loadPlannedUnits(p);
+    const r = await loadPlannedUnits(p, options.fetchGuard);
     loaded.push(...r.loaded);
     unavailable.push(...r.unavailable);
   }
