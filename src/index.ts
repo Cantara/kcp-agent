@@ -58,6 +58,7 @@ export { planTree, plans, DEFAULT_MAX_NODES, type FollowOptions, type PlanNode, 
 export { verifyManifestText, resolveLocation, type SignatureResult, type SignatureStatus, type VerifyOptions } from "./verify.js";
 export {
   toEntry,
+  verifyEntry,
   inMemoryStore,
   fileStore,
   recall,

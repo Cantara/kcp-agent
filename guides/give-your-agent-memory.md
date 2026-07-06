@@ -83,8 +83,13 @@ and a run under different capabilities is a *different plan* — a miss, not a s
 
 - **Explicit, not ambient.** `--memory <dir>` is a declared input, like `--as-of` is for
   time. Memory never runs in the background and never becomes hidden state.
-- **Integrity is enforced, not assumed.** Entries are hash-addressed and reuse is
-  replay-gated. A forged or edited episode does not replay clean, so it cannot steer a plan.
+- **Integrity is enforced, not assumed.** Every entry is hash-addressed, and `recall`/`reuse`
+  re-derive that hash before using it — an episode edited in the store (answer swapped, citation
+  moved) no longer matches its id and is dropped, fail-closed. For grounded answers, reuse also
+  re-checks every citation against the live manifest, so even a self-consistent forgery drifts
+  the moment its fabricated `sha256` meets the real unit bytes. (Authenticity of *authorship* —
+  signing episodes so a foreign store can be trusted — is future work; today, treat a memory
+  directory as you would any local input you control.)
 - **Access is re-checked on recall.** Because bytes are stripped on ingest, recall and reuse
   re-read the units live, through the fetch guard — memory can never bypass the next access
   check.

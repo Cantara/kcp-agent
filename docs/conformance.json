@@ -95,6 +95,18 @@
       ]
     },
     {
+      "layer": "Memory red team — access-on-recall and poisoning fail closed (bytes stripped, integrity enforced, reuse capability-keyed, forgery caught by live replay)",
+      "section": "hardening",
+      "where": "memory.ts · verifyEntry + reuse.ts + session.ts",
+      "impl": ["src/memory.ts", "src/reuse.ts", "src/session.ts"],
+      "proofs": [
+        { "file": "test/memory-redteam.test.ts", "test": "does NOT reuse a credentialed answer for a request that lacks the credential" },
+        { "file": "test/memory-redteam.test.ts", "test": "kcp_load never returns a unit the caller lost access to, even when it declares it in `known`" },
+        { "file": "test/memory-redteam.test.ts", "test": "a tampered episode on disk is refused by recall and reuse, fail-closed" },
+        { "file": "test/memory-redteam.test.ts", "test": "even a self-consistent forgery is caught by live replay: a fabricated citation drifts" }
+      ]
+    },
+    {
       "layer": "MCP session dedup — kcp_load withholds bytes the caller already holds, re-serving on any sha drift",
       "section": "hardening",
       "where": "session.ts · dedupeLoaded + mcp.ts · kcp_load",

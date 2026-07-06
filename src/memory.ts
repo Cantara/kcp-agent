@@ -122,6 +122,23 @@ export function toEntry(raw: unknown, recordedAt: string, meta: { optionsKey?: s
   };
 }
 
+/**
+ * Re-derive the hash-address and confirm the stored artifact hasn't been tampered
+ * with since it was recorded. A memory entry is a hash-pinned artifact; this is
+ * where that pin is *enforced*, fail-closed. Recall and reuse drop any entry that
+ * fails this check, so a naively edited episode (answer swapped, citation moved)
+ * can never steer a plan.
+ *
+ * Boundary: this detects tampering of a recorded entry. It cannot distinguish a
+ * legitimate recording from a self-consistent forgery minted by an attacker who
+ * already holds the real unit bytes and can write the memory dir — that needs
+ * signed episodes (future work). Reuse defends the residual case by re-checking
+ * every citation against the live manifest.
+ */
+export function verifyEntry(entry: MemoryEntry): boolean {
+  return typeof entry.id === "string" && entry.id === sha256(JSON.stringify(entry.artifact));
+}
+
 // --- stores ------------------------------------------------------------------
 
 export function inMemoryStore(seed: MemoryEntry[] = []): MemoryStore {
@@ -158,6 +175,7 @@ export function fileStore(dir: string): MemoryStore {
 export async function recall(store: MemoryStore, task: string, opts: RecallOptions = {}): Promise<Recalled[]> {
   const query = new Set(terms(task));
   const scored = (await store.list())
+    .filter(verifyEntry) // fail-closed: a tampered episode is never recalled
     .map((entry) => {
       const overlap = terms(entry.task).filter((t) => query.has(t)).length;
       return { entry, score: overlap };

@@ -12,7 +12,7 @@
 // run), reuse is refused as `unverifiable`, never granted on faith. A forged or
 // stale memory entry must not be able to steer the next plan.
 
-import type { MemoryEntry, MemoryKind, MemoryStore, RecallReplay } from "./memory.js";
+import { verifyEntry, type MemoryEntry, type MemoryKind, type MemoryStore, type RecallReplay } from "./memory.js";
 
 export type ReuseStatus = "reuse" | "drifted" | "unverifiable" | "miss";
 
@@ -47,6 +47,7 @@ function sameOptions(a: string | undefined, b: string | undefined): boolean {
 export async function reuse(store: MemoryStore, req: ReuseRequest, opts: ReuseOptions = {}): Promise<ReuseDecision> {
   const candidates = (await store.list()).filter(
     (e) =>
+      verifyEntry(e) && // fail-closed: a tampered episode is never a reuse candidate
       e.task === req.task &&
       e.manifestSource === req.manifestSource &&
       sameOptions(e.optionsKey, req.optionsKey) &&
