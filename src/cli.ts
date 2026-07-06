@@ -34,6 +34,7 @@
 //   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
 //   --ground              verify each answer claim against a loaded unit; surface unsubstantiated ones
 //   --ground-model <id>   verifier model for --ground (default: claude-haiku-4-5)
+//   --ground-rounds <n>   closed-loop grounding: a surfaced gap re-navigates for evidence (default 0)
 
 import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
@@ -42,6 +43,7 @@ import { planTree, plans, type FollowOptions } from "./follow.js";
 import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded } from "./format.js";
 import { synthesize, loadAnthropicSdk, type SynthesisResult } from "./synthesize.js";
 import { groundAnswer, makeClaudeVerifier } from "./ground.js";
+import { groundingLoop, type GroundRoundFn } from "./groundloop.js";
 import { askLoop } from "./loop.js";
 import { validateLocation } from "./validate.js";
 import { replayArtifact } from "./replay.js";
@@ -75,6 +77,7 @@ interface Args {
   loopModel?: string;
   ground: boolean;
   groundModel?: string;
+  groundRounds?: number;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -109,6 +112,7 @@ function parseArgs(argv: string[]): Args {
       case "--loop-model": a.loopModel = next(); break;
       case "--ground": a.ground = true; break;
       case "--ground-model": a.groundModel = next(); break;
+      case "--ground-rounds": a.groundRounds = Number(next()); a.ground = true; break;
       case "--json": a.json = true; break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
@@ -215,6 +219,36 @@ async function main() {
     console.log(`Loop converged (${r.converged}) after ${r.rounds.length} round(s) · expanded task: "${r.expandedTask}"`);
     if (r.rounds.some((x) => x.addedUnits.length > 0)) console.log(formatPlan(r.finalPlans[0]));
     printAnswer(r.synthesis);
+    return;
+  }
+
+  // ask --ground-rounds N: closed-loop grounding — a surfaced gap re-navigates for evidence.
+  if (a.command === "ask" && a.ground && (a.groundRounds ?? 0) > 0) {
+    const navigate: GroundRoundFn = async (extraTerms) => {
+      const expanded = extraTerms.length ? `${a.task} ${extraTerms.join(" ")}` : a.task!;
+      const t = await planTree(a.manifest!, expanded, buildFollowOptions(a));
+      if (t.error) throw new Error(`${t.location}: ${t.error}`);
+      const ps = plans(t);
+      const budgetBlocked = ps.some((p) => p.skipped.some((s) => /over budget/.test(s.reason)));
+      // Synthesis answers the ORIGINAL task; expansion only steered discovery.
+      const synthPlans = ps.map((p, i) => (i === 0 ? { ...p, task: a.task! } : p));
+      const syn = await synthesize(synthPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
+      return { units: syn.unitsLoaded, answer: syn.answer, budgetBlocked };
+    };
+    const loop = await groundingLoop({
+      task: a.task,
+      navigate,
+      verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
+      maxRounds: a.groundRounds,
+    });
+    if (a.json) { console.log(JSON.stringify(loop, null, 2)); return; }
+    console.log("─".repeat(60));
+    console.log(`Answer (from ${loop.rounds.at(-1)?.addedUnitIds.length ?? 0} new unit(s) across ${loop.rounds.length} round(s)):\n`);
+    console.log(loop.answer);
+    for (const round of loop.rounds.slice(1)) {
+      console.log(`  ground round ${round.round}: +terms ${round.seededTerms.join(", ") || "(none)"} → +units ${round.addedUnitIds.join(", ") || "(none)"} · ${round.gaps} gap(s) left`);
+    }
+    console.log(formatGrounded(loop.final));
     return;
   }
 

@@ -142,6 +142,16 @@ never ground a claim: attribution is a proposal, grounding is adjudicated. Unsup
 gap is also a signal to the *publisher*: the task needed evidence the manifest didn't provide. The
 surfaced list is capped to guard against a compromised generator flooding it with spurious gaps.
 
+**`--ground-rounds <n>`** closes the loop: a surfaced gap seeds reformulation terms, the agent
+re-navigates to try to find the missing evidence, and re-grounds — up to `n` rounds. Termination is
+guaranteed by three independent bounds, any one of which halts: the term gate is **absorbing** (a
+term accepted once is known forever, so re-navigation can only add units from the finite eligible
+set), the **round cap**, and a **progress guard** (a round that adds no new unit halts). Oscillation
+is impossible — the loaded set grows monotonically or the loop stops. Every terminal state that
+isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) still **surfaces** the
+remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
+can never cross a gate, name a URL, or spend past the budget.
+
 ### Demos — twelve scenarios, no mocks
 
 ```bash
@@ -212,6 +222,7 @@ planning sensibly.
 | `--loop-model <id>` | (`ask --loop`) critic model — default `claude-haiku-4-5` |
 | `--ground` | (`ask`) verify each answer claim against a loaded unit; surface unsubstantiated ones |
 | `--ground-model <id>` | (`ask --ground`) verifier model — default `claude-haiku-4-5` |
+| `--ground-rounds <n>` | (`ask`) closed-loop grounding: a surfaced gap re-navigates for evidence (default 0) |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.
