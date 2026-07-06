@@ -95,6 +95,17 @@
       ]
     },
     {
+      "layer": "MCP session dedup — kcp_load withholds bytes the caller already holds, re-serving on any sha drift",
+      "section": "hardening",
+      "where": "session.ts · dedupeLoaded + mcp.ts · kcp_load",
+      "impl": ["src/session.ts", "src/mcp.ts"],
+      "proofs": [
+        { "file": "test/session.test.ts", "test": "withholds the content of a unit the caller holds at the same sha" },
+        { "file": "test/session.test.ts", "test": "FAIL-CLOSED: a stale caller sha (unit drifted) re-serves the fresh bytes, never a stub" },
+        { "file": "test/mcp.test.ts", "test": "kcp_load dedups a unit the caller already holds, and re-serves it once it drifts" }
+      ]
+    },
+    {
       "layer": "Memory-validated reuse — a determinism cache: reuse a prior episode only if it still replays clean, fail-closed on drift",
       "section": "hardening",
       "where": "reuse.ts · reuse",

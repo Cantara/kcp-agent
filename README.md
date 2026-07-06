@@ -333,6 +333,15 @@ deterministic; it just has to ask someone who is. Register it in e.g. Claude Cod
 claude mcp add kcp -- node /path/to/kcp-agent/dist/cli.js mcp
 ```
 
+**Session dedup.** `kcp_load` accepts a `known` argument — the units the caller already holds,
+as `[{id, sha256}]`. A unit whose sha still matches comes back as an `unchanged` stub (bytes
+withheld, sha confirmed) instead of re-serving its content, saving the caller's context window
+across a multi-turn session; the response reports `deduped` and `bytesSaved`. This is the
+caller-side of episodic memory, kept in character: the server stays stateless (the caller's
+window *is* the session), a stub is emitted **only** on an exact sha match — any drift re-serves
+the fresh bytes — and because `kcp_load` re-plans and so re-gates every call, a unit the caller
+has since lost access to is simply absent, never smuggled back as a stub.
+
 ## Signatures
 
 A manifest may declare a `signing` block (scheme `ed25519`, key + detached signature URLs — see

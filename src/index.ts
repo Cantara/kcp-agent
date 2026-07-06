@@ -76,6 +76,14 @@ export {
   type ReuseDecision,
   type ReuseOptions,
 } from "./reuse.js";
+export {
+  dedupeLoaded,
+  knownMap,
+  type KnownUnits,
+  type EmittedUnit,
+  type UnchangedUnit,
+  type DedupResult,
+} from "./session.js";
 export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";
 export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
 export {

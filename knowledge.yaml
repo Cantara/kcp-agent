@@ -128,6 +128,13 @@ units:
     audience: [agent, developer]
     triggers: [reuse, cache, determinism, drift, fail-closed, cache hit]
 
+  - id: session-dedup
+    path: src/session.ts
+    intent: "How MCP session dedup works — kcp_load withholds bytes the caller already holds (exact sha match), returning an unchanged stub; the server stays stateless and re-serves on any drift"
+    scope: project
+    audience: [agent, developer]
+    triggers: [session, dedup, kcp_load, unchanged, token savings, mcp]
+
   - id: demo-manifest
     path: examples/demo-hub/knowledge.yaml
     intent: "A worked example manifest exercising every planner stage — trust gating, temporal validity, payment, rate limits, federation"
