@@ -247,6 +247,13 @@ units:
     audience: [agent, developer]
     triggers: [guide, port, conformant, implementation, go, rust, second implementation, spec]
 
+  - id: guide-trace
+    path: guides/trace-your-decisions.md
+    intent: "Trace every navigation decision — run plan --trace for the 13-gate cascade, save two plans and diff them, use kcp_trace over MCP"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, trace, decision trace, diff, gate cascade, audit trail]
+
   - id: conformance-vectors
     path: vectors/README.md
     intent: "The spec conformance vector corpus — (manifest, task, options) → expected plan fixtures any KCP implementation must reproduce; the prerequisite for a second (e.g. Go) implementation"

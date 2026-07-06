@@ -129,8 +129,10 @@
       <div class="pillar">
         <h3>The plan is the audit log</h3>
         <p>A plan is an inspectable artifact produced <em>before</em> anything is loaded or paid for.
-          When the LLM loop runs, each round chains another plan — the diff between them shows exactly
-          which gate moved and what it cost. Audit before action, end to end.</p>
+          <code>plan --trace</code> exposes the full gate cascade — every unit evaluated through thirteen
+          ordered gates, each verdict recorded — so you can see <em>why</em> the plan looks the way it does.
+          <code>diff</code> compares two saved plans and names every unit that moved, every score that shifted,
+          every budget that changed. Audit before action, end to end.</p>
       </div>
     </div>
   </section>
@@ -244,11 +246,17 @@ final plan: datacenter-power, subsea-cable-feature
       <pre class="capture"><code># plan — deterministic, no API key, no model
 npx kcp-agent plan "your task" --manifest https://example.com/knowledge.yaml
 
+# trace — the gate cascade: why every unit was selected or skipped
+npx kcp-agent plan "your task" --manifest ./docs --trace
+
+# diff — compare two saved plans: what moved, what shifted, what changed
+npx kcp-agent diff plan-a.json plan-b.json
+
 # ask — plan, then synthesize with Claude from exactly the planned units
 export ANTHROPIC_API_KEY=...
 npx kcp-agent ask "your task" --manifest ./docs --loop
 
-# serve the planner to any MCP client (manifest is passed per tool call)
+# serve the planner to any MCP client (kcp_plan, kcp_load, kcp_trace, kcp_validate, kcp_replay)
 npx kcp-agent mcp</code></pre>
       <p>Thirteen narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
         all asserted in CI. Native binaries for Linux/macOS/Windows on the

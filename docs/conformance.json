@@ -228,6 +228,30 @@
         { "file": "test/manifest.test.ts", "test": "parses into the compact model" },
         { "file": "test/manifest.test.ts", "test": "plans a typical task against itself" }
       ]
+    },
+    {
+      "layer": "Decision trace — per-unit gate cascade (audience → context_budget), every verdict recorded",
+      "section": "hardening",
+      "where": "trace.ts · trace",
+      "impl": ["src/trace.ts"],
+      "proofs": [
+        { "file": "test/trace.test.ts", "test": "trace outcomes match the canonical plan exactly" },
+        { "file": "test/trace.test.ts", "test": "gate summary counts are consistent" },
+        { "file": "test/trace.test.ts", "test": "is deterministic: same inputs produce identical traces" },
+        { "file": "test/trace.test.ts", "test": "money_budget gate rejects over-budget units" }
+      ]
+    },
+    {
+      "layer": "Plan diff — what moved between two plans: units, scores, budgets, reasons",
+      "section": "hardening",
+      "where": "diff.ts · diffPlans",
+      "impl": ["src/diff.ts"],
+      "proofs": [
+        { "file": "test/diff.test.ts", "test": "identical plans produce an identical diff" },
+        { "file": "test/diff.test.ts", "test": "detects units moving from selected to skipped when the task changes" },
+        { "file": "test/diff.test.ts", "test": "detects budget shifts" },
+        { "file": "test/diff.test.ts", "test": "is deterministic" }
+      ]
     }
   ]
 }
