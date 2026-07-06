@@ -152,11 +152,11 @@ isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) sti
 remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
 can never cross a gate, name a URL, or spend past the budget.
 
-### Demos — twelve scenarios, no mocks
+### Demos — thirteen scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all twelve, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · summer · milky-way · dogfood
+node examples/demos.js            # all thirteen, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -168,6 +168,7 @@ node examples/demos.js vault      # one at a time
 | **The Org** | federation `context` slices by env; `agent_identity` plans credentials pre-fetch | §3.6 |
 | **The Audit** | two `--json` plans diffed: exactly which gate a capability flip moves, and its price | — |
 | **The Loop** | the audited critique loop with a scripted critic: injection bounces, terms re-plan, budget holds | — |
+| **The Grounding** | `ask --ground`: a claim citing an unloaded unit fails closed; the closed loop re-navigates and grounds it against real bytes | — |
 | **The 03:00 Page** | a zero-day across four federated parties — attestation, a signed CERT, supersession, TLP:AMBER as an enforced gate, an intel budget ([`examples/incident/`](examples/incident/)) | all of it |
 | **The Borrowed Leash** | a scripted foreign MCP client replans the incident over stdio — same gates, same ledger — then `kcp_replay` catches its falsified artifact | — |
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
@@ -176,7 +177,7 @@ node examples/demos.js vault      # one at a time
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all twelve in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all thirteen in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
