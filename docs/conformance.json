@@ -83,6 +83,53 @@
       ]
     },
     {
+      "layer": "Episodic memory — a memory is a replayable plan, stripped of unit bytes so recall can't bypass the access gate",
+      "section": "hardening",
+      "where": "memory.ts · toEntry / recall",
+      "impl": ["src/memory.ts"],
+      "proofs": [
+        { "file": "test/memory.test.ts", "test": "SECURITY: strips unit content on ingest but keeps id/path/sha for replay" },
+        { "file": "test/memory.test.ts", "test": "is hash-addressed: the same artifact yields the same id regardless of recordedAt" },
+        { "file": "test/memory.test.ts", "test": "attaches replay-validated status to each hit" },
+        { "file": "test/memory.test.ts", "test": "without a replay hook, hits are returned unverified (never falsely 'valid')" }
+      ]
+    },
+    {
+      "layer": "Memory red team — access-on-recall and poisoning fail closed (bytes stripped, integrity enforced, reuse capability-keyed, forgery caught by live replay)",
+      "section": "hardening",
+      "where": "memory.ts · verifyEntry + reuse.ts + session.ts",
+      "impl": ["src/memory.ts", "src/reuse.ts", "src/session.ts"],
+      "proofs": [
+        { "file": "test/memory-redteam.test.ts", "test": "does NOT reuse a credentialed answer for a request that lacks the credential" },
+        { "file": "test/memory-redteam.test.ts", "test": "kcp_load never returns a unit the caller lost access to, even when it declares it in `known`" },
+        { "file": "test/memory-redteam.test.ts", "test": "a tampered episode on disk is refused by recall and reuse, fail-closed" },
+        { "file": "test/memory-redteam.test.ts", "test": "even a self-consistent forgery is caught by live replay: a fabricated citation drifts" }
+      ]
+    },
+    {
+      "layer": "MCP session dedup — kcp_load withholds bytes the caller already holds, re-serving on any sha drift",
+      "section": "hardening",
+      "where": "session.ts · dedupeLoaded + mcp.ts · kcp_load",
+      "impl": ["src/session.ts", "src/mcp.ts"],
+      "proofs": [
+        { "file": "test/session.test.ts", "test": "withholds the content of a unit the caller holds at the same sha" },
+        { "file": "test/session.test.ts", "test": "FAIL-CLOSED: a stale caller sha (unit drifted) re-serves the fresh bytes, never a stub" },
+        { "file": "test/mcp.test.ts", "test": "kcp_load dedups a unit the caller already holds, and re-serves it once it drifts" }
+      ]
+    },
+    {
+      "layer": "Memory-validated reuse — a determinism cache: reuse a prior episode only if it still replays clean, fail-closed on drift",
+      "section": "hardening",
+      "where": "reuse.ts · reuse",
+      "impl": ["src/reuse.ts"],
+      "proofs": [
+        { "file": "test/reuse.test.ts", "test": "grants reuse when the episode matches and still replays clean" },
+        { "file": "test/reuse.test.ts", "test": "FAIL-CLOSED: refuses reuse when the manifest drifted since the episode" },
+        { "file": "test/reuse.test.ts", "test": "FAIL-CLOSED: without a replay hook, reuse is refused as unverifiable (never granted on faith)" },
+        { "file": "test/reuse.test.ts", "test": "misses on a different task, a different options set, or a different manifest" }
+      ]
+    },
+    {
       "layer": "Closed-loop grounding — a gap re-navigates for evidence, with a bounded convergence proof",
       "section": "hardening",
       "where": "groundloop.ts · groundingLoop",

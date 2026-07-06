@@ -51,6 +51,31 @@ describe("MCP server", () => {
     expect(payload.units.find((u: { id: string }) => u.id === "deploy-guide").content.length).toBeGreaterThan(0);
   });
 
+  it("kcp_load dedups a unit the caller already holds, and re-serves it once it drifts", async () => {
+    const first = await call("kcp_load", { task: "how do I deploy?", manifest: "examples/demo-hub", env: "prod" });
+    const p1 = JSON.parse(first.result.content[0].text);
+    const dg = p1.units.find((u: { id: string }) => u.id === "deploy-guide");
+    // Second call: the caller declares it already holds deploy-guide at that sha.
+    const second = await call("kcp_load", {
+      task: "how do I deploy?", manifest: "examples/demo-hub", env: "prod",
+      known: [{ id: "deploy-guide", sha256: dg.sha256 }],
+    });
+    const p2 = JSON.parse(second.result.content[0].text);
+    const stub = p2.units.find((u: { id: string }) => u.id === "deploy-guide");
+    expect(stub.unchanged).toBe(true);
+    expect(stub.content).toBeUndefined();
+    expect(p2.deduped).toContainEqual({ id: "deploy-guide", sha256: dg.sha256 });
+    expect(p2.bytesSaved).toBeGreaterThan(0);
+    // A stale sha (the caller's copy drifted) must re-serve the fresh bytes, never a stub.
+    const stale = await call("kcp_load", {
+      task: "how do I deploy?", manifest: "examples/demo-hub", env: "prod",
+      known: [{ id: "deploy-guide", sha256: "stale-sha" }],
+    });
+    const reserved = JSON.parse(stale.result.content[0].text).units.find((u: { id: string }) => u.id === "deploy-guide");
+    expect(reserved.unchanged).toBeUndefined();
+    expect(reserved.content.length).toBeGreaterThan(0);
+  });
+
   it("kcp_validate reports findings", async () => {
     const r = await call("kcp_validate", { manifest: "examples/demo-hub" });
     const report = JSON.parse(r.result.content[0].text);

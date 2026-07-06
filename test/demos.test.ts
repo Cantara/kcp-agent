@@ -181,6 +181,36 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("status: grounded");
   });
 
+  it("moved-world: an episode keeps no bytes, recall finds it, replay proves fresh then drifted", () => {
+    const out = demo("moved-world");
+    // ingest strips the unit bytes; the episode is hash-addressed
+    expect(out).toContain("kind grounded-answer · unit bytes retained: none");
+    // recall matches by task-term overlap
+    expect(out).toContain('recall "the exclusive story winner": 1 episode matches (score 2)');
+    // replay against today's files: the pinned sha still holds
+    expect(out).toMatch(/✓ still-grounded\s+Nordfab AS won the exclusive award\..*↳ chipfab-exclusive · sha 7d83d7dcbd74 unchanged/);
+    // once the source moves, replay fails closed
+    expect(out).toContain("✗ drifted");
+    expect(out).toContain("fresh ok: true   ·   moved ok: false");
+  });
+
+  it("deja-vu: reuse is granted on an exact match, missed on new options, refused on drift", () => {
+    const out = demo("deja-vu");
+    expect(out).toMatch(/♻ reuse\s+same task \+ manifest \+ options, manifest unchanged/);
+    expect(out).toMatch(/· miss\s+role=admin — a different capability set is a different plan/);
+    expect(out).toMatch(/⚠ drifted\s+manifest moved since the episode/);
+    expect(out).toContain("manifest sha changed: bb22… ≠ cc33…");
+  });
+
+  it("borrowed-memory: turn two re-serves nothing, a drifted unit comes back in full", () => {
+    const out = demo("borrowed-memory");
+    expect(out).toContain("plan loads 2 units: deploy-guide, front-door");
+    expect(out).toContain("turn 1 (first contact): 0 withheld · 0 bytes saved — all served");
+    expect(out).toMatch(/turn 2 \(caller holds all\): 2 withheld · \d+ bytes saved — all "unchanged" stubs/);
+    expect(out).toContain("turn 3 (deploy-guide drifted): 1 withheld, 1 re-served");
+    expect(out).toContain("a stub carries { id, path, sha256, unchanged } — never the bytes");
+  });
+
   it("dogfood: the repo manifest validates and routes to the planner source", () => {
     const out = demo("dogfood");
     expect(out).toContain("✓ valid");

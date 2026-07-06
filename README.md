@@ -152,11 +152,11 @@ isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) sti
 remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
 can never cross a gate, name a URL, or spend past the budget.
 
-### Demos — thirteen scenarios, no mocks
+### Demos — sixteen scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all thirteen, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · dogfood
+node examples/demos.js            # all sixteen, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -174,10 +174,13 @@ node examples/demos.js vault      # one at a time
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
 | **The Summer Plan** | a family vacation across four federated parties — a signed hub, timetable supersession, an identity-gated accessibility registry, x402 tour detail, and the `not_for` footgun caught by the validate lint ([`examples/summer/`](examples/summer/)) | §3.6/§4.11/§4.22 |
 | **The Milky Way** | a whole enterprise documentation estate — a signed hub over eight domains: env-sliced dev mirror, a future regulation dated out, human-only HR docs, HSM-attested formulations, an identity-gated ERP vendor with subscription rate tiers, and a CSRD annual handover ([`examples/milky-way/`](examples/milky-way/)) | §3.6/§4.14/§4.22 |
+| **The Moved World** | episodic memory: an answer recorded byte-free, recalled by task overlap, then replayed — still-grounded while the pins hold, drifted the moment the source moves | — |
+| **The Déjà Vu** | memory-validated reuse: identical inputs against an unchanged manifest are provably the same plan; new options miss; a drifted manifest is refused | — |
+| **The Borrowed Memory** | MCP session dedup: `kcp_load` withholds the bytes a caller already holds (sha-confirmed stubs), and re-serves any unit that drifted | — |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all thirteen in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all sixteen in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
@@ -225,6 +228,9 @@ planning sensibly.
 | `--ground-model <id>` | (`ask --ground`) verifier model — default `claude-haiku-4-5` |
 | `--ground-rounds <n>` | (`ask`) closed-loop grounding: a surfaced gap re-navigates for evidence (default 0) |
 | `--check-gaps` | (`replay`) re-navigate today's manifest to see if a grounded answer's surfaced gap now closes |
+| `--memory <dir>` | (`remember`/`recall`) episodic-memory directory — one hash-addressed entry per artifact |
+| `--replay` | (`recall`) re-verify each recalled episode against today's manifests (a drifted hit exits 1) |
+| `--limit <n>` | (`recall`) cap the number of episodes returned |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.
@@ -261,6 +267,57 @@ not read as verified. With `--check-gaps` it re-navigates today's manifest to se
 previously-surfaced gap now **closes** (the manifest grew the missing evidence since the answer)
 — gaps have a lifecycle, and a memory is a plan you can re-verify against a moved world.
 
+### `remember` / `recall` — episodic memory as replayable plans
+
+```bash
+node dist/cli.js ask "who won the exclusive story" --manifest examples/fjordwire --ground --json > ans.json
+node dist/cli.js remember ans.json --memory .kcp-memory        # log the episode (unit bytes stripped)
+node dist/cli.js recall "the exclusive story winner" --memory .kcp-memory --replay
+```
+
+A memory here is not a summary or an embedding — it is the plan/grounded-answer artifact itself,
+**stripped of the one thing that would make it dangerous to keep: the unit bytes.** Caching
+restricted or paid content in the memory log would let a later recall read it without re-passing
+the access gate, so `remember` keeps only what replay needs — each unit's `id`, `path`, `sha256`,
+and the citation table — and drops every `content` field. Entries are hash-addressed by their
+content-stripped artifact, so recording the same answer twice is idempotent.
+
+`recall` matches past episodes by lexical task-term overlap (the same tokenizer the planner
+scores with), ranked by overlap. Because the bytes are gone, a recalled episode carries **no
+freshness claim on its own**: with `--replay` each hit is re-verified against today's manifests —
+**valid** (every cited unit holds its pinned bytes), **drifted** (a citation moved — exit 1), or
+**unverifiable** (the replay could not run). Without `--replay`, every hit is reported
+`unverifiable` — memory never falsely claims a stale answer is still true. A memory is a plan you
+can re-verify against a moved world.
+
+### memory-validated reuse — a determinism-preserving cache
+
+Passing `--memory <dir>` to `plan` or `ask` turns the episode log into a cache whose
+correctness rests on the same property everything else does: a plan is a pure function of
+`(manifest bytes, task, options)`. The rule is **recall (exact match) + replay (freshness) =
+reuse**, and everything short of that is fail-closed.
+
+```bash
+node dist/cli.js plan "how do I deploy" --manifest . --memory .kcp-memory   # records + reports determinism
+node dist/cli.js plan "how do I deploy" --manifest . --memory .kcp-memory   # ♻ provably identical to episode …
+node dist/cli.js ask  "how do I deploy" --manifest . --ground --memory .kcp-memory   # reuses a clean grounded answer, skips the model
+```
+
+`plan --memory` records each plan and, if a prior episode ran with the *same* task, manifest,
+and options, reports whether today's manifest is byte-identical (**♻ provably identical**) or
+has **drifted** since — a determinism/audit signal, never a silent reuse across a sha change.
+The cache key includes the effective `--as-of` date, so an unpinned plan is only reuse-eligible
+within the same day; a run under different capabilities (`--role`, `--budget`, …) is a different
+plan, not a hit.
+
+`ask --ground --memory` is where reuse pays off: before calling the model it looks for a cached
+**grounded answer** for the identical request and replays it — re-reading every cited unit and
+re-checking its pinned `sha256`. Only if *every* citation still holds is the stored answer
+returned (**♻ reused**, no model call); if any cited unit drifted or is gone, the answer is
+**re-computed**, never served stale. Because ingest already stripped the unit bytes, a recalled
+answer can never smuggle restricted content past the next access gate — reuse re-reads the units
+through the guard, live. A memory is a plan you can re-verify against a moved world.
+
 ### `mcp` — serve the planner to any MCP client
 
 ```bash
@@ -278,6 +335,15 @@ deterministic; it just has to ask someone who is. Register it in e.g. Claude Cod
 ```bash
 claude mcp add kcp -- node /path/to/kcp-agent/dist/cli.js mcp
 ```
+
+**Session dedup.** `kcp_load` accepts a `known` argument — the units the caller already holds,
+as `[{id, sha256}]`. A unit whose sha still matches comes back as an `unchanged` stub (bytes
+withheld, sha confirmed) instead of re-serving its content, saving the caller's context window
+across a multi-turn session; the response reports `deduped` and `bytesSaved`. This is the
+caller-side of episodic memory, kept in character: the server stays stateless (the caller's
+window *is* the session), a stub is emitted **only** on an exact sha match — any drift re-serves
+the fresh bytes — and because `kcp_load` re-plans and so re-gates every call, a unit the caller
+has since lost access to is simply absent, never smuggled back as a stub.
 
 ## Signatures
 
@@ -380,12 +446,18 @@ Not yet consumed: dependency chains between units, `hints.load_strategy`, compli
 
 ## Guides
 
+- [Quickstart — your first ten minutes](guides/quickstart.md) — install → plan → ask → validate
+  → serve → replay, end to end.
 - [Make your repo navigable in 10 minutes](guides/make-your-repo-navigable.md) — from nothing to a
   manifest real plans run against, kept honest in CI.
 - [Sign your manifest](guides/sign-your-manifest.md) — ed25519 over exact bytes, envelopes, key
   pinning, and the fail-closed lifecycle.
 - [Wire the planner into Claude Code](guides/wire-mcp-into-claude-code.md) — `kcp_plan` /
   `kcp_load` / `kcp_validate` over MCP, no API key needed.
+- [Give your agent a memory](guides/give-your-agent-memory.md) — record answers as replayable,
+  byte-free episodes; recall by task, verify by replay, reuse only while they hold.
+- [Cut context cost with session dedup](guides/cut-context-cost-with-dedup.md) — how an MCP
+  caller passes `known` units to `kcp_load` and stops re-spending its context window.
 
 ## License
 

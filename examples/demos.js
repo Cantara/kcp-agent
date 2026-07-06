@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — thirteen narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — sixteen narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all thirteen in CI as regression tests.
+// all sixteen in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -29,6 +29,7 @@ const SEALED = path.join(EX, 'sealed');
 const INCIDENT = path.join(EX, 'incident');
 const SUMMER = path.join(EX, 'summer', 'tourism');
 const MILKY = path.join(EX, 'milky-way');
+const DEMO_HUB = path.join(EX, 'demo-hub');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -59,6 +60,7 @@ function agent(args) {
     .replaceAll(INCIDENT, 'examples/incident')
     .replaceAll(SUMMER, 'examples/summer/tourism')
     .replaceAll(MILKY, 'examples/milky-way')
+    .replaceAll(DEMO_HUB, 'examples/demo-hub')
     .replaceAll(ROOT, '.');
   return {
     stdout: stripAnsi((r.stdout || '').toString()).replaceAll(ROOT + path.sep, ''),
@@ -692,6 +694,173 @@ const SCENARIOS = [
       'words, HSM attestation for the crown jewels, an identity-gated vendor edge, and a ' +
       'subscription that moves the agent into the premium rate tier — every gate deterministic, ' +
       'every skip a sentence you could read to an auditor.',
+  },
+  {
+    id: 'moved-world',
+    title: 'The Moved World — a memory is a plan you can re-verify',
+    useCase:
+      'Episodic memory is not a summary or an embedding — it is the grounded-answer artifact ' +
+      'itself, stripped of the unit bytes (caching restricted content would bypass the next access ' +
+      'gate) and hash-addressed. Recall matches by task-term overlap; then replay re-reads every ' +
+      'cited unit and re-checks its pinned sha256 against today\'s world. The navigation, loading, ' +
+      'and shas are REAL; the answer + verifier are scripted through the same seam the tests use.',
+    async run() {
+      const { planTree, plans } = await import(pathToFileURL(path.join(ROOT, 'dist', 'follow.js')).href);
+      const { loadPlannedUnits } = await import(pathToFileURL(path.join(ROOT, 'dist', 'synthesize.js')).href);
+      const { groundAnswer } = await import(pathToFileURL(path.join(ROOT, 'dist', 'ground.js')).href);
+      const { toEntry, inMemoryStore, recall } = await import(pathToFileURL(path.join(ROOT, 'dist', 'memory.js')).href);
+      const { replayGroundedAnswer } = await import(pathToFileURL(path.join(ROOT, 'dist', 'replayground.js')).href);
+
+      const TASK = 'who won the exclusive story';
+      const opts = { planOptions: { asOf: '2026-07-06', capabilities: { role: 'agent', paymentMethods: ['free', 'x402'] } } };
+      const ANSWER = 'Nordfab AS won the exclusive award.';
+      const verifier = async ({ claim }) => (/nordfab|exclusive/i.test(claim) ? { supportedBy: 'chipfab-exclusive' } : { supportedBy: null });
+
+      const p = plans(await planTree(FJORDWIRE, TASK, opts))[0];
+      const units = (await loadPlannedUnits(p)).loaded;
+      const grounding = await groundAnswer(TASK, ANSWER, units, { verifier });
+      const artifact = { plan: { task: TASK, manifest: p.manifest }, synthesis: { answer: ANSWER, unitsLoaded: units }, grounding };
+
+      // Record it. toEntry strips the unit bytes and hash-addresses the episode.
+      const store = inMemoryStore();
+      const entry = toEntry(artifact, '2026-07-06T12:00:00.000Z');
+      await store.append(entry);
+      const retainedBytes = JSON.stringify(entry.artifact).includes('SECRET') || /"content"/.test(JSON.stringify(entry.artifact));
+
+      // A week later, recall it by a *related* task and replay against today's files.
+      const hits = await recall(store, 'the exclusive story winner');
+      const fresh = await replayGroundedAnswer(hits[0].entry.artifact, 'episode', {});
+
+      // Now the world moves: the source rewrote the story (here we pin a stale sha to stand in).
+      const moved = JSON.parse(JSON.stringify(hits[0].entry.artifact));
+      moved.grounding.claims[0].sha256 = '0'.repeat(64);
+      const drifted = await replayGroundedAnswer(moved, 'episode', {});
+
+      const claim0 = fresh.claims[0];
+      const lines = [
+        `recorded episode ${entry.id.slice(0, 12)}… · kind ${entry.kind} · unit bytes retained: ${retainedBytes ? 'yes' : 'none'}`,
+        '',
+        `recall "the exclusive story winner": ${hits.length} episode matches (score ${hits[0].score})`,
+        c.dim(`  ↳ ${hits[0].entry.task} · status ${hits[0].status}`),
+        '',
+        c.bold('replay against today\'s world:'),
+        c.green(`  ✓ still-grounded  ${claim0.claim}`) + c.dim(`  ↳ ${claim0.unitId} · ${claim0.detail}`),
+        c.bold('replay after the source moved:'),
+        c.yellow(`  ✗ ${drifted.claims[0].status}      ${drifted.claims[0].claim}`) + c.dim(`  ↳ ${drifted.claims[0].detail}`),
+        '',
+        c.bold(`fresh ok: ${fresh.ok}   ·   moved ok: ${drifted.ok}`),
+      ];
+      return { blocks: [{
+        command:
+          'kcp-agent ask "who won the exclusive story" --manifest examples/fjordwire --ground --json > ep.json\n' +
+          '  kcp-agent recall "the exclusive story winner" --memory .kcp-memory --replay   # verifier scripted — offline',
+        lines,
+      }] };
+    },
+    verdict:
+      'The episode kept zero unit bytes — recall re-reads the units live, so a cached answer can ' +
+      'never smuggle restricted content past the next access gate. Recall found it by task overlap, ' +
+      'and replay proved it: still-grounded while the bytes match their pin, drifted the moment the ' +
+      'source moves. A memory here is evidence with a lifecycle, not a frozen assertion.',
+  },
+  {
+    id: 'deja-vu',
+    title: 'The Déjà Vu — a determinism cache that fails closed on drift',
+    useCase:
+      'A plan is a pure function of (manifest bytes, task, options), so a prior episode is safe to ' +
+      'reuse only if it matches on ALL of those AND still replays clean. `plan/ask --memory` makes ' +
+      'the episode log a cache: identical inputs against an unchanged manifest are provably the same ' +
+      'plan; a drifted manifest is never reused; a different capability set is a different plan, not ' +
+      'a hit. Fully offline — plan needs no model.',
+    async run() {
+      const { planTree, plans } = await import(pathToFileURL(path.join(ROOT, 'dist', 'follow.js')).href);
+      const { toEntry, inMemoryStore } = await import(pathToFileURL(path.join(ROOT, 'dist', 'memory.js')).href);
+      const { reuse } = await import(pathToFileURL(path.join(ROOT, 'dist', 'reuse.js')).href);
+
+      const TASK = 'how do I deploy?';
+      const opts = { planOptions: { asOf: '2026-07-06', env: 'prod', capabilities: { role: 'agent' } } };
+      const p = plans(await planTree(DEMO_HUB, TASK, opts))[0];
+      const source = p.manifest.source, freshSha = p.manifest.sha256;
+      const optionsKey = 'role=agent;env=prod;as_of=2026-07-06';
+
+      const store = inMemoryStore([toEntry(p, '2026-07-06T09:00:00.000Z', { optionsKey })]);
+      const shaEqual = async (e) => (e.manifestSha === freshSha
+        ? { ok: true, detail: `manifest@${(freshSha || '').slice(0, 12)}… unchanged` }
+        : { ok: false, detail: 'manifest sha changed' });
+
+      const hit = await reuse(store, { task: TASK, manifestSource: source, optionsKey, kind: 'plan' }, { replay: shaEqual });
+      const otherCaps = await reuse(store, { task: TASK, manifestSource: source, optionsKey: 'role=admin;env=prod;as_of=2026-07-06', kind: 'plan' }, { replay: shaEqual });
+      const drifted = await reuse(store, { task: TASK, manifestSource: source, optionsKey, kind: 'plan' }, { replay: async () => ({ ok: false, detail: 'manifest sha changed: bb22… ≠ cc33…' }) });
+
+      const lines = [
+        `episode recorded for "${TASK}" · manifest@${(freshSha || '').slice(0, 12)}… · options ${optionsKey}`,
+        '',
+        c.green(`  ♻ ${hit.status.padEnd(13)} same task + manifest + options, manifest unchanged`) + c.dim(`  ↳ ${hit.detail}`),
+        c.yellow(`  · ${otherCaps.status.padEnd(13)} role=admin — a different capability set is a different plan`),
+        c.yellow(`  ⚠ ${drifted.status.padEnd(13)} manifest moved since the episode`) + c.dim(`  ↳ ${drifted.detail}`),
+      ];
+      return { blocks: [{
+        command:
+          'kcp-agent plan "how do I deploy?" --manifest examples/demo-hub --env prod --memory .kcp-memory   # twice',
+        lines,
+      }] };
+    },
+    verdict:
+      'Reuse is granted only when the episode matches exactly and still replays clean — provably the ' +
+      'same plan, no re-work. Change the capabilities and it is a cache miss (a different plan, not a ' +
+      'stale hit); drift the manifest and reuse is refused outright. The cache can never serve a plan ' +
+      'that today\'s inputs would not reproduce.',
+  },
+  {
+    id: 'borrowed-memory',
+    title: 'The Borrowed Memory — don\'t re-serve bytes the caller already holds',
+    useCase:
+      'kcp_load returns the CONTENT of the planned units so the calling agent synthesizes. Across a ' +
+      'multi-turn session that re-sends the same bytes every turn. Session dedup fixes it: the caller ' +
+      'declares what it holds (id → sha256) and kcp_load withholds matching bytes, returning an ' +
+      '"unchanged" stub instead. The server stays stateless; a stub is emitted ONLY on an exact sha ' +
+      'match, so any drift re-serves the fresh bytes. Fully offline.',
+    async run() {
+      const { planTree, plans } = await import(pathToFileURL(path.join(ROOT, 'dist', 'follow.js')).href);
+      const { loadPlannedUnits } = await import(pathToFileURL(path.join(ROOT, 'dist', 'synthesize.js')).href);
+      const { dedupeLoaded } = await import(pathToFileURL(path.join(ROOT, 'dist', 'session.js')).href);
+
+      const TASK = 'how do I deploy and handle an incident?';
+      const opts = { planOptions: { asOf: '2026-07-06', env: 'prod', capabilities: { role: 'agent' } } };
+      const loaded = [];
+      for (const p of plans(await planTree(DEMO_HUB, TASK, opts))) loaded.push(...(await loadPlannedUnits(p)).loaded);
+
+      // Turn 1: first contact — everything is served.
+      const t1 = dedupeLoaded(loaded, []);
+      const known = loaded.map((u) => ({ id: u.id, sha256: u.sha256 }));
+      // Turn 2: the caller already holds all of them unchanged.
+      const t2 = dedupeLoaded(loaded, known);
+      // Turn 3: one unit drifted since the caller cached it — it must be re-served.
+      const stale = known.map((k, i) => (i === 0 ? { id: k.id, sha256: 'stale-sha' } : k));
+      const t3 = dedupeLoaded(loaded, stale);
+      const reservedId = t3.units.find((u) => !u.unchanged).id;
+
+      const lines = [
+        `plan loads ${loaded.length} units: ${loaded.map((u) => u.id).join(', ')}`,
+        '',
+        `  turn 1 (first contact): ${t1.deduped.length} withheld · ${t1.bytesSaved} bytes saved — all served`,
+        `  turn 2 (caller holds all): ${t2.deduped.length} withheld · ${c.green(t2.bytesSaved + ' bytes saved')} — all "unchanged" stubs`,
+        `  turn 3 (${reservedId} drifted): ${t3.deduped.length} withheld, ${c.yellow('1 re-served')} — the stale unit comes back in full`,
+        '',
+        c.dim('  a stub carries { id, path, sha256, unchanged } — never the bytes'),
+      ];
+      return { blocks: [{
+        command:
+          'kcp_load { task, manifest: examples/demo-hub, known: [{id, sha256}, …] }   # MCP session dedup',
+        lines,
+      }] };
+    },
+    verdict:
+      'Turn two re-serves nothing — every unit the caller already holds comes back as a sha-confirmed ' +
+      'stub, saving its context window real bytes. When one unit drifts, only that one is re-served: ' +
+      '"unchanged" is a literal claim that the bytes match, never a shortcut that hides a change. And ' +
+      'because kcp_load re-plans (and re-gates) every call, a unit the caller has lost access to is ' +
+      'simply absent — dedup can never smuggle it back.',
   },
   {
     id: 'dogfood',
