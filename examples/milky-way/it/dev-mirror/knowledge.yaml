@@ -1,0 +1,22 @@
+# The Dev Mirror — sandbox endpoints and mock data for integration
+# development. The hub's federation ref tags this manifest context: [dev],
+# so a production agent never plans over sandbox knowledge — and the
+# exclusion is written into the plan, not left to convention.
+
+kcp_version: "0.25"
+project: melkeveien-dev-mirror
+version: 1.1.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Integration Platform (example)"
+
+units:
+  - id: sandbox-guide
+    path: docs/sandbox.md
+    intent: "Sandbox endpoints, mock order data and reset procedures for integration development"
+    scope: global
+    audience: [agent, developer]
+    triggers: [sandbox, mock, test, dev, reset, integration]

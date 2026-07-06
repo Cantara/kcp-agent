@@ -1,0 +1,29 @@
+# People — HR publishes for two audiences. Onboarding is for agents and
+# humans alike; the salary review process is audience: [human] — an agent
+# asked about it gets a written audience gate instead of paraphrasing HR
+# policy at an employee. Targeting is a manifest fact, not a hope.
+
+kcp_version: "0.25"
+project: melkeveien-people
+version: 1.2.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA People & Organisation (example)"
+
+units:
+  - id: onboarding
+    path: docs/onboarding.md
+    intent: "Onboarding a newcomer: accounts, badge, safety training, and the first-week checklist"
+    scope: global
+    audience: [agent, human]
+    triggers: [onboarding, newcomer, accounts, badge, first, week]
+
+  - id: salary-review
+    path: docs/salary-review.md
+    intent: "The annual salary review: timeline, criteria, and who decides"
+    scope: global
+    audience: [human]
+    triggers: [salary, review, compensation, pay, annual]

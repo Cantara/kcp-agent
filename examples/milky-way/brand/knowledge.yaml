@@ -1,0 +1,30 @@
+# Brand & Communications — the most public domain in the estate. Free,
+# openly licensed, meant to be quoted. The press kit exists precisely so
+# that a comms agent has somewhere legitimate to land when R&D's not_for
+# turns it away from the formulations.
+
+kcp_version: "0.25"
+project: melkeveien-brand
+version: 2.0.0
+updated: "2026-07-06"
+language: en
+license: "CC-BY-4.0"
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Brand & Communications (example)"
+
+units:
+  - id: brand-guidelines
+    path: docs/brand-guidelines.md
+    intent: "Brand guidelines: logo use, colours, typography, and tone of voice"
+    scope: global
+    audience: [agent, human]
+    triggers: [brand, logo, colour, typography, tone]
+
+  - id: press-kit
+    path: docs/press-kit.md
+    intent: "Boilerplate, executive quotes, product imagery index and approved launch messaging for media use — including the oat drink launch"
+    scope: global
+    audience: [agent, human]
+    triggers: [press, release, media, launch, boilerplate, messaging]

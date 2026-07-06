@@ -1,0 +1,19 @@
+# Machine-readable knowledge unit: agents read the schema, not prose about it.
+openapi: "3.1.0"
+info:
+  title: Melkeveien Order Intake API
+  version: "2.3.0"
+paths:
+  /orders:
+    post:
+      summary: Submit a production order to the plant MES
+      responses:
+        "201": {description: Order accepted}
+        "409": {description: Duplicate order id}
+        "422": {description: Payload fails contract validation}
+  /orders/{id}:
+    get:
+      summary: Order status
+      responses:
+        "200": {description: Current order state}
+        "404": {description: Unknown order id}

@@ -1,0 +1,32 @@
+# Sustainability — CSRD reporting on an annual cadence, where the handover
+# is the interesting part: the 2025 statement remains formally valid while
+# the 2026 half-year statement is already in force, and superseded_by
+# disambiguates the overlap (§4.22). An agent citing emissions numbers
+# cites the successor — and the skip reason says why.
+
+kcp_version: "0.25"
+project: melkeveien-esg
+version: 1.0.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Sustainability (example)"
+
+units:
+  - id: csrd-2025
+    path: docs/csrd-2025.md
+    intent: "The 2025 CSRD sustainability statement: scope 1-3 emissions, energy mix, and reduction targets"
+    scope: global
+    audience: [agent, human]
+    triggers: [csrd, sustainability, emissions, scope, energy, reporting]
+    temporal: {valid_until: "2026-12-31", superseded_by: csrd-2026}
+
+  - id: csrd-2026
+    path: docs/csrd-2026.md
+    intent: "The 2026 half-year CSRD update: restated scope 3 emissions after the new supplier data pipeline, and revised targets"
+    scope: global
+    audience: [agent, human]
+    triggers: [csrd, sustainability, emissions, scope, energy, reporting]
+    temporal: {valid_from: "2026-07-01"}

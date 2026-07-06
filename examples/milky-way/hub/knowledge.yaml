@@ -1,0 +1,73 @@
+# Melkeveien SA — the Group Documentation Hub, the single entry point an
+# agent starts from when it walks the cooperative's documentation estate.
+# This manifest is SIGNED (detached ed25519 over the exact bytes); the hub
+# federates outward to eight domains — two IT environments sliced by context,
+# six knowledge domains, and an external ERP vendor behind an identity gate.
+# Re-seal after editing:
+#
+#   node scripts/seal-example.mjs examples/milky-way/hub/knowledge.yaml milkyway-2026
+
+kcp_version: "0.25"
+project: melkeveien-hub
+version: 1.0.0
+updated: "2026-07-06"
+language: en
+
+network:
+  role: hub
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Group Documentation Office (example)"
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  signature: knowledge.yaml.sig
+
+units:
+  - id: estate-map
+    path: docs/estate-map.md
+    intent: "Which domain publishes what across the Melkeveien documentation estate, and where an agent should start"
+    scope: global
+    audience: [agent, human]
+    triggers: [estate, domains, documentation, map, start]
+
+  - id: documentation-policy
+    path: docs/documentation-policy.md
+    intent: "How Melkeveien documents are classified, signed, versioned and retired across the estate"
+    scope: global
+    audience: [agent, human]
+    triggers: [policy, classification, signing, versioning, retirement]
+
+manifests:
+  - id: platform
+    url: "../it/platform/knowledge.yaml"
+    relationship: internal
+    context: [prod, staging]
+  - id: dev-mirror
+    url: "../it/dev-mirror/knowledge.yaml"
+    relationship: internal
+    context: [dev]
+  - id: quality
+    url: "../quality/knowledge.yaml"
+    relationship: internal
+  - id: recipes
+    url: "../recipes/knowledge.yaml"
+    relationship: internal
+  - id: people
+    url: "../people/knowledge.yaml"
+    relationship: internal
+  - id: brand
+    url: "../brand/knowledge.yaml"
+    relationship: internal
+  - id: esg
+    url: "../esg/knowledge.yaml"
+    relationship: internal
+  - id: vendor
+    url: "../vendor/knowledge.yaml"
+    relationship: vendor
+    agent_identity:
+      required: true
+      credential_hint: vendor_portal_token
+      docs_url: "https://orion-systems.example/agent-access"
