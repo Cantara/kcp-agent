@@ -3,7 +3,7 @@
 // shipping code, live. Right pane: an honest simulation whose numbers are
 // computed from the same real manifest.
 
-import { parseManifest, plan, formatPlan, gateTerms, validateManifest } from "./kcp-agent.js";
+import { parseManifest, plan, formatPlan, gateTerms, validateManifest, groundAnswer } from "./kcp-agent.js";
 
 const esc = (s) =>
   String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -538,6 +538,60 @@ function initPlayground() {
   renderPlayground();
 }
 
+/* ---------- grounding: the answer is defensible, or the gap is surfaced ---------- */
+
+// Real fjordwire unit content + its real sha256 (computed from the shipping
+// example files). The grounding below is computed by the SAME groundAnswer that
+// ships in the CLI — only the answer and the verifier are scripted, exactly as
+// examples/demos.js scripts them to run offline.
+const GROUND_UNITS = {
+  "chipfab-exclusive": {
+    id: "chipfab-exclusive",
+    sha256: "7d83d7dcbd74b02311aacd1d68aaa8f7ca90690a2ec0eeead5557b2cbcfebe36",
+    content:
+      "# Exclusive: the sovereign compute award\n\nNordfab AS has won the EU sovereign-compute award. " +
+      "The winning bid pairs the Trondheim fab expansion with hydro-backed capacity contracts.",
+  },
+  "datacenter-power": {
+    id: "datacenter-power",
+    sha256: "3fd2cee8760edd44da22a756164f3ec395f0ac024302fb26ae375db7695df246",
+    content:
+      "# Live: Nordic datacenter power-grid capacity\n\nHourly feed: spot prices, constraint map, " +
+      "and available grid capacity for the compute-award regions.",
+  },
+};
+const GROUND_ANSWER = "Nordfab AS won the exclusive award. Grid capacity in the compute regions is constrained.";
+// The verifier PROPOSES a unit per claim; groundAnswer adjudicates whether it was actually loaded.
+const groundVerifier = async ({ claim }) =>
+  /nordfab|exclusive/i.test(claim) ? { supportedBy: "chipfab-exclusive" }
+  : /grid|capacity|constrain/i.test(claim) ? { supportedBy: "datacenter-power" }
+  : { supportedBy: null };
+
+function renderGrounded(g) {
+  const line = (cl) =>
+    cl.grounded
+      ? green("  ● " + cl.claim) + dim(`  ↳ ${cl.unitId} · sha ${cl.sha256.slice(0, 12)}`)
+      : yellow("  ○ " + cl.claim) + dim(`  ↳ ${cl.reason}`);
+  const head = g.status === "grounded"
+    ? green(`✓ grounded — every claim backed by a loaded, hash-pinned unit`)
+    : yellow(`⚠ ${g.status} — ${g.gaps.length} claim(s) unsubstantiated`);
+  return [bold(`Grounded (${g.grounded.length}/${g.claims.length}):`), ...g.claims.map(line), "", head].join("\n");
+}
+
+async function initGrounding() {
+  const base = $("ground-base");
+  const closed = $("ground-closed");
+  if (!base || !closed) return;
+  const task = "who won the exclusive story";
+  // Base round: only chipfab-exclusive is loaded — the grid claim cites
+  // datacenter-power, which was NOT loaded, so grounding refuses it (fail-closed).
+  const g0 = await groundAnswer(task, GROUND_ANSWER, [GROUND_UNITS["chipfab-exclusive"]], { verifier: groundVerifier });
+  base.innerHTML = renderGrounded(g0);
+  // Closed loop: the gap re-navigates, the feed loads, the claim grounds against real bytes.
+  const g1 = await groundAnswer(task, GROUND_ANSWER, Object.values(GROUND_UNITS), { verifier: groundVerifier });
+  closed.innerHTML = renderGrounded(g1);
+}
+
 /* ---------- the receipts: conformance matrix + bundle integrity ---------- */
 
 const GH = "https://github.com/Cantara/kcp-agent/blob/main/";
@@ -630,6 +684,7 @@ loadManifests()
   // the arena's example fetch fails.
   .finally(() => {
     initPlayground();
+    initGrounding();
     initConformance();
     initBundleSha();
   });

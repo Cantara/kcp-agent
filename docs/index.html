@@ -45,6 +45,7 @@
         <a href="#arena">Arena</a>
         <a href="#why">Why</a>
         <a href="#loop">The Loop</a>
+        <a href="#grounding">Grounding</a>
         <a href="#playground">Playground</a>
         <a href="#receipts">Receipts</a>
         <a href="#install">Install</a>
@@ -158,6 +159,30 @@ final plan: datacenter-power, subsea-cable-feature
     <p class="capture__note">Verbatim from <code>node examples/demos.js loop</code> — <code>test/docs.test.ts</code>
       re-runs the demo in CI and fails if any line above is not in its real output. The narration cannot drift
       from the code.</p>
+  </section>
+
+  <!-- ================= GROUNDING ================= -->
+  <section id="grounding" class="section section--alt">
+    <h2>The Grounding — the answer is defensible, or the gap is surfaced</h2>
+    <p class="section__lead"><code>ask --ground</code> extends the plan's fail-closed gates to the
+      <em>output</em>: each answer claim must be attributed to a loaded, hash-pinned unit, or it is surfaced as a
+      gap — never silently dropped. A verifier <em>proposes</em> which unit supports a claim; the deterministic
+      layer <em>adjudicates</em> whether it may. The two panes below are computed live by the same
+      <code>groundAnswer</code> that ships in the CLI (bundled here) — the answer and verifier are scripted so it
+      runs offline, exactly as the demos do.</p>
+    <div class="match__panes">
+      <div class="pane pane--kcp">
+        <div class="pane__head"><span class="pane__mark">●</span> terminal grounding — a claim cites a unit that was not loaded</div>
+        <div class="pane__body" id="ground-base"></div>
+      </div>
+      <div class="pane pane--kcp">
+        <div class="pane__head"><span class="pane__mark">●</span> <code>--ground-rounds</code> — the gap re-navigates, grounds against real bytes</div>
+        <div class="pane__body" id="ground-closed"></div>
+      </div>
+    </div>
+    <p class="capture__note">The grid claim cites <code>datacenter-power</code>, but in the base round that unit was
+      not loaded — so grounding refuses it: attribution is a proposal, grounding is adjudicated. The closed loop then
+      re-navigates, loads the feed, and grounds the claim against its real <code>sha256</code>.</p>
   </section>
 
   <!-- ================= PLAYGROUND ================= -->
