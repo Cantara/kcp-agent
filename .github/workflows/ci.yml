@@ -28,6 +28,16 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  # The Rust port (rust/kcp-planner) must reproduce every conformance vector.
+  # A new vector added to the corpus fails here until the Rust core handles it —
+  # two independent implementations agreeing is what validates the spec.
+  rust-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --manifest-path rust/kcp-planner/Cargo.toml --locked
+
   natives:
     needs: test
     runs-on: ubuntu-latest
