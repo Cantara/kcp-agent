@@ -205,6 +205,27 @@ units:
     audience: [agent, human]
     triggers: [guide, mcp, claude code, register, wire, integrate]
 
+  - id: guide-quickstart
+    path: guides/quickstart.md
+    intent: "First ten minutes with kcp-agent — install, then plan, ask, validate, serve over MCP, and replay a saved artifact end to end"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, quickstart, getting started, install, first steps, tutorial]
+
+  - id: guide-memory
+    path: guides/give-your-agent-memory.md
+    intent: "Give an agent episodic memory — record answers as replayable byte-free episodes, recall by task overlap, verify by replay, and reuse only while they still hold"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, memory, remember, recall, reuse, episode]
+
+  - id: guide-dedup
+    path: guides/cut-context-cost-with-dedup.md
+    intent: "Cut a calling agent's context cost — pass known units to kcp_load so unchanged bytes come back as sha-confirmed stubs instead of being re-served"
+    scope: global
+    audience: [agent, human]
+    triggers: [guide, dedup, session, kcp_load, known units, context cost, token savings]
+
   - id: conformance-matrix
     path: docs/conformance.json
     intent: "The spec conformance matrix — every KCP layer the agent implements mapped to its implementation file and the CI tests that enforce it"

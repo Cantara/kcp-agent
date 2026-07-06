@@ -152,11 +152,11 @@ isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) sti
 remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
 can never cross a gate, name a URL, or spend past the budget.
 
-### Demos — thirteen scenarios, no mocks
+### Demos — sixteen scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all thirteen, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · dogfood
+node examples/demos.js            # all sixteen, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -174,10 +174,13 @@ node examples/demos.js vault      # one at a time
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
 | **The Summer Plan** | a family vacation across four federated parties — a signed hub, timetable supersession, an identity-gated accessibility registry, x402 tour detail, and the `not_for` footgun caught by the validate lint ([`examples/summer/`](examples/summer/)) | §3.6/§4.11/§4.22 |
 | **The Milky Way** | a whole enterprise documentation estate — a signed hub over eight domains: env-sliced dev mirror, a future regulation dated out, human-only HR docs, HSM-attested formulations, an identity-gated ERP vendor with subscription rate tiers, and a CSRD annual handover ([`examples/milky-way/`](examples/milky-way/)) | §3.6/§4.14/§4.22 |
+| **The Moved World** | episodic memory: an answer recorded byte-free, recalled by task overlap, then replayed — still-grounded while the pins hold, drifted the moment the source moves | — |
+| **The Déjà Vu** | memory-validated reuse: identical inputs against an unchanged manifest are provably the same plan; new options miss; a drifted manifest is refused | — |
+| **The Borrowed Memory** | MCP session dedup: `kcp_load` withholds the bytes a caller already holds (sha-confirmed stubs), and re-serves any unit that drifted | — |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all thirteen in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all sixteen in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
@@ -443,12 +446,18 @@ Not yet consumed: dependency chains between units, `hints.load_strategy`, compli
 
 ## Guides
 
+- [Quickstart — your first ten minutes](guides/quickstart.md) — install → plan → ask → validate
+  → serve → replay, end to end.
 - [Make your repo navigable in 10 minutes](guides/make-your-repo-navigable.md) — from nothing to a
   manifest real plans run against, kept honest in CI.
 - [Sign your manifest](guides/sign-your-manifest.md) — ed25519 over exact bytes, envelopes, key
   pinning, and the fail-closed lifecycle.
 - [Wire the planner into Claude Code](guides/wire-mcp-into-claude-code.md) — `kcp_plan` /
   `kcp_load` / `kcp_validate` over MCP, no API key needed.
+- [Give your agent a memory](guides/give-your-agent-memory.md) — record answers as replayable,
+  byte-free episodes; recall by task, verify by replay, reuse only while they hold.
+- [Cut context cost with session dedup](guides/cut-context-cost-with-dedup.md) — how an MCP
+  caller passes `known` units to `kcp_load` and stops re-spending its context window.
 
 ## License
 
