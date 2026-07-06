@@ -28,6 +28,13 @@ export interface MemoryEntry {
   task: string;
   manifestSource?: string;
   manifestSha?: string;
+  /**
+   * A stable digest of the planner inputs (role/methods/budget/…) this artifact
+   * was produced under. A plan is a function of its options, so reuse (slice 3)
+   * matches on this too — an episode made under different capabilities is a
+   * different plan, not a cache hit. Absent for standalone-`remember` entries.
+   */
+  optionsKey?: string;
   /** When this entry was appended — NOT part of the id (so re-records dedup). */
   recordedAt: string;
   /** The content-stripped artifact: replay-sufficient, never the unit bytes. */
@@ -100,7 +107,7 @@ function classify(raw: any): { kind: MemoryKind; task: string; manifest: any } {
 }
 
 /** Normalize a plan/grounded-answer artifact into a hash-addressed, byte-free memory entry. */
-export function toEntry(raw: unknown, recordedAt: string): MemoryEntry {
+export function toEntry(raw: unknown, recordedAt: string, meta: { optionsKey?: string } = {}): MemoryEntry {
   const { kind, task, manifest } = classify(raw);
   const artifact = stripArtifact(raw);
   return {
@@ -109,6 +116,7 @@ export function toEntry(raw: unknown, recordedAt: string): MemoryEntry {
     task,
     manifestSource: manifest?.source,
     manifestSha: manifest?.sha256,
+    optionsKey: meta.optionsKey,
     recordedAt,
     artifact,
   };

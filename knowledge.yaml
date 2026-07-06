@@ -121,6 +121,13 @@ units:
     audience: [agent, developer]
     triggers: [memory, remember, recall, episode, replay, freshness]
 
+  - id: memory-reuse
+    path: src/reuse.ts
+    intent: "How memory-validated reuse works — a determinism cache that reuses a prior episode only if it matches exactly (task + manifest + options) and still replays clean today; fail-closed on any drift or unverifiable freshness"
+    scope: project
+    audience: [agent, developer]
+    triggers: [reuse, cache, determinism, drift, fail-closed, cache hit]
+
   - id: demo-manifest
     path: examples/demo-hub/knowledge.yaml
     intent: "A worked example manifest exercising every planner stage — trust gating, temporal validity, payment, rate limits, federation"

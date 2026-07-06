@@ -95,6 +95,18 @@
       ]
     },
     {
+      "layer": "Memory-validated reuse — a determinism cache: reuse a prior episode only if it still replays clean, fail-closed on drift",
+      "section": "hardening",
+      "where": "reuse.ts · reuse",
+      "impl": ["src/reuse.ts"],
+      "proofs": [
+        { "file": "test/reuse.test.ts", "test": "grants reuse when the episode matches and still replays clean" },
+        { "file": "test/reuse.test.ts", "test": "FAIL-CLOSED: refuses reuse when the manifest drifted since the episode" },
+        { "file": "test/reuse.test.ts", "test": "FAIL-CLOSED: without a replay hook, reuse is refused as unverifiable (never granted on faith)" },
+        { "file": "test/reuse.test.ts", "test": "misses on a different task, a different options set, or a different manifest" }
+      ]
+    },
+    {
       "layer": "Closed-loop grounding — a gap re-navigates for evidence, with a bounded convergence proof",
       "section": "hardening",
       "where": "groundloop.ts · groundingLoop",

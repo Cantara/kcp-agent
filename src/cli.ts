@@ -57,6 +57,7 @@ import { validateLocation } from "./validate.js";
 import { replayArtifact } from "./replay.js";
 import { serveMcp } from "./mcp.js";
 import { toEntry, fileStore, recall, type MemoryEntry, type RecallReplay } from "./memory.js";
+import { reuse } from "./reuse.js";
 
 interface Args {
   command: string;
@@ -193,6 +194,28 @@ function buildRecallReplay(guard: FetchGuard): RecallReplay {
       return { ok: false, unverifiable: true, detail: `could not replay: ${err instanceof Error ? err.message : String(err)}` };
     }
   };
+}
+
+/** A stable digest of the planner inputs — the reuse cache key (a plan is a function of these). */
+function buildOptionsKey(a: Args): string {
+  // A run with no pinned --as-of implicitly uses today, so bake the effective
+  // date in: an unpinned plan is only reuse-eligible within the same day.
+  const asOf = a.asOf ?? new Date().toISOString().slice(0, 10);
+  return JSON.stringify({
+    env: a.env ?? null,
+    asOf,
+    maxUnits: a.maxUnits ?? null,
+    strict: a.strict,
+    role: a.role ?? null,
+    methods: a.methods ?? null,
+    credentials: a.credentials ?? null,
+    attest: a.attest ?? null,
+    budget: a.budget ?? null,
+    currency: a.currency ?? null,
+    follow: a.follow,
+    maxDepth: a.maxDepth ?? null,
+    maxNodes: a.maxNodes ?? null,
+  });
 }
 
 function buildFollowOptions(a: Args): FollowOptions {
@@ -348,11 +371,59 @@ async function main() {
   if (a.command === "plan") {
     if (a.json) console.log(JSON.stringify(a.follow ? tree : allPlans[0], null, 2));
     else console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
+    // --memory: report determinism against a prior episode (fail-closed on sha drift), then record.
+    if (a.memory) {
+      const store = fileStore(a.memory);
+      const rootPlan = allPlans[0] as { manifest?: { source?: string; sha256?: string } };
+      const source = rootPlan.manifest?.source;
+      const freshSha = rootPlan.manifest?.sha256;
+      const optionsKey = buildOptionsKey(a);
+      if (source) {
+        // "Freshness" for a plan is just sha equality with the fetch we already did — no extra I/O.
+        const shaReplay: RecallReplay = async (e) =>
+          e.manifestSha === freshSha
+            ? { ok: true, detail: `manifest@${(freshSha ?? "").slice(0, 12)}… unchanged` }
+            : { ok: false, detail: `manifest drifted: episode ${(e.manifestSha ?? "?").slice(0, 12)}… ≠ today ${(freshSha ?? "?").slice(0, 12)}…` };
+        const d = await reuse(store, { task: a.task, manifestSource: source, optionsKey, kind: "plan" }, { replay: shaReplay });
+        if (!a.json) {
+          if (d.status === "reuse") console.log(`\n♻ determinism: provably identical to episode ${d.entry!.id.slice(0, 12)}… (${d.entry!.recordedAt}) — ${d.detail}`);
+          else if (d.status === "drifted") console.log(`\n⚠ ${d.detail} since episode ${d.entry!.id.slice(0, 12)}… (${d.entry!.recordedAt}) — this plan differs from the recorded one`);
+          else console.log(`\n· new episode for this task + manifest + options`);
+        }
+        await store.append(toEntry(allPlans[0], new Date().toISOString(), { optionsKey }));
+      }
+    }
     return;
   }
 
   // ask: show the plan(s), then synthesize across every followed manifest.
   if (!a.json) console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
+
+  // --memory + --ground: try to reuse a cached grounded answer BEFORE calling the
+  // model. Reuse is granted only if every cited unit still holds its pinned bytes
+  // (replayGroundedAnswer), so a stale answer is re-computed, never served.
+  const optionsKey = buildOptionsKey(a);
+  const source = (allPlans[0] as { manifest?: { source?: string } }).manifest?.source;
+  const store = a.memory ? fileStore(a.memory) : undefined;
+  if (store && a.ground && source) {
+    const d = await reuse(
+      store,
+      { task: a.task, manifestSource: source, optionsKey, kind: "grounded-answer" },
+      { replay: buildRecallReplay(buildFetchGuard(a)) },
+    );
+    if (d.status === "reuse") {
+      const art = d.artifact as { synthesis?: { answer?: string; unitsLoaded?: unknown[] }; grounding?: Parameters<typeof formatGrounded>[0] };
+      if (a.json) { console.log(JSON.stringify({ reused: d.entry!.id, ...(art as object) }, null, 2)); return; }
+      console.log(`\n♻ reused grounded answer from episode ${d.entry!.id.slice(0, 12)}… (${d.entry!.recordedAt}) — ${d.detail}`);
+      console.log("─".repeat(60));
+      console.log(`Answer (reused, from ${art.synthesis?.unitsLoaded?.length ?? 0} unit(s)):\n`);
+      console.log(art.synthesis?.answer ?? "");
+      if (art.grounding) console.log(formatGrounded(art.grounding));
+      return;
+    }
+    if (!a.json && d.status === "drifted") console.log(`\n⚠ cached answer stale (${d.detail}) — re-answering.`);
+  }
+
   const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
 
   // --ground: verify the answer against the loaded units and surface the gaps.
@@ -361,6 +432,11 @@ async function main() {
         verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
       })
     : undefined;
+
+  // Record the episode so the next identical, grounded ask can reuse it.
+  if (store && grounding) {
+    await store.append(toEntry({ plan: allPlans[0], synthesis: result, grounding }, new Date().toISOString(), { optionsKey }));
+  }
 
   if (a.json) {
     console.log(JSON.stringify({ plan: a.follow ? tree : allPlans[0], synthesis: result, grounding }, null, 2));

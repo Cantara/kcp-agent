@@ -287,6 +287,34 @@ freshness claim on its own**: with `--replay` each hit is re-verified against to
 `unverifiable` — memory never falsely claims a stale answer is still true. A memory is a plan you
 can re-verify against a moved world.
 
+### memory-validated reuse — a determinism-preserving cache
+
+Passing `--memory <dir>` to `plan` or `ask` turns the episode log into a cache whose
+correctness rests on the same property everything else does: a plan is a pure function of
+`(manifest bytes, task, options)`. The rule is **recall (exact match) + replay (freshness) =
+reuse**, and everything short of that is fail-closed.
+
+```bash
+node dist/cli.js plan "how do I deploy" --manifest . --memory .kcp-memory   # records + reports determinism
+node dist/cli.js plan "how do I deploy" --manifest . --memory .kcp-memory   # ♻ provably identical to episode …
+node dist/cli.js ask  "how do I deploy" --manifest . --ground --memory .kcp-memory   # reuses a clean grounded answer, skips the model
+```
+
+`plan --memory` records each plan and, if a prior episode ran with the *same* task, manifest,
+and options, reports whether today's manifest is byte-identical (**♻ provably identical**) or
+has **drifted** since — a determinism/audit signal, never a silent reuse across a sha change.
+The cache key includes the effective `--as-of` date, so an unpinned plan is only reuse-eligible
+within the same day; a run under different capabilities (`--role`, `--budget`, …) is a different
+plan, not a hit.
+
+`ask --ground --memory` is where reuse pays off: before calling the model it looks for a cached
+**grounded answer** for the identical request and replays it — re-reading every cited unit and
+re-checking its pinned `sha256`. Only if *every* citation still holds is the stored answer
+returned (**♻ reused**, no model call); if any cited unit drifted or is gone, the answer is
+**re-computed**, never served stale. Because ingest already stripped the unit bytes, a recalled
+answer can never smuggle restricted content past the next access gate — reuse re-reads the units
+through the guard, live. A memory is a plan you can re-verify against a moved world.
+
 ### `mcp` — serve the planner to any MCP client
 
 ```bash

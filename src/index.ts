@@ -69,6 +69,13 @@ export {
   type RecallReplay,
   type RecallOptions,
 } from "./memory.js";
+export {
+  reuse,
+  type ReuseStatus,
+  type ReuseRequest,
+  type ReuseDecision,
+  type ReuseOptions,
+} from "./reuse.js";
 export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";
 export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
 export {
