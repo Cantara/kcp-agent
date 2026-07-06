@@ -211,6 +211,14 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("a stub carries { id, path, sha256, unchanged } — never the bytes");
   });
 
+  it("context-window: the token ceiling is greedy by score, over-budget units skipped with the arithmetic", () => {
+    const out = demo("context-window");
+    expect(out).toMatch(/● 1\. chipfab-exclusive/);
+    expect(out).toContain("Context: 2,900/3,000 tokens (100 remaining)");
+    expect(out).toContain("datacenter-power: over context budget: 900 tokens would exceed remaining 100 of 3,000");
+    expect(out).toContain("subsea-cable-feature: over context budget: 1,400 tokens would exceed remaining 100 of 3,000");
+  });
+
   it("dogfood: the repo manifest validates and routes to the planner source", () => {
     const out = demo("dogfood");
     expect(out).toContain("✓ valid");

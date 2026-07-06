@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — sixteen narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — seventeen narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all sixteen in CI as regression tests.
+// all seventeen in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -861,6 +861,32 @@ const SCENARIOS = [
       '"unchanged" is a literal claim that the bytes match, never a shortcut that hides a change. And ' +
       'because kcp_load re-plans (and re-gates) every call, a unit the caller has lost access to is ' +
       'simply absent — dedup can never smuggle it back.',
+  },
+  {
+    id: 'context-window',
+    title: 'The Context Window — tokens are the scarce resource; budget them',
+    useCase:
+      '--context-budget names what actually decides how much a model can read: tokens. It works ' +
+      'exactly like the money --budget — greedy by score, a unit that would blow the ceiling is ' +
+      'skipped with the arithmetic in the reason, and a smaller lower-scored unit still fits. A ' +
+      "unit's size comes from a declared size_tokens (or bytes/4), weighed on metadata BEFORE any " +
+      'fetch (audit-before-action). Composes with --budget: a unit must fit both ceilings.',
+    run() {
+      const p = agent(['plan', 'sovereign compute award', '--manifest', FJORDWIRE,
+        '--methods', 'free,x402', '--context-budget', '3000', '--as-of', '2026-07-06']);
+      return { blocks: [{ command: p.command, lines: [
+        ...pick(p.stdout, ['●']).map((l) => '  ' + l.trim()),
+        '',
+        ...pick(p.stdout, ['Context:', 'projected ']).map((l) => '  ' + c.cyan(l.trim())),
+        '',
+        ...pick(p.stdout, ['over context budget']).map((l) => '  ' + c.yellow(l.trim())),
+      ] }] };
+    },
+    verdict:
+      'The exclusive (2,600 tokens) eats most of a 3,000-token window; the free summary (300) ' +
+      'still fits; the two feeds that would blow it are skipped with the exact arithmetic. Greedy ' +
+      'by score, deterministic, and decided on metadata before a single byte is fetched — the same ' +
+      'discipline the money budget uses, pointed at the resource that governs what a model can read.',
   },
   {
     id: 'dogfood',

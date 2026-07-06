@@ -71,6 +71,10 @@ export interface Unit {
   payment?: Payment;
   rate_limits?: RateLimits;
   temporal?: Temporal;
+  /** Declared token cost — the faithful input for context-window budgeting (#33). */
+  size_tokens?: number;
+  /** Declared byte size — the estimate source when size_tokens is absent (tokens ≈ bytes/4). */
+  bytes?: number;
 }
 
 export interface Signing {

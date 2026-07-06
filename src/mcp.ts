@@ -33,7 +33,7 @@ import type { PlanOptions } from "./planner.js";
 export const PROTOCOL_VERSION = "2025-06-18";
 // Version must match package.json — test/mcp.test.ts pins them together
 // (a runtime read wouldn't survive `deno compile`, which embeds only the module graph).
-export const SERVER_INFO = { name: "kcp-agent", version: "0.8.0" };
+export const SERVER_INFO = { name: "kcp-agent", version: "0.9.0" };
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -65,6 +65,7 @@ const PLAN_ARGS = {
     strict: { type: "boolean", description: "Fail-closed: drop non-eligible units instead of listing them" },
     budget: { type: "number", description: "Spend ceiling for pay-per-request units" },
     currency: { type: "string", description: "Budget currency (default USDC)" },
+    context_budget: { type: "number", description: "Token ceiling for what the plan loads into the caller's context window; over-budget units skipped with the arithmetic" },
     follow: { type: "boolean", description: "Follow eligible federation refs (default false)" },
     max_depth: { type: "number", description: "Federation hops to follow when follow=true (default 1)" },
     max_nodes: { type: "number", description: "Cap on total manifests fetched across the walk (default 64)" },
@@ -178,6 +179,7 @@ function toFollowOptions(args: Record<string, unknown>): FollowOptions {
       args["budget"] === undefined
         ? undefined
         : { amount: Number(args["budget"]), currency: args["currency"] === undefined ? undefined : String(args["currency"]) },
+    contextBudget: args["context_budget"] === undefined ? undefined : Number(args["context_budget"]),
     capabilities: {
       ...(args["role"] === undefined ? {} : { role: String(args["role"]) }),
       ...(methods ? { paymentMethods: methods } : {}),

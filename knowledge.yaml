@@ -8,7 +8,7 @@
 
 kcp_version: "0.25"
 project: kcp-agent
-version: 0.8.0
+version: 0.9.0
 updated: "2026-07-06"
 language: en
 
@@ -225,6 +225,13 @@ units:
     scope: global
     audience: [agent, human]
     triggers: [guide, dedup, session, kcp_load, known units, context cost, token savings]
+
+  - id: conformance-vectors
+    path: vectors/README.md
+    intent: "The spec conformance vector corpus — (manifest, task, options) → expected plan fixtures any KCP implementation must reproduce; the prerequisite for a second (e.g. Go) implementation"
+    scope: global
+    audience: [agent, developer]
+    triggers: [conformance, vectors, corpus, port, second implementation, spec validation]
 
   - id: conformance-matrix
     path: docs/conformance.json

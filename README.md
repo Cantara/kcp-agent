@@ -71,6 +71,16 @@ attestation (§3.2), federation `context` + `agent_identity` (§3.6), and paymen
 (§4.14/§4.15). A restricted unit the agent can't attest for is listed but marked **not
 load-eligible** — fail-closed, with the reason attached.
 
+**Budgeting the context window.** Tokens are the actually-scarce resource when feeding a model,
+so `--context-budget <n>` names it — a token ceiling that works exactly like the money `--budget`:
+greedy by score, and a unit that would blow the ceiling is skipped with the arithmetic in the
+reason (`over context budget: 1,240 tokens would exceed remaining 800 of 4,000`), while a smaller
+lower-scored unit still gets its chance. Since the planner works on metadata *before* fetching
+(audit-before-action), a unit's size comes from a declared `size_tokens` (faithful) or `bytes/4`
+(a flagged estimate); a unit that declares neither is admitted but counted **unmeasured** (the
+projection is a lower bound) — unless `--strict`, which excludes it fail-closed. `--context-budget`
+composes with `--budget`: a unit must fit both ceilings.
+
 ### `ask` — plan, then answer via Claude
 
 ```bash
@@ -152,11 +162,11 @@ isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) sti
 remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
 can never cross a gate, name a URL, or spend past the budget.
 
-### Demos — sixteen scenarios, no mocks
+### Demos — seventeen scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all sixteen, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · dogfood
+node examples/demos.js            # all seventeen, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · context-window · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -177,10 +187,11 @@ node examples/demos.js vault      # one at a time
 | **The Moved World** | episodic memory: an answer recorded byte-free, recalled by task overlap, then replayed — still-grounded while the pins hold, drifted the moment the source moves | — |
 | **The Déjà Vu** | memory-validated reuse: identical inputs against an unchanged manifest are provably the same plan; new options miss; a drifted manifest is refused | — |
 | **The Borrowed Memory** | MCP session dedup: `kcp_load` withholds the bytes a caller already holds (sha-confirmed stubs), and re-serves any unit that drifted | — |
+| **The Context Window** | `--context-budget`: a token ceiling, greedy by score, over-budget units skipped with the arithmetic; size from declared `size_tokens` or `bytes/4` | — |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all sixteen in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all seventeen in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
@@ -212,6 +223,7 @@ planning sensibly.
 | `--attest <provider>` | attestation provider the agent can present |
 | `--budget <amount>` | spend ceiling for pay-per-request units — greedy by score, skips (with arithmetic) what would blow it. One ceiling for the whole federated walk, not per manifest |
 | `--currency <code>` | budget currency (default `USDC`) |
+| `--context-budget <n>` | token ceiling for what the plan loads into the model's context window — greedy by score, skips (with arithmetic) what would blow it. Composes with `--budget`: a unit must fit both |
 | `--follow` | fetch and plan eligible federation refs too (fail-closed: gated/excluded refs are never fetched) |
 | `--max-depth <n>` | federation hops to follow (default 1; implies `--follow`) |
 | `--max-nodes <n>` | cap on total manifests fetched across the whole walk (default 64; fail-closed fan-out ceiling) |
@@ -441,6 +453,17 @@ Every row is pinned to the CI tests that enforce it in
 [`docs/conformance.json`](docs/conformance.json) — rendered as
 [the Receipts](https://cantara.github.io/kcp-agent/#receipts) on the site — and
 `test/docs.test.ts` fails the build if a referenced test disappears or is renamed.
+
+### Conformance vectors
+
+[`vectors/`](vectors/) freezes the planner's decisions as portable
+`(manifest, task, options) → expected outcome` fixtures — the deterministic core's behavior as
+**data**, not code. `test/vectors.test.ts` proves the reference planner reproduces every one; any
+second implementation (a Go/Rust port for a 2–5 MB static binary, or a third party's) is
+conformant iff it does the same. Two independent implementations that pass the same vectors
+validate the *spec*, not just the code — the strongest proof a protocol is unambiguous. The corpus
+is generated from the reference planner (`npm run gen:vectors`) so the expected outcomes are never
+hand-written, and is [proposed upstream](vectors/README.md) as the normative KCP conformance suite.
 
 Not yet consumed: dependency chains between units, `hints.load_strategy`, compliance/audit blocks.
 

@@ -155,6 +155,18 @@
       ]
     },
     {
+      "layer": "Context-window budget — a token ceiling on what a plan loads, greedy by score, fail-closed with the arithmetic",
+      "section": "§4.15",
+      "where": "planner.ts · unitTokens / planContext + greedy loop",
+      "impl": ["src/planner.ts"],
+      "proofs": [
+        { "file": "test/context.test.ts", "test": "skips an over-budget unit with the token arithmetic, and a smaller unit still fits" },
+        { "file": "test/context.test.ts", "test": "uses declared size_tokens exactly, and estimates bytes/4 (flagged approximate)" },
+        { "file": "test/context.test.ts", "test": "admits an undeclared-size unit but counts it unmeasured; --strict excludes it" },
+        { "file": "test/context.test.ts", "test": "fits money but blown by tokens → skipped for context" }
+      ]
+    },
+    {
       "layer": "Payment methods & tiers",
       "section": "§4.14",
       "where": "planner.ts · planPayment",
@@ -195,6 +207,16 @@
         { "file": "test/replay.test.ts", "test": "replays every node of a --follow tree artifact" },
         { "file": "test/replay.test.ts", "test": "detects manifest drift by sha256 before re-planning" },
         { "file": "test/replay.test.ts", "test": "detects a tampered artifact even when the manifest bytes still match" }
+      ]
+    },
+    {
+      "layer": "Conformance vectors — the planner's decisions frozen as portable data any implementation must reproduce",
+      "section": "conformance",
+      "where": "vectors/ + vectors.ts · runVector / outcomeOf",
+      "impl": ["src/vectors.ts", "scripts/gen-vectors.mjs"],
+      "proofs": [
+        { "file": "test/vectors.test.ts", "test": "ships a non-trivial corpus covering the core spec layers" },
+        { "file": "test/vectors.test.ts", "test": "every vector's name matches its filename (stable, addressable corpus)" }
       ]
     },
     {

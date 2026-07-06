@@ -34,6 +34,7 @@ units:
     scope: global
     audience: [agent, human]
     triggers: [front page, headlines, pricing]
+    size_tokens: 200
     hints: {load_strategy: eager}
 
   - id: chipfab-exclusive
@@ -42,6 +43,7 @@ units:
     scope: module
     audience: [agent]
     triggers: [sovereign, compute, award, exclusive]
+    size_tokens: 2600
     temporal:
       valid_from: "2026-07-05"
     payment:
@@ -55,6 +57,7 @@ units:
     scope: module
     audience: [agent]
     triggers: [datacenter, power grid, capacity, compute]
+    size_tokens: 900
     payment:
       default_tier: metered
       methods:
@@ -66,6 +69,7 @@ units:
     scope: module
     audience: [agent]
     triggers: [subsea, cable, compute]
+    size_tokens: 1400
     payment:
       default_tier: metered
       methods:
@@ -77,6 +81,7 @@ units:
     scope: module
     audience: [agent]
     triggers: [sovereign, compute, award]
+    size_tokens: 300
 
   - id: chipfab-rumour
     path: stories/chipfab-rumour.md
@@ -84,6 +89,7 @@ units:
     scope: module
     audience: [agent]
     triggers: [sovereign, compute, award, rumour]
+    size_tokens: 1100
     temporal:
       valid_from: "2026-06-28"
       valid_until: "2026-07-05"

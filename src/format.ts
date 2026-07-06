@@ -80,6 +80,15 @@ export function formatPlan(p: AgentPlan): string {
   out.push(c.dim("  " + p.budget.note));
   out.push("");
 
+  // context budget (only when the agent planned with one)
+  if (p.context.ceiling !== undefined) {
+    out.push(c.bold("Context: ") +
+      c.cyan(`${p.context.projectedTokens?.toLocaleString("en-US")}/${p.context.ceiling.toLocaleString("en-US")} tokens`) +
+      c.dim(` (${p.context.remaining?.toLocaleString("en-US")} remaining)`));
+    out.push(c.dim("  " + p.context.note));
+    out.push("");
+  }
+
   // federation
   if (p.federation.length) {
     out.push(c.bold("Federation:"));

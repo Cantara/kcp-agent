@@ -1,0 +1,45 @@
+{
+  "name": "temporal-supersession-overlap",
+  "spec": "§4.22",
+  "description": "on the overlap day the predecessor is skipped because its declared successor is active",
+  "manifest": "kcp_version: \"0.25\"\nproject: newsroom\nversion: 1.0.0\nunits:\n  - id: award-rumour\n    path: stories/rumour.md\n    intent: \"Rumour round-up: who is favourite for the sovereign compute award?\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, rumour]\n    temporal:\n      valid_from: \"2026-06-28\"\n      valid_until: \"2026-07-05\"\n      superseded_by: award-exclusive\n  - id: award-exclusive\n    path: stories/award.md\n    intent: \"Exclusive: the sovereign compute award decision\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, exclusive]\n    temporal:\n      valid_from: \"2026-07-05\"\n",
+  "task": "sovereign compute award",
+  "options": {
+    "asOf": "2026-07-05",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [
+      {
+        "id": "award-exclusive",
+        "loadEligible": true,
+        "score": 23
+      }
+    ],
+    "skipped": [
+      {
+        "id": "award-rumour",
+        "reason": "superseded by award-exclusive (successor active)"
+      }
+    ],
+    "federation": [],
+    "trust": {
+      "requiresAttestation": false,
+      "agentCanAttest": true
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 1
+    },
+    "warnings": []
+  }
+}

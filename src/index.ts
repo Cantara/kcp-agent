@@ -15,6 +15,7 @@ export {
 export {
   plan,
   scoreUnit,
+  unitTokens,
   DEFAULT_CAPABILITIES,
   type AgentCapabilities,
   type PlanOptions,
@@ -23,6 +24,7 @@ export {
   type SkippedUnit,
   type FederationPlan,
   type BudgetPlan,
+  type ContextPlan,
   type PaymentPlan,
 } from "./planner.js";
 export { formatPlan, formatPlanTree, formatValidation, formatGrounded, formatGroundedReplay } from "./format.js";
@@ -86,6 +88,7 @@ export {
   type DedupResult,
 } from "./session.js";
 export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";
+export { outcomeOf, runVector, type VectorOutcome, type ConformanceVector } from "./vectors.js";
 export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
 export {
   runLoop,
