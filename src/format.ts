@@ -1,4 +1,4 @@
-// Human-readable rendering of plans, plan trees, and validation reports.
+// Human-readable rendering of plans, plan trees, validation reports, traces, and diffs.
 
 import type { AgentPlan } from "./planner.js";
 import type { PlanNode } from "./follow.js";
@@ -7,6 +7,8 @@ import type { ReplayReport } from "./replay.js";
 import type { GroundedAnswer } from "./ground.js";
 import type { GroundedReplayReport } from "./replayground.js";
 import type { Recalled } from "./memory.js";
+import type { DecisionTrace } from "./trace.js";
+import type { PlanDiff } from "./diff.js";
 
 const useColor = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const c = {
@@ -261,5 +263,119 @@ export function formatValidation(report: ValidationReport): string {
       : c.red(`✗ invalid`) + c.dim(` — ${errors.length} error(s), ${warnings.length} warning(s)`)
   );
   out.push("");
+  return out.join("\n");
+}
+
+/** Render a decision trace: the gate cascade for every unit in the manifest. */
+export function formatTrace(t: DecisionTrace): string {
+  const out: string[] = [];
+  out.push("");
+  out.push(c.bold("Decision Trace"));
+  out.push(c.dim(`  ${t.units.length} units evaluated · ${t.taskTerms.length} search terms: ${t.taskTerms.join(", ")}`));
+  out.push("");
+
+  // Gate summary
+  out.push(c.bold("Gate summary:"));
+  for (const gs of t.gateSummary) {
+    if (gs.passed === 0 && gs.failed === 0) continue; // gate never reached
+    const bar = gs.failed > 0
+      ? `${c.green(String(gs.passed))} passed, ${c.red(String(gs.failed))} rejected`
+      : c.green(`${gs.passed} passed`);
+    out.push(`  ${c.dim(gs.gate.padEnd(16))} ${bar}`);
+  }
+  out.push("");
+
+  // Per-unit cascade
+  for (const u of t.units) {
+    const mark = u.outcome === "selected" ? c.green("●") : c.red("○");
+    const scorePart = u.score !== undefined ? c.dim(` (score ${u.score})`) : "";
+    out.push(`${mark} ${c.bold(u.id)}${scorePart} ${c.dim(u.path)}`);
+    for (const g of u.gates) {
+      const gMark = g.passed ? c.green("  ✓") : c.red("  ✗");
+      out.push(`${gMark} ${c.dim(g.gate.padEnd(16))} ${g.detail}`);
+    }
+    out.push("");
+  }
+
+  const selected = t.units.filter((u) => u.outcome === "selected").length;
+  const skipped = t.units.filter((u) => u.outcome === "skipped").length;
+  out.push(c.dim(`${selected} selected, ${skipped} skipped`));
+  out.push("");
+  return out.join("\n");
+}
+
+/** Render a plan diff: what changed between two plan artifacts. */
+export function formatDiff(d: PlanDiff): string {
+  const out: string[] = [];
+  out.push("");
+  out.push(c.bold("Plan Diff"));
+  out.push(c.dim(`  A: ${d.a.project} v${d.a.version} · "${d.a.task}" · ${d.a.asOf}`));
+  out.push(c.dim(`  B: ${d.b.project} v${d.b.version} · "${d.b.task}" · ${d.b.asOf}`));
+  out.push("");
+
+  if (d.identical) {
+    out.push(c.green("✓ plans are identical"));
+    out.push("");
+    return out.join("\n");
+  }
+
+  if (d.moves.length) {
+    out.push(c.bold(`Moves (${d.moves.length}):`));
+    for (const m of d.moves) {
+      const arrow = m.direction === "selected_to_skipped"
+        ? c.red("selected → skipped")
+        : c.green("skipped → selected");
+      out.push(`  ${c.bold(m.id)}: ${arrow}`);
+      if (m.from.score !== undefined) out.push(`    ${c.dim(`was: score ${m.from.score}`)}`);
+      if (m.from.reason) out.push(`    ${c.dim(`was: ${m.from.reason}`)}`);
+      if (m.to.score !== undefined) out.push(`    ${c.dim(`now: score ${m.to.score}`)}`);
+      if (m.to.reason) out.push(`    ${c.dim(`now: ${m.to.reason}`)}`);
+    }
+    out.push("");
+  }
+
+  if (d.scoreChanges.length) {
+    out.push(c.bold(`Score changes (${d.scoreChanges.length}):`));
+    for (const s of d.scoreChanges) {
+      const dir = s.delta > 0 ? c.green(`+${s.delta}`) : c.red(String(s.delta));
+      out.push(`  ${c.bold(s.id)}: ${s.before} → ${s.after} (${dir})`);
+    }
+    out.push("");
+  }
+
+  if (d.presence.length) {
+    out.push(c.bold(`Units added/removed (${d.presence.length}):`));
+    for (const p of d.presence) {
+      const mark = p.side === "b_only" ? c.green("+") : c.red("-");
+      out.push(`  ${mark} ${p.id} ${c.dim(p.side === "b_only" ? "(new in B)" : "(removed in B)")}`);
+    }
+    out.push("");
+  }
+
+  if (d.budgetShifts.length) {
+    out.push(c.bold("Budget/context shifts:"));
+    for (const b of d.budgetShifts) {
+      out.push(`  ${c.dim(b.field)}: ${b.before ?? "—"} → ${b.after ?? "—"}`);
+    }
+    out.push("");
+  }
+
+  if (d.reasonChanges.length) {
+    out.push(c.bold(`Reason changes (${d.reasonChanges.length}):`));
+    for (const r of d.reasonChanges) {
+      out.push(`  ${c.bold(r.id)}`);
+      out.push(`    ${c.dim(`was: ${r.before}`)}`);
+      out.push(`    ${c.dim(`now: ${r.after}`)}`);
+    }
+    out.push("");
+  }
+
+  if (d.warningChanges.added.length || d.warningChanges.removed.length) {
+    out.push(c.bold("Warning changes:"));
+    for (const w of d.warningChanges.added) out.push(`  ${c.green("+")} ${w}`);
+    for (const w of d.warningChanges.removed) out.push(`  ${c.red("-")} ${w}`);
+    out.push("");
+  }
+
   return out.join("\n");
 }

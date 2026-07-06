@@ -29,11 +29,13 @@ import { validateLocation } from "./validate.js";
 import { replayArtifact } from "./replay.js";
 import { dedupeLoaded, type KnownUnits } from "./session.js";
 import type { PlanOptions } from "./planner.js";
+import { loadManifest } from "./client.js";
+import { trace as traceDecision } from "./trace.js";
 
 export const PROTOCOL_VERSION = "2025-06-18";
 // Version must match package.json — test/mcp.test.ts pins them together
 // (a runtime read wouldn't survive `deno compile`, which embeds only the module graph).
-export const SERVER_INFO = { name: "kcp-agent", version: "0.9.0" };
+export const SERVER_INFO = { name: "kcp-agent", version: "0.10.0" };
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -142,6 +144,14 @@ export const TOOLS = [
     },
   },
   {
+    name: "kcp_trace",
+    description:
+      "Produce a decision trace for a task: every unit in the manifest annotated with the gate " +
+      "cascade it was evaluated through (audience, temporal, relevance, budget, context, etc.). " +
+      "Same inputs as kcp_plan; returns the canonical plan plus structured per-unit gate verdicts.",
+    inputSchema: PLAN_ARGS,
+  },
+  {
     name: "kcp_replay",
     description:
       "Cross-examine a saved plan artifact (the JSON returned by kcp_plan): re-fetch each manifest, " +
@@ -218,6 +228,12 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<st
       // Session dedup: withhold bytes the caller already holds unchanged (exact sha match).
       const { units, deduped, bytesSaved } = dedupeLoaded(loaded, args["known"] as KnownUnits | undefined);
       return JSON.stringify({ plan: tree, units, unavailable, deduped, bytesSaved }, null, 2);
+    }
+    case "kcp_trace": {
+      const follow = toFollowOptions(args);
+      const manifest = await loadManifest(String(args["manifest"] ?? ""), follow.fetchGuard);
+      const t = traceDecision(manifest, String(args["task"] ?? ""), follow.planOptions);
+      return JSON.stringify(t, null, 2);
     }
     case "kcp_validate": {
       const guard = { allowPrivate: args["allow_private_hosts"] === true };

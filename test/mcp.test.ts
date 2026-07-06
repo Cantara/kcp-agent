@@ -22,10 +22,10 @@ describe("MCP server", () => {
     expect(await handleMessage({ jsonrpc: "2.0", method: "notifications/initialized" })).toBeNull();
   });
 
-  it("lists the four tools", async () => {
+  it("lists the five tools", async () => {
     const r = (await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" })) as Rpc;
     expect(r.result.tools.map((t: { name: string }) => t.name)).toEqual([
-      "kcp_plan", "kcp_load", "kcp_validate", "kcp_replay",
+      "kcp_plan", "kcp_load", "kcp_validate", "kcp_trace", "kcp_replay",
     ]);
     for (const t of TOOLS) expect(t.inputSchema).toBeDefined();
   });

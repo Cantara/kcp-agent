@@ -8,6 +8,7 @@
 //                                                                     --check-gaps: re-navigate to see if a surfaced gap now closes
 //   kcp-agent remember <artifact.json> --memory <dir>                 log a plan/grounded-answer artifact to episodic memory (unit bytes stripped)
 //   kcp-agent recall   "<task>" --memory <dir>                        recall past episodes by task overlap; --replay re-verifies each against today's world
+//   kcp-agent diff     <a.json> <b.json>                              compare two saved plan artifacts (exit 0 identical, exit 1 changed)
 //   kcp-agent mcp                                                     serve the planner over MCP stdio
 //
 // Options (plan/ask):
@@ -30,6 +31,7 @@
 //   --no-verify           skip manifest signature verification
 //   --require-signature   fail unless every manifest has a verified signature
 //   --trust-key <loc>     pinned ed25519 public key (path, URL, or inline) for verification
+//   --trace               show the decision trace: per-unit gate cascade (plan only)
 //   --json                emit the result as JSON
 //   ask only:
 //   --model <id>          Claude model id (default: claude-opus-4-8)
@@ -48,7 +50,8 @@ import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
 import type { FetchGuard } from "./fetch.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
-import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay, formatRecall } from "./format.js";
+import { loadManifest } from "./client.js";
+import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay, formatRecall, formatTrace, formatDiff } from "./format.js";
 import { synthesize, loadAnthropicSdk, loadPlannedUnits, type SynthesisResult } from "./synthesize.js";
 import { groundAnswer, makeClaudeVerifier } from "./ground.js";
 import { replayGroundedAnswer } from "./replayground.js";
@@ -59,6 +62,8 @@ import { replayArtifact } from "./replay.js";
 import { serveMcp } from "./mcp.js";
 import { toEntry, fileStore, recall, type MemoryEntry, type RecallReplay } from "./memory.js";
 import { reuse } from "./reuse.js";
+import { trace as traceDecision } from "./trace.js";
+import { diffPlans } from "./diff.js";
 
 interface Args {
   command: string;
@@ -94,10 +99,12 @@ interface Args {
   memory?: string;
   replay: boolean;
   limit?: number;
+  trace: boolean;
+  positionals: string[];
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false, replay: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false, replay: false, trace: false, positionals: [] };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -135,11 +142,13 @@ function parseArgs(argv: string[]): Args {
       case "--memory": a.memory = next(); break;
       case "--replay": a.replay = true; break;
       case "--limit": a.limit = Number(next()); break;
+      case "--trace": a.trace = true; break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
         positionals.push(t);
     }
   }
+  a.positionals = positionals;
   a.task = positionals.join(" ") || undefined;
   return a;
 }
@@ -243,6 +252,7 @@ const USAGE =
   '  kcp-agent replay   <plan.json> [--json]\n' +
   '  kcp-agent remember <artifact.json> --memory <dir>\n' +
   '  kcp-agent recall   "<task>" --memory <dir> [--replay] [--limit <n>]\n' +
+  '  kcp-agent diff     <a.json> <b.json> [--json]\n' +
   '  kcp-agent mcp\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
@@ -311,6 +321,20 @@ async function main() {
     process.exit(hits.some((h) => h.status === "drifted") ? 1 : 0);
   }
 
+  if (a.command === "diff") {
+    if (a.positionals.length < 2) {
+      console.error("Usage: kcp-agent diff <a.json> <b.json> [--json]\n\n" + USAGE);
+      process.exit(2);
+    }
+    const planA = JSON.parse(readFileSync(a.positionals[0], "utf8"));
+    const planB = JSON.parse(readFileSync(a.positionals[1], "utf8"));
+    // Accept raw plans or tree/ask wrappers (extract .plan when present).
+    const extractPlan = (obj: any) => obj.plan ?? obj;
+    const d = diffPlans(extractPlan(planA), extractPlan(planB));
+    console.log(a.json ? JSON.stringify(d, null, 2) : formatDiff(d));
+    process.exit(d.identical ? 0 : 1);
+  }
+
   if (a.command !== "plan" && a.command !== "ask") {
     console.error(`Unknown command: ${a.command}\n\n${USAGE}`);
     process.exit(2);
@@ -374,6 +398,15 @@ async function main() {
   const allPlans = plans(tree);
 
   if (a.command === "plan") {
+    // --trace: produce the decision trace (gate cascade for every unit).
+    if (a.trace) {
+      const manifest = await loadManifest(a.manifest!, buildFetchGuard(a));
+      const t = traceDecision(manifest, a.task!, buildPlanOptions(a));
+      if (a.json) { console.log(JSON.stringify(t, null, 2)); return; }
+      console.log(formatPlan(t.plan));
+      console.log(formatTrace(t));
+      return;
+    }
     if (a.json) console.log(JSON.stringify(a.follow ? tree : allPlans[0], null, 2));
     else console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
     // --memory: report determinism against a prior episode (fail-closed on sha drift), then record.
