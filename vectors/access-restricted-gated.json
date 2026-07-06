@@ -1,0 +1,45 @@
+{
+  "name": "access-restricted-gated",
+  "spec": "§4.11",
+  "description": "access:restricted fails closed with no credentials, even when x402 is settleable",
+  "manifest": "kcp_version: \"0.25\"\nproject: vault\nversion: 1.0.0\nunits:\n  - id: board-memo\n    path: memos/board.md\n    intent: \"Board memo on the merger deal terms\"\n    audience: [agent]\n    triggers: [merger, deal, board]\n    access: restricted\n    auth_scope: \"read:board\"\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.30\"}] }\n  - id: public-brief\n    path: briefs/public.md\n    intent: \"Public brief on the merger deal\"\n    audience: [agent]\n    triggers: [merger, deal, brief]\n",
+  "task": "merger deal terms",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [
+      {
+        "id": "board-memo",
+        "loadEligible": false,
+        "score": 17
+      },
+      {
+        "id": "public-brief",
+        "loadEligible": true,
+        "score": 14
+      }
+    ],
+    "skipped": [],
+    "federation": [],
+    "trust": {
+      "requiresAttestation": false,
+      "agentCanAttest": true
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 1
+    },
+    "warnings": []
+  }
+}

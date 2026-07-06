@@ -1,0 +1,58 @@
+{
+  "name": "federation-context-identity",
+  "spec": "§3.6",
+  "description": "federation refs are sliced by env context; an agent_identity ref needs its credential before fetch",
+  "manifest": "kcp_version: \"0.25\"\nproject: platform-hub\nversion: 1.0.0\nunits:\n  - id: deploy-guide\n    path: docs/deploy.md\n    intent: \"How to deploy to production\"\n    audience: [agent]\n    triggers: [deploy, production, release]\nmanifests:\n  - id: platform-prod\n    url: https://prod.example.com/knowledge.yaml\n    context: [prod]\n  - id: platform-dev\n    url: https://dev.example.com/knowledge.yaml\n    context: [dev, test]\n  - id: vendor\n    url: https://vendor.example.com/knowledge.yaml\n    agent_identity: { required: true, credential_hint: vendor_token }\n",
+  "task": "deploy to production",
+  "options": {
+    "env": "prod",
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [
+      {
+        "id": "deploy-guide",
+        "loadEligible": true,
+        "score": 16
+      }
+    ],
+    "skipped": [],
+    "federation": [
+      {
+        "id": "platform-prod",
+        "selected": true,
+        "reason": "eligible"
+      },
+      {
+        "id": "platform-dev",
+        "selected": false,
+        "reason": "context [\"dev\",\"test\"] excludes env 'prod'"
+      },
+      {
+        "id": "vendor",
+        "selected": true,
+        "reason": "needs vendor_token before fetch",
+        "credentialNeeded": "vendor_token"
+      }
+    ],
+    "trust": {
+      "requiresAttestation": false,
+      "agentCanAttest": true
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 1
+    },
+    "warnings": []
+  }
+}

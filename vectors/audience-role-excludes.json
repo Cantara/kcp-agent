@@ -1,0 +1,43 @@
+{
+  "name": "audience-role-excludes",
+  "spec": "§4",
+  "description": "a human-only unit is not selected for an agent; audience targeting",
+  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n",
+  "task": "merger salary review",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [],
+    "skipped": [
+      {
+        "id": "salary-review",
+        "reason": "audience [\"human\"] excludes role 'agent'"
+      },
+      {
+        "id": "press-kit",
+        "reason": "not_for declares it does not serve 'salary negotiation'"
+      }
+    ],
+    "federation": [],
+    "trust": {
+      "requiresAttestation": false,
+      "agentCanAttest": true
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 0
+    },
+    "warnings": []
+  }
+}

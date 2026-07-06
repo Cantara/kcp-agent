@@ -210,6 +210,16 @@
       ]
     },
     {
+      "layer": "Conformance vectors — the planner's decisions frozen as portable data any implementation must reproduce",
+      "section": "conformance",
+      "where": "vectors/ + vectors.ts · runVector / outcomeOf",
+      "impl": ["src/vectors.ts", "scripts/gen-vectors.mjs"],
+      "proofs": [
+        { "file": "test/vectors.test.ts", "test": "ships a non-trivial corpus covering the core spec layers" },
+        { "file": "test/vectors.test.ts", "test": "every vector's name matches its filename (stable, addressable corpus)" }
+      ]
+    },
+    {
       "layer": "Discovery (knowledge.yaml from path, directory, URL)",
       "section": "§2",
       "where": "client.ts",

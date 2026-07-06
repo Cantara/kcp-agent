@@ -1,0 +1,40 @@
+{
+  "name": "attestation-gated",
+  "spec": "§3.2",
+  "description": "a restricted unit is gated when the manifest requires attestation the agent cannot present",
+  "manifest": "kcp_version: \"0.25\"\nproject: cert\nversion: 1.0.0\ntrust:\n  agent_requirements:\n    require_attestation: true\n    trusted_providers: [soc.cert.example]\nunits:\n  - id: advisory\n    path: advisories/zero-day.md\n    intent: \"Zero-day advisory for the incident response team\"\n    audience: [agent]\n    triggers: [zero-day, advisory, incident]\n    access: restricted\n",
+  "task": "zero-day incident advisory",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [
+      {
+        "id": "advisory",
+        "loadEligible": false,
+        "score": 34
+      }
+    ],
+    "skipped": [],
+    "federation": [],
+    "trust": {
+      "requiresAttestation": true,
+      "agentCanAttest": false
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 0
+    },
+    "warnings": []
+  }
+}

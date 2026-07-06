@@ -454,6 +454,17 @@ Every row is pinned to the CI tests that enforce it in
 [the Receipts](https://cantara.github.io/kcp-agent/#receipts) on the site — and
 `test/docs.test.ts` fails the build if a referenced test disappears or is renamed.
 
+### Conformance vectors
+
+[`vectors/`](vectors/) freezes the planner's decisions as portable
+`(manifest, task, options) → expected outcome` fixtures — the deterministic core's behavior as
+**data**, not code. `test/vectors.test.ts` proves the reference planner reproduces every one; any
+second implementation (a Go/Rust port for a 2–5 MB static binary, or a third party's) is
+conformant iff it does the same. Two independent implementations that pass the same vectors
+validate the *spec*, not just the code — the strongest proof a protocol is unambiguous. The corpus
+is generated from the reference planner (`npm run gen:vectors`) so the expected outcomes are never
+hand-written, and is [proposed upstream](vectors/README.md) as the normative KCP conformance suite.
+
 Not yet consumed: dependency chains between units, `hints.load_strategy`, compliance/audit blocks.
 
 ## Guides

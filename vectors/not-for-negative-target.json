@@ -1,0 +1,45 @@
+{
+  "name": "not-for-negative-target",
+  "spec": "§4",
+  "description": "a unit its publisher scoped out via not_for is skipped even when relevant",
+  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n",
+  "task": "salary negotiation press",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "human",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [
+      {
+        "id": "salary-review",
+        "loadEligible": true,
+        "score": 9
+      }
+    ],
+    "skipped": [
+      {
+        "id": "press-kit",
+        "reason": "not_for declares it does not serve 'salary negotiation'"
+      }
+    ],
+    "federation": [],
+    "trust": {
+      "requiresAttestation": false,
+      "agentCanAttest": true
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 1
+    },
+    "warnings": []
+  }
+}

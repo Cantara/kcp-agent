@@ -1,6 +1,6 @@
 {
   "name": "kcp-agent",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Reference agent that consumes the Knowledge Context Protocol end-to-end — a deterministic, fail-closed navigation planner plus optional LLM synthesis.",
   "type": "module",
   "bin": {
@@ -11,6 +11,7 @@
   },
   "files": [
     "dist",
+    "vectors",
     "README.md",
     "LICENSE"
   ],
@@ -19,6 +20,7 @@
     "build:site": "node scripts/build-site.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "gen:vectors": "node scripts/gen-vectors.mjs",
     "agent": "node dist/cli.js"
   },
   "keywords": [
