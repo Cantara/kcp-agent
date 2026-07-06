@@ -64,6 +64,20 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("projected spend: 0.1 → 0.4 USDC");
   });
 
+  it("trace: the gate cascade shows why units are selected or skipped, and the diff shows the swap", () => {
+    const out = demo("trace");
+    // The trace shows all gates passing for chipfab-exclusive
+    expect(out).toContain("chipfab-exclusive");
+    expect(out).toContain("✓ audience");
+    expect(out).toContain("✓ relevance");
+    // The trace shows temporal rejection for chipfab-rumour
+    expect(out).toContain("chipfab-rumour");
+    expect(out).toContain("✗ temporal");
+    // The diff shows the swap between July 4 and July 6
+    expect(out).toContain("selected → skipped");
+    expect(out).toContain("skipped → selected");
+  });
+
   it("loop: the gate bounces injection, terms re-plan, budget holds at convergence", () => {
     const out = demo("loop");
     expect(out).toContain("base plan selects: chipfab-exclusive");
