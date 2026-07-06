@@ -32,6 +32,8 @@ await build({
     "node:path": stub,
     "node:crypto": stub,
     "node:readline": stub,
+    "node:dns/promises": stub,
+    "node:net": stub,
   },
   external: ["@anthropic-ai/sdk", "npm:@anthropic-ai/sdk@^0.68.0"],
   logLevel: "info",

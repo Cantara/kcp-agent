@@ -2,8 +2,9 @@ name: Release
 
 # Cut a release by hand: tags the target ref, cross-compiles the native
 # executables, attaches them (checksummed) to a GitHub release, and publishes
-# to npm when NPM_TOKEN is configured. Everything happens in this one workflow
-# because a tag pushed with GITHUB_TOKEN does not trigger other workflows.
+# to npm via Trusted Publishing (OIDC — no token secret). Everything happens in
+# this one workflow because a tag pushed with GITHUB_TOKEN does not trigger
+# other workflows (so ci.yml's tag-triggered publish never fires for this tag).
 
 on:
   workflow_dispatch:
@@ -18,7 +19,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write # npm provenance attestation
+  id-token: write # OIDC for npm Trusted Publishing + provenance attestation
 
 jobs:
   release:
@@ -38,8 +39,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24 # npm >= 11.5.1 for OIDC Trusted Publishing auto-detect
           cache: npm
+          # NB: no registry-url — it would write an .npmrc placeholder token that
+          # takes precedence over OIDC and fails the publish with a masked E404.
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -82,13 +85,8 @@ jobs:
           generate_release_notes: true
           files: dist-bin/*
 
+      # npm Trusted Publishing (OIDC) — no token secret; matches ci.yml's tag
+      # publish, which release.yml can't rely on because a GITHUB_TOKEN-pushed
+      # tag does not trigger other workflows. id-token: write is set above.
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN is not configured — skipping npm publish. Configure the secret and re-run, or publish manually."
-            exit 0
-          fi
-          npm config set //registry.npmjs.org/:_authToken '${NODE_AUTH_TOKEN}'
-          npm publish --provenance --access public
+        run: npm publish --provenance --access public

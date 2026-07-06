@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { webcrypto } from "node:crypto";
+import { guardedFetchText, type FetchGuard } from "./fetch.js";
 import type { Signing } from "./model.js";
 
 export type SignatureStatus = "verified" | "invalid" | "unverifiable" | "unsigned";
@@ -24,6 +25,8 @@ export interface SignatureResult {
 export interface VerifyOptions {
   /** Pinned key material (path, URL, or inline) — overrides any key the manifest or signature file supplies. */
   trustedKey?: string;
+  /** Guard applied to any signature/key URL the manifest points at. */
+  fetchGuard?: FetchGuard;
   /** Injectable fetcher for tests. */
   fetchText?: (location: string) => Promise<string>;
 }
@@ -36,13 +39,11 @@ export function resolveLocation(base: string | undefined, loc: string): string {
   return loc;
 }
 
-async function defaultFetchText(location: string): Promise<string> {
-  if (/^https?:\/\//.test(location)) {
-    const res = await fetch(location);
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return await res.text();
-  }
-  return readFileSync(location, "utf8");
+function makeDefaultFetchText(guard: FetchGuard): (location: string) => Promise<string> {
+  return async (location: string) => {
+    if (/^https?:\/\//.test(location)) return await guardedFetchText(location, guard);
+    return readFileSync(location, "utf8");
+  };
 }
 
 const B64 = /^[A-Za-z0-9+/=\s]+$/;
@@ -100,7 +101,7 @@ export async function verifyManifestText(
   if (signing.scheme && !/^(ed25519|eddsa)$/i.test(signing.scheme)) {
     return { status: "unverifiable", detail: `unsupported signing scheme '${signing.scheme}'`, keyId: signing.key_id };
   }
-  const fetchText = options.fetchText ?? defaultFetchText;
+  const fetchText = options.fetchText ?? makeDefaultFetchText(options.fetchGuard ?? {});
 
   // Locate the signature (and possibly an embedded key + key id).
   let signatureMaterial: string;

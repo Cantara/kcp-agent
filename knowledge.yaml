@@ -8,7 +8,7 @@
 
 kcp_version: "0.25"
 project: kcp-agent
-version: 0.5.0
+version: 0.6.0
 updated: "2026-07-06"
 language: en
 
@@ -78,6 +78,13 @@ units:
     scope: project
     audience: [agent, developer]
     triggers: [signature, signing, verify, ed25519, trust key]
+
+  - id: network-boundary
+    path: src/fetch.ts
+    intent: "How every remote fetch is guarded — SSRF/private-host refusal, https-only, manual redirect re-checking, fan-out and response-size ceilings, fail-closed by default"
+    scope: project
+    audience: [agent, developer]
+    triggers: [ssrf, fetch, network, security, redirect, size limit, private host]
 
   - id: manifest-linter
     path: src/validate.ts

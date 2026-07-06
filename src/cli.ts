@@ -21,6 +21,8 @@
 //   --currency <code>     budget currency (default USDC)
 //   --follow              fetch and plan eligible federation refs too
 //   --max-depth <n>       federation hops to follow (default 1, implies --follow)
+//   --max-nodes <n>       cap on total manifests fetched across the walk (default 64)
+//   --allow-private-hosts permit fetches to loopback/private/link-local hosts (and http://) — off by default
 //   --no-verify           skip manifest signature verification
 //   --require-signature   fail unless every manifest has a verified signature
 //   --trust-key <loc>     pinned ed25519 public key (path, URL, or inline) for verification
@@ -33,6 +35,7 @@
 
 import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
+import type { FetchGuard } from "./fetch.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
 import { formatPlan, formatPlanTree, formatValidation, formatReplay } from "./format.js";
 import { synthesize, type SynthesisResult } from "./synthesize.js";
@@ -57,6 +60,8 @@ interface Args {
   currency?: string;
   follow: boolean;
   maxDepth?: number;
+  maxNodes?: number;
+  allowPrivateHosts: boolean;
   noVerify: boolean;
   requireSignature: boolean;
   trustKey?: string;
@@ -68,7 +73,7 @@ interface Args {
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, noVerify: false, requireSignature: false, loop: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -88,6 +93,8 @@ function parseArgs(argv: string[]): Args {
       case "--currency": a.currency = next(); break;
       case "--follow": a.follow = true; break;
       case "--max-depth": a.maxDepth = Number(next()); a.follow = true; break;
+      case "--max-nodes": a.maxNodes = Number(next()); break;
+      case "--allow-private-hosts": a.allowPrivateHosts = true; break;
       case "--no-verify": a.noVerify = true; break;
       case "--require-signature": a.requireSignature = true; break;
       case "--trust-key": a.trustKey = next(); break;
@@ -121,13 +128,19 @@ function buildPlanOptions(a: Args): PlanOptions {
   };
 }
 
+function buildFetchGuard(a: Args): FetchGuard {
+  return { allowPrivate: a.allowPrivateHosts };
+}
+
 function buildFollowOptions(a: Args): FollowOptions {
   return {
     planOptions: buildPlanOptions(a),
     maxDepth: a.follow ? (a.maxDepth ?? 1) : 0,
+    maxNodes: a.maxNodes,
     noVerify: a.noVerify,
     requireSignature: a.requireSignature,
     trustedKey: a.trustKey,
+    fetchGuard: buildFetchGuard(a),
   };
 }
 
@@ -156,7 +169,7 @@ async function main() {
   if (a.command === "validate") {
     const location = a.manifest ?? a.task;
     if (!location) { console.error("Missing manifest location.\n\n" + USAGE); process.exit(2); }
-    const report = await validateLocation(location);
+    const report = await validateLocation(location, buildFetchGuard(a));
     console.log(a.json ? JSON.stringify(report, null, 2) : formatValidation(report));
     process.exit(report.ok ? 0 : 1);
   }
@@ -165,7 +178,7 @@ async function main() {
     const file = a.manifest ?? a.task;
     if (!file) { console.error("Missing plan artifact path.\n\n" + USAGE); process.exit(2); }
     const artifact = JSON.parse(readFileSync(file, "utf8"));
-    const report = await replayArtifact(artifact, file);
+    const report = await replayArtifact(artifact, file, buildFetchGuard(a));
     console.log(a.json ? JSON.stringify(report, null, 2) : formatReplay(report));
     process.exit(report.ok ? 0 : 1);
   }
@@ -210,7 +223,7 @@ async function main() {
 
   // ask: show the plan(s), then synthesize across every followed manifest.
   if (!a.json) console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
-  const result = await synthesize(allPlans, { model: a.model });
+  const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
   if (a.json) {
     console.log(JSON.stringify({ plan: a.follow ? tree : allPlans[0], synthesis: result }, null, 2));
     return;

@@ -228,6 +228,6 @@ export async function askLoop(
   const loop = await runLoop(location, task, options);
   // Synthesis answers the ORIGINAL task; expansion terms only steered discovery.
   const synthPlans = loop.finalPlans.map((p, i) => (i === 0 ? { ...p, task } : p));
-  const synthesis = await synthesize(synthPlans, { model: options.synthesisModel });
+  const synthesis = await synthesize(synthPlans, { model: options.synthesisModel, fetchGuard: options.followOptions?.fetchGuard });
   return { ...loop, synthesis };
 }

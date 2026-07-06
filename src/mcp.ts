@@ -30,7 +30,7 @@ import type { PlanOptions } from "./planner.js";
 export const PROTOCOL_VERSION = "2025-06-18";
 // Version must match package.json — test/mcp.test.ts pins them together
 // (a runtime read wouldn't survive `deno compile`, which embeds only the module graph).
-export const SERVER_INFO = { name: "kcp-agent", version: "0.5.0" };
+export const SERVER_INFO = { name: "kcp-agent", version: "0.6.0" };
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -64,6 +64,11 @@ const PLAN_ARGS = {
     currency: { type: "string", description: "Budget currency (default USDC)" },
     follow: { type: "boolean", description: "Follow eligible federation refs (default false)" },
     max_depth: { type: "number", description: "Federation hops to follow when follow=true (default 1)" },
+    max_nodes: { type: "number", description: "Cap on total manifests fetched across the walk (default 64)" },
+    allow_private_hosts: {
+      type: "boolean",
+      description: "Permit fetches to loopback/private/link-local hosts and http:// (default false — fail-closed)",
+    },
     role: { type: "string", description: "Agent role for audience targeting (default: agent)" },
     methods: {
       type: "array",
@@ -157,6 +162,10 @@ function toFollowOptions(args: Record<string, unknown>): FollowOptions {
   return {
     planOptions,
     maxDepth: args["follow"] === true ? (args["max_depth"] === undefined ? 1 : Number(args["max_depth"])) : 0,
+    maxNodes: args["max_nodes"] === undefined ? undefined : Number(args["max_nodes"]),
+    // A foreign MCP client is exactly the untrusted-caller case: keep the fetch
+    // guard on (no private hosts, https-only) unless the operator opts in.
+    fetchGuard: { allowPrivate: args["allow_private_hosts"] === true },
   };
 }
 
@@ -168,25 +177,27 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<st
       return JSON.stringify(tree, null, 2);
     }
     case "kcp_load": {
-      const tree = await planTree(String(args["manifest"] ?? ""), String(args["task"] ?? ""), toFollowOptions(args));
+      const follow = toFollowOptions(args);
+      const tree = await planTree(String(args["manifest"] ?? ""), String(args["task"] ?? ""), follow);
       if (tree.error) throw new Error(`${tree.location}: ${tree.error}`);
       const units = [];
       const unavailable = [];
       for (const p of plans(tree)) {
-        const r = await loadPlannedUnits(p);
+        const r = await loadPlannedUnits(p, follow.fetchGuard);
         units.push(...r.loaded);
         unavailable.push(...r.unavailable);
       }
       return JSON.stringify({ plan: tree, units, unavailable }, null, 2);
     }
     case "kcp_validate": {
-      const report = await validateLocation(String(args["manifest"] ?? ""));
+      const guard = { allowPrivate: args["allow_private_hosts"] === true };
+      const report = await validateLocation(String(args["manifest"] ?? ""), guard);
       return JSON.stringify(report, null, 2);
     }
     case "kcp_replay": {
       const raw = args["artifact"];
       const artifact: unknown = typeof raw === "string" ? JSON.parse(raw) : raw;
-      const report = await replayArtifact(artifact, "mcp:artifact");
+      const report = await replayArtifact(artifact, "mcp:artifact", { allowPrivate: args["allow_private_hosts"] === true });
       return JSON.stringify(report, null, 2);
     }
     default:

@@ -61,6 +61,19 @@
       ]
     },
     {
+      "layer": "Network boundary — SSRF, fan-out, and response-size guards on every remote fetch",
+      "section": "hardening",
+      "where": "fetch.ts + follow.ts",
+      "impl": ["src/fetch.ts", "src/follow.ts"],
+      "proofs": [
+        { "file": "test/fetch.test.ts", "test": "refuses a loopback host by default (SSRF fail-closed)" },
+        { "file": "test/fetch.test.ts", "test": "refuses an IPv4-mapped-IPv6 metadata target over https (URL normalizes to hex)" },
+        { "file": "test/fetch.test.ts", "test": "re-checks each redirect target through the guard (never auto-follows)" },
+        { "file": "test/fetch.test.ts", "test": "stops fetching once the total-node cap is reached, fail-closed with a reason" },
+        { "file": "test/fetch.test.ts", "test": "rejects an oversize body while streaming (no content-length)" }
+      ]
+    },
+    {
       "layer": "Payment methods & tiers",
       "section": "§4.14",
       "where": "planner.ts · planPayment",

@@ -8,6 +8,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { loadManifestText, parseManifest } from "./client.js";
+import type { FetchGuard } from "./fetch.js";
 import { terms } from "./planner.js";
 import type { Manifest, Unit } from "./model.js";
 
@@ -154,11 +155,11 @@ function validateTemporal(unit: Unit, where: string, findings: Finding[]) {
 }
 
 /** Load a manifest from a path/dir/URL and validate it. */
-export async function validateLocation(location: string): Promise<ValidationReport> {
+export async function validateLocation(location: string, fetchGuard: FetchGuard = {}): Promise<ValidationReport> {
   let text: string;
   let source: string;
   try {
-    ({ text, source } = await loadManifestText(location));
+    ({ text, source } = await loadManifestText(location, fetchGuard));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { source: location, findings: [{ level: "error", where: "manifest", message }], ok: false };
