@@ -59,9 +59,18 @@ function isPrivateV4(ip: string): boolean {
 }
 
 function isPrivateV6(ip: string): boolean {
-  // Normalize IPv4-mapped (::ffff:a.b.c.d) and route it through the v4 check.
-  const mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateV4(mapped[1]);
+  // IPv4-mapped addresses embed a v4 address that a connect() actually reaches,
+  // so decode and check it. `new URL` normalizes ::ffff:a.b.c.d to hex
+  // (::ffff:a9fe:a9fe), so both forms must be handled or an https:// IPv6
+  // literal slips the v4 private check straight through to e.g. metadata.
+  const dotted = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) return isPrivateV4(dotted[1]);
+  const hex = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    return isPrivateV4(`${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`);
+  }
   return (
     ip === "::1" || // loopback
     ip === "::" || // unspecified
@@ -72,8 +81,13 @@ function isPrivateV6(ip: string): boolean {
   );
 }
 
-/** Refuse a URL whose scheme/host an untrusted manifest must not reach. Returns the checked URL. */
-async function assertFetchable(rawUrl: string, guard: FetchGuard): Promise<URL> {
+/**
+ * Refuse a URL whose scheme/host an untrusted manifest must not reach; return
+ * the checked URL. Exported because it *is* the security decision — applied to
+ * the initial URL and, identically, to every redirect target — so it is tested
+ * directly rather than only through the network path.
+ */
+export async function assertPublicUrl(rawUrl: string, guard: FetchGuard): Promise<URL> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -122,7 +136,7 @@ export async function guardedFetchText(rawUrl: string, guard: FetchGuard = {}): 
 
   let current = rawUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const url = await assertFetchable(current, guard);
+    const url = await assertPublicUrl(current, guard);
     const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
 
     // Manual redirect handling: re-check every hop's target against the guard,

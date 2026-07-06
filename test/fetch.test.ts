@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { guardedFetchText, isPrivateAddress, DEFAULT_MAX_NODES } from "../src/index.js";
+import { assertPublicUrl } from "../src/fetch.js";
 import { planTree } from "../src/follow.js";
 import { verifyManifestText } from "../src/verify.js";
 
@@ -18,7 +19,9 @@ describe("isPrivateAddress", () => {
     expect(isPrivateAddress("::1")).toBe(true);
     expect(isPrivateAddress("fe80::1")).toBe(true);
     expect(isPrivateAddress("fc00::1")).toBe(true);
-    expect(isPrivateAddress("::ffff:169.254.169.254")).toBe(true); // IPv4-mapped metadata
+    expect(isPrivateAddress("::ffff:169.254.169.254")).toBe(true); // IPv4-mapped metadata (dotted)
+    expect(isPrivateAddress("::ffff:a9fe:a9fe")).toBe(true); // ...and the hex form URL normalization produces
+    expect(isPrivateAddress("::ffff:0a00:0001")).toBe(true); // ::ffff:10.0.0.1
   });
   it("permits public addresses", () => {
     for (const ip of ["8.8.8.8", "1.1.1.1", "93.184.216.34", "2606:4700:4700::1111"]) {
@@ -136,6 +139,41 @@ describe("planTree fan-out ceiling", () => {
   it("defaults to a bounded ceiling even when the caller passes none", () => {
     expect(DEFAULT_MAX_NODES).toBeGreaterThan(0);
     expect(DEFAULT_MAX_NODES).toBeLessThanOrEqual(256);
+  });
+});
+
+// The URL-allow decision as a directly testable predicate. A boolean guard
+// can't stage "permit host A, refuse host B" in one loopback-only run, so the
+// faithful proof that a redirect target is re-validated is to test the exact
+// function guardedFetchText applies to every hop — including the redirect hop.
+describe("assertPublicUrl — the per-hop redirect gate", () => {
+  it("refuses a private-IP redirect target (the metadata-pivot the guard exists to stop)", async () => {
+    await expect(assertPublicUrl("http://169.254.169.254/latest/meta-data", {})).rejects.toThrow(
+      /private\/loopback\/link-local.*169\.254\.169\.254/
+    );
+  });
+
+  it("refuses an IPv4-mapped-IPv6 metadata target over https (URL normalizes to hex)", async () => {
+    // https, so the cleartext-http check can't mask a miss in the private check:
+    // this asserts the embedded 169.254.169.254 is decoded and refused as private.
+    await expect(assertPublicUrl("https://[::ffff:169.254.169.254]/", {})).rejects.toThrow(
+      /private\/loopback\/link-local/
+    );
+  });
+
+  it("refuses a non-http(s) redirect scheme", async () => {
+    await expect(assertPublicUrl("ftp://evil.example/x", {})).rejects.toThrow(/refused scheme/);
+  });
+
+  it("permits a public https target", async () => {
+    const url = await assertPublicUrl("https://8.8.8.8/x", {});
+    expect(url.href).toBe("https://8.8.8.8/x");
+  });
+
+  it("permits a private target only when allowPrivate is set", async () => {
+    await expect(assertPublicUrl("https://10.0.0.5/x", {})).rejects.toThrow(/private/);
+    const url = await assertPublicUrl("https://10.0.0.5/x", { allowPrivate: true });
+    expect(url.hostname).toBe("10.0.0.5");
   });
 });
 
