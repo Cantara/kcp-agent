@@ -4,7 +4,8 @@
 //   kcp-agent plan     "<task>" --manifest <path|dir|url> [options]   inspect the load plan (no API key)
 //   kcp-agent ask      "<task>" --manifest <path|dir|url> [options]   plan + answer via Claude
 //   kcp-agent validate <path|dir|url>                                 lint a knowledge.yaml
-//   kcp-agent replay   <plan.json>                                    re-verify a saved plan artifact (exit 1 on drift)
+//   kcp-agent replay   <artifact.json>                                re-verify a saved plan OR grounded-answer artifact (exit 1 on drift)
+//                                                                     --check-gaps: re-navigate to see if a surfaced gap now closes
 //   kcp-agent mcp                                                     serve the planner over MCP stdio
 //
 // Options (plan/ask):
@@ -40,9 +41,10 @@ import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
 import type { FetchGuard } from "./fetch.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
-import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded } from "./format.js";
-import { synthesize, loadAnthropicSdk, type SynthesisResult } from "./synthesize.js";
+import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay } from "./format.js";
+import { synthesize, loadAnthropicSdk, loadPlannedUnits, type SynthesisResult } from "./synthesize.js";
 import { groundAnswer, makeClaudeVerifier } from "./ground.js";
+import { replayGroundedAnswer } from "./replayground.js";
 import { groundingLoop, type GroundRoundFn } from "./groundloop.js";
 import { askLoop } from "./loop.js";
 import { validateLocation } from "./validate.js";
@@ -78,10 +80,11 @@ interface Args {
   ground: boolean;
   groundModel?: string;
   groundRounds?: number;
+  checkGaps: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -113,6 +116,7 @@ function parseArgs(argv: string[]): Args {
       case "--ground": a.ground = true; break;
       case "--ground-model": a.groundModel = next(); break;
       case "--ground-rounds": a.groundRounds = Number(next()); a.ground = true; break;
+      case "--check-gaps": a.checkGaps = true; break;
       case "--json": a.json = true; break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
@@ -141,6 +145,22 @@ function buildPlanOptions(a: Args): PlanOptions {
 
 function buildFetchGuard(a: Args): FetchGuard {
   return { allowPrivate: a.allowPrivateHosts };
+}
+
+/** The `--check-gaps` reground seam: re-plan the artifact's manifest today and see which gap claims now ground. */
+function buildReground(artifact: unknown, a: Args, guard: FetchGuard): (task: string, gapClaims: string[]) => Promise<string[]> {
+  const a2 = artifact as { plan?: { manifest?: { source?: string }; plan?: { manifest?: { source?: string } } } };
+  const source = a2.plan?.manifest?.source ?? a2.plan?.plan?.manifest?.source;
+  return async (task, gapClaims) => {
+    if (!source) return [];
+    const tree = await planTree(source, task, { ...buildFollowOptions(a), fetchGuard: guard });
+    if (tree.error) return [];
+    const units = [];
+    for (const p of plans(tree)) units.push(...(await loadPlannedUnits(p, guard)).loaded);
+    // Treat the gap claims as a mini-answer and re-ground them against today's units.
+    const g = await groundAnswer(task, gapClaims.join(" "), units, { verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel) });
+    return g.grounded.map((c) => c.claim);
+  };
 }
 
 function buildFollowOptions(a: Args): FollowOptions {
@@ -187,9 +207,19 @@ async function main() {
 
   if (a.command === "replay") {
     const file = a.manifest ?? a.task;
-    if (!file) { console.error("Missing plan artifact path.\n\n" + USAGE); process.exit(2); }
+    if (!file) { console.error("Missing artifact path.\n\n" + USAGE); process.exit(2); }
     const artifact = JSON.parse(readFileSync(file, "utf8"));
-    const report = await replayArtifact(artifact, file, buildFetchGuard(a));
+    const guard = buildFetchGuard(a);
+    // A grounded-answer artifact (from `ask --ground --json`) is re-verified
+    // claim-by-claim; a plan/tree artifact goes through the plan replay.
+    const g = artifact as { grounding?: { claims?: unknown } };
+    if (g.grounding && Array.isArray(g.grounding.claims)) {
+      const reground = a.checkGaps ? buildReground(artifact, a, guard) : undefined;
+      const report = await replayGroundedAnswer(artifact, file, { fetchGuard: guard, reground });
+      console.log(a.json ? JSON.stringify(report, null, 2) : formatGroundedReplay(report));
+      process.exit(report.ok ? 0 : 1);
+    }
+    const report = await replayArtifact(artifact, file, guard);
     console.log(a.json ? JSON.stringify(report, null, 2) : formatReplay(report));
     process.exit(report.ok ? 0 : 1);
   }

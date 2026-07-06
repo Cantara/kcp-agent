@@ -25,7 +25,14 @@ export {
   type BudgetPlan,
   type PaymentPlan,
 } from "./planner.js";
-export { formatPlan, formatPlanTree, formatValidation, formatGrounded } from "./format.js";
+export { formatPlan, formatPlanTree, formatValidation, formatGrounded, formatGroundedReplay } from "./format.js";
+export {
+  replayGroundedAnswer,
+  type GroundedReplayReport,
+  type ClaimReplayCheck,
+  type GapReplayCheck,
+  type GroundedReplayOptions,
+} from "./replayground.js";
 export {
   groundAnswer,
   splitClaims,

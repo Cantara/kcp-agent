@@ -72,6 +72,17 @@
       ]
     },
     {
+      "layer": "Grounded-answer replay — a grounded answer is re-verified against a moved world; gaps have a lifecycle",
+      "section": "hardening",
+      "where": "replayground.ts · replayGroundedAnswer",
+      "impl": ["src/replayground.ts"],
+      "proofs": [
+        { "file": "test/replayground.test.ts", "test": "drifted: the unit's bytes no longer match the pinned sha — fail-closed (ok false)" },
+        { "file": "test/replayground.test.ts", "test": "gone: the cited unit can no longer be read — fail-closed" },
+        { "file": "test/replayground.test.ts", "test": "gap-closes: a previously-unsupported claim now grounds against a grown manifest" }
+      ]
+    },
+    {
       "layer": "Closed-loop grounding — a gap re-navigates for evidence, with a bounded convergence proof",
       "section": "hardening",
       "where": "groundloop.ts · groundingLoop",
