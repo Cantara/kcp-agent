@@ -1,0 +1,133 @@
+{
+  "name": "audience-role-excludes",
+  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n",
+  "task": "merger salary review",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "taskTerms": [
+      "merger",
+      "salary",
+      "review"
+    ],
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ],
+      "credentials": []
+    },
+    "units": [
+      {
+        "id": "salary-review",
+        "path": "hr/salary.md",
+        "intent": "Annual salary review for the merger integration team",
+        "outcome": "skipped",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": false,
+            "detail": "audience [\"human\"] excludes role 'agent'"
+          }
+        ],
+        "rejectedBy": "audience"
+      },
+      {
+        "id": "press-kit",
+        "path": "comms/press.md",
+        "intent": "Press kit for the merger announcement",
+        "outcome": "skipped",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\",\"human\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": false,
+            "detail": "not_for declares it does not serve 'salary negotiation'"
+          }
+        ],
+        "rejectedBy": "not_for"
+      }
+    ],
+    "gateSummary": [
+      {
+        "gate": "audience",
+        "passed": 1,
+        "failed": 1
+      },
+      {
+        "gate": "not_for",
+        "passed": 0,
+        "failed": 1
+      },
+      {
+        "gate": "temporal",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "deprecated",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "supersession",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "relevance",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "attestation",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "payment",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "access",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "strict",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "max_units",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "money_budget",
+        "passed": 0,
+        "failed": 0
+      },
+      {
+        "gate": "context_budget",
+        "passed": 0,
+        "failed": 0
+      }
+    ]
+  }
+}

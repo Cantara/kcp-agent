@@ -1,0 +1,376 @@
+{
+  "name": "context-budget-skip",
+  "manifest": "kcp_version: \"0.25\"\nproject: newsroom\nversion: 1.0.0\nunits:\n  - id: award-exclusive\n    path: stories/award.md\n    intent: \"Exclusive: the sovereign compute award decision and the winning bid\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, exclusive]\n    size_tokens: 2600\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.25\"}] }\n  - id: power-feed\n    path: feeds/power.md\n    intent: \"Live datacenter power-grid capacity feed for the compute award\"\n    audience: [agent]\n    triggers: [datacenter, power, capacity, compute]\n    size_tokens: 900\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.05\"}] }\n  - id: free-summary\n    path: stories/summary.md\n    intent: \"Free summary of the sovereign compute award\"\n    audience: [agent]\n    triggers: [sovereign, compute, award]\n    size_tokens: 300\n  - id: weather\n    path: misc/weather.md\n    intent: \"Local weather forecast\"\n    audience: [agent]\n    triggers: [weather, forecast]\n    size_tokens: 100\n",
+  "task": "sovereign compute award",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    },
+    "contextBudget": 3000
+  },
+  "expect": {
+    "taskTerms": [
+      "sovereign",
+      "compute",
+      "award"
+    ],
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ],
+      "credentials": []
+    },
+    "units": [
+      {
+        "id": "award-exclusive",
+        "path": "stories/award.md",
+        "intent": "Exclusive: the sovereign compute award decision and the winning bid",
+        "outcome": "selected",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 23: intent matches 3 term(s); triggers match 3 term(s); id/path matches 1 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "no attestation required"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "x402: 0.25 USDC/request"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "public access"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 1 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": true,
+            "detail": "2,600 tokens (2,600 of 3,000 used)"
+          }
+        ],
+        "score": 23,
+        "tokens": {
+          "value": 2600,
+          "source": "declared"
+        },
+        "cost": {
+          "amount": 0.25,
+          "currency": "USDC",
+          "method": "x402"
+        }
+      },
+      {
+        "id": "power-feed",
+        "path": "feeds/power.md",
+        "intent": "Live datacenter power-grid capacity feed for the compute award",
+        "outcome": "skipped",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 10: intent matches 2 term(s); triggers match 1 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "no attestation required"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "x402: 0.05 USDC/request"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "public access"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 3 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": false,
+            "detail": "900 tokens would exceed remaining 100 of 3,000"
+          }
+        ],
+        "rejectedBy": "context_budget",
+        "score": 10
+      },
+      {
+        "id": "free-summary",
+        "path": "stories/summary.md",
+        "intent": "Free summary of the sovereign compute award",
+        "outcome": "selected",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 21: intent matches 3 term(s); triggers match 3 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "no attestation required"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "free"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "public access"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 2 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": true,
+            "detail": "300 tokens (2,900 of 3,000 used)"
+          }
+        ],
+        "score": 21,
+        "tokens": {
+          "value": 300,
+          "source": "declared"
+        }
+      },
+      {
+        "id": "weather",
+        "path": "misc/weather.md",
+        "intent": "Local weather forecast",
+        "outcome": "skipped",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": false,
+            "detail": "no task-relevance match"
+          }
+        ],
+        "rejectedBy": "relevance"
+      }
+    ],
+    "gateSummary": [
+      {
+        "gate": "audience",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "gate": "not_for",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "gate": "temporal",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "gate": "deprecated",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "gate": "supersession",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "gate": "relevance",
+        "passed": 3,
+        "failed": 1
+      },
+      {
+        "gate": "attestation",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "gate": "payment",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "gate": "access",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "gate": "strict",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "gate": "max_units",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "gate": "money_budget",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "gate": "context_budget",
+        "passed": 2,
+        "failed": 1
+      }
+    ]
+  }
+}

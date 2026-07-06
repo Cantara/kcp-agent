@@ -21,6 +21,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:vectors": "node scripts/gen-vectors.mjs",
+    "gen:rust-fixtures": "node scripts/gen-rust-fixtures.mjs",
     "agent": "node dist/cli.js"
   },
   "keywords": [

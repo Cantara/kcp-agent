@@ -11,11 +11,13 @@ use serde::Deserialize;
 
 // ── inputs ───────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
     pub role: String,
     pub payment_methods: Vec<String>,
     pub credentials: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attestation_provider: Option<String>,
 }
 
@@ -73,7 +75,7 @@ pub struct PlanOptions {
 }
 
 impl PlanOptions {
-    fn caps(&self) -> AgentCapabilities {
+    pub fn caps(&self) -> AgentCapabilities {
         let d = AgentCapabilities::default();
         match &self.capabilities {
             None => d,
@@ -159,6 +161,8 @@ pub struct TrustInfo {
 #[derive(Debug, Clone)]
 pub struct AgentPlan {
     pub task: String,
+    pub manifest_project: String,
+    pub manifest_version: String,
     pub trust: TrustInfo,
     pub environment: Option<String>,
     pub as_of: String,
@@ -561,6 +565,8 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
 
     AgentPlan {
         task: task.to_string(),
+        manifest_project: manifest.project.clone(),
+        manifest_version: manifest.version.clone(),
         trust: TrustInfo { requires_attestation, agent_can_attest, note: trust_note },
         environment: options.env.clone(),
         as_of,
