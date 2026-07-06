@@ -5,6 +5,12 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  # Manual/handoff publish: a workflow_dispatch run of THIS file mints an OIDC
+  # token whose workflow claim is ci.yml — the workflow npm authorizes as the
+  # package's Trusted Publisher. release.yml (a different, unauthorized workflow)
+  # dispatches this to publish, and it can also be run by hand to (re)publish
+  # the version currently on the dispatched ref.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -100,11 +106,14 @@ jobs:
         with:
           files: dist-bin/*
 
-  # Publishes kcp-agent to npm on v* tags via npm Trusted Publishing
-  # (OIDC — no token secret). Requires npm >= 11.5.1, hence Node 24.
+  # Publishes kcp-agent to npm via npm Trusted Publishing (OIDC — no token
+  # secret). Requires npm >= 11.5.1, hence Node 24. Runs on a v* tag push or on
+  # workflow_dispatch (the handoff release.yml uses, and a manual publish path).
+  # needs: [test] only — publishing the tarball is independent of the native
+  # binaries (natives is skipped on a non-tag dispatch anyway).
   publish:
-    needs: [test, natives]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
