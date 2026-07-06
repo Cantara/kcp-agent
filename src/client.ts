@@ -14,6 +14,11 @@ type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => !!v && typeof v === "object" && !Array.isArray(v);
 const asStr = (v: unknown): string | undefined => (v === undefined || v === null ? undefined : String(v));
 const asStrArr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+const asNum = (v: unknown): number | undefined => {
+  if (v === undefined || v === null) return undefined;
+  const n = Number(v);
+  return Number.isNaN(n) ? undefined : n;
+};
 
 function normCount(v: unknown): number | "unlimited" | undefined {
   if (v === undefined || v === null) return undefined;
@@ -80,6 +85,8 @@ function parseUnit(v: Raw): Unit {
     not_for: asStrArr(v["not_for"]),
     payment: parsePayment(v["payment"]),
     rate_limits: parseRateLimits(v["rate_limits"]),
+    size_tokens: asNum(v["size_tokens"]),
+    bytes: asNum(v["bytes"]),
     temporal: isObj(v["temporal"])
       ? {
           valid_from: asStr(v["temporal"]["valid_from"]),

@@ -65,6 +65,7 @@ const unitArb: fc.Arbitrary<Unit> = fc
     not_for: fc.option(wordsArb(1, 2), { nil: undefined }),
     temporal: temporalArb,
     payment: paymentArb,
+    size_tokens: fc.option(fc.constantFrom(200, 500, 1500, 3000), { nil: undefined }),
   })
   .map((u) => ({ ...u, path: `docs/${u.id}.md` }));
 
@@ -112,6 +113,18 @@ describe("planner invariants (property-based)", () => {
         expect(spend).toBeLessThanOrEqual(amount + 1e-9);
         expect(p.budget.projectedSpend!).toBeLessThanOrEqual(amount + 1e-9);
         expect(p.budget.ceiling).toBe(amount);
+      }),
+    );
+  });
+
+  // ── 2b. context ceiling ─────────────────────────────────────────────────────
+  it("projected tokens of selected units never exceed the context ceiling", () => {
+    fc.assert(
+      fc.property(manifestArb, taskArb, optionsArb, fc.constantFrom(500, 1500, 4000), (m, task, opts, contextBudget) => {
+        const p = plan(m, task, { ...opts, contextBudget });
+        expect(p.context.ceiling).toBe(contextBudget);
+        // The measured projection is the sum the greedy loop admitted — never over the ceiling.
+        expect(p.context.projectedTokens!).toBeLessThanOrEqual(contextBudget + 1e-9);
       }),
     );
   });

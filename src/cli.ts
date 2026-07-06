@@ -21,6 +21,7 @@
 //   --credentials <list>  credential kinds the agent holds, e.g. api_key,oauth2
 //   --attest <provider>   attestation provider the agent can present
 //   --budget <amount>     spend ceiling for pay-per-request units (greedy by score, skip what blows it)
+//   --context-budget <n>  token ceiling for what a plan loads into the model's context window (greedy by score; over-budget units skipped with the arithmetic)
 //   --currency <code>     budget currency (default USDC)
 //   --follow              fetch and plan eligible federation refs too
 //   --max-depth <n>       federation hops to follow (default 1, implies --follow)
@@ -73,6 +74,7 @@ interface Args {
   attest?: string;
   budget?: number;
   currency?: string;
+  contextBudget?: number;
   follow: boolean;
   maxDepth?: number;
   maxNodes?: number;
@@ -112,6 +114,7 @@ function parseArgs(argv: string[]): Args {
       case "--credentials": a.credentials = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean); break;
       case "--attest": a.attest = next(); break;
       case "--budget": a.budget = Number(next()); break;
+      case "--context-budget": a.contextBudget = Number(next()); break;
       case "--currency": a.currency = next(); break;
       case "--follow": a.follow = true; break;
       case "--max-depth": a.maxDepth = Number(next()); a.follow = true; break;
@@ -148,6 +151,7 @@ function buildPlanOptions(a: Args): PlanOptions {
     maxUnits: a.maxUnits,
     strict: a.strict,
     budget: a.budget !== undefined && !Number.isNaN(a.budget) ? { amount: a.budget, currency: a.currency } : undefined,
+    contextBudget: a.contextBudget !== undefined && !Number.isNaN(a.contextBudget) ? a.contextBudget : undefined,
     capabilities: {
       ...(a.role ? { role: a.role } : {}),
       ...(a.methods ? { paymentMethods: a.methods } : {}),
@@ -212,6 +216,7 @@ function buildOptionsKey(a: Args): string {
     attest: a.attest ?? null,
     budget: a.budget ?? null,
     currency: a.currency ?? null,
+    contextBudget: a.contextBudget ?? null,
     follow: a.follow,
     maxDepth: a.maxDepth ?? null,
     maxNodes: a.maxNodes ?? null,

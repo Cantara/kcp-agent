@@ -15,6 +15,7 @@ export {
 export {
   plan,
   scoreUnit,
+  unitTokens,
   DEFAULT_CAPABILITIES,
   type AgentCapabilities,
   type PlanOptions,
@@ -23,6 +24,7 @@ export {
   type SkippedUnit,
   type FederationPlan,
   type BudgetPlan,
+  type ContextPlan,
   type PaymentPlan,
 } from "./planner.js";
 export { formatPlan, formatPlanTree, formatValidation, formatGrounded, formatGroundedReplay } from "./format.js";

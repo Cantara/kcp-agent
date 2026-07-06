@@ -45,6 +45,15 @@ export interface PlanOptions {
    * the ceiling is tree-wide, not per manifest.
    */
   budget?: { amount: number; currency?: string; spent?: number };
+  /**
+   * Token ceiling for what a plan loads into the model's context window (#33).
+   * Mirrors `budget`: greedy by score, a unit that would blow the ceiling is
+   * skipped with the arithmetic. A unit's size is its declared `size_tokens`,
+   * or `bytes/4` when only `bytes` is declared. A unit with neither is admitted
+   * but counted `unmeasured` (the projection is a lower bound) — unless `strict`,
+   * which excludes it fail-closed.
+   */
+  contextBudget?: number;
 }
 
 export interface PaymentPlan {
@@ -95,6 +104,19 @@ export interface BudgetPlan {
   note: string;
 }
 
+export interface ContextPlan {
+  /** Token ceiling, when the agent planned with one. */
+  ceiling?: number;
+  /** Sum of the selected units' token cost (declared or estimated). */
+  projectedTokens?: number;
+  remaining?: number;
+  /** True when any selected unit's size was estimated from bytes rather than declared. */
+  approximate: boolean;
+  /** Count of selected units with no declared size — the projection is a lower bound by this many. */
+  unmeasured: number;
+  note: string;
+}
+
 export interface AgentPlan {
   task: string;
   manifest: {
@@ -109,11 +131,12 @@ export interface AgentPlan {
   environment?: string;
   asOf: string;
   /** The planner inputs echoed into the artifact — everything `kcp-agent replay` needs to recompute this plan. */
-  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number } };
+  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number };
   selected: PlannedUnit[];
   skipped: SkippedUnit[];
   federation: FederationPlan[];
   budget: BudgetPlan;
+  context: ContextPlan;
   warnings: string[];
   /** Signature verification result — attached by the loading layer, never by the pure planner. */
   signature?: SignatureResult;
@@ -211,6 +234,52 @@ function planPayment(payment: Unit["payment"], caps: AgentCapabilities): Payment
 
 /** Round away float noise in currency arithmetic. */
 const money = (n: number): number => Number(n.toFixed(6));
+
+/** Thousands-separated integer for readable token arithmetic (1240 → "1,240"). */
+const fmtTokens = (n: number): string => Math.round(n).toLocaleString("en-US");
+
+/**
+ * The token cost the planner should weigh for a unit, computed from metadata
+ * BEFORE any fetch (audit-before-action). Declared `size_tokens` is faithful;
+ * `bytes/4` is a deterministic estimate; neither declared means unmeasured.
+ */
+export function unitTokens(unit: Unit): { tokens?: number; approximate: boolean; measured: boolean } {
+  if (unit.size_tokens !== undefined) return { tokens: unit.size_tokens, approximate: false, measured: true };
+  if (unit.bytes !== undefined) return { tokens: Math.ceil(unit.bytes / 4), approximate: true, measured: true };
+  return { tokens: undefined, approximate: false, measured: false };
+}
+
+/** Build the ContextPlan from the finally-selected units and the token ceiling. */
+function planContext(
+  manifest: Manifest,
+  selected: PlannedUnit[],
+  ceiling: number | undefined,
+): ContextPlan {
+  const byId = new Map(manifest.units.map((u) => [u.id, u] as const));
+  let projectedTokens = 0;
+  let approximate = false;
+  let unmeasured = 0;
+  for (const s of selected) {
+    if (!s.loadEligible) continue; // only units that will actually load consume the window
+    const info = unitTokens(byId.get(s.id) ?? ({} as Unit));
+    if (!info.measured) { unmeasured++; continue; }
+    projectedTokens += info.tokens ?? 0;
+    if (info.approximate) approximate = true;
+  }
+  if (ceiling === undefined) {
+    return { approximate, unmeasured, note: "no context budget set." };
+  }
+  const remaining = ceiling - projectedTokens;
+  const flags = [approximate ? "some sizes estimated" : "", unmeasured ? `${unmeasured} unmeasured` : ""].filter(Boolean);
+  return {
+    ceiling,
+    projectedTokens,
+    remaining,
+    approximate,
+    unmeasured,
+    note: `projected ${fmtTokens(projectedTokens)} of ${fmtTokens(ceiling)} tokens; ${fmtTokens(remaining)} remaining${flags.length ? ` (${flags.join(", ")})` : ""}.`,
+  };
+}
 
 /** Resolve the rate-limit tier the agent falls into, and its per-minute ceiling. */
 function planBudget(
@@ -351,7 +420,11 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
   const budget = options.budget;
   const budgetCurrency = budget?.currency ?? "USDC";
   const upstreamSpent = budget?.spent ?? 0; // committed by earlier manifests in a federated walk — the ceiling is tree-wide
+  const contextBudget = options.contextBudget;
+  const unitById = new Map(manifest.units.map((mu) => [mu.id, mu] as const));
   let spend = 0;
+  let usedTokens = 0;
+  let sawUnmeasured = 0;
   let beyondMax = 0;
   const capped: PlannedUnit[] = [];
   for (const u of selected) {
@@ -371,10 +444,33 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       }
       spend += price;
     }
+    // Context ceiling: only load-eligible units consume the window. A unit that
+    // would blow it is skipped with the arithmetic; a smaller one still fits.
+    if (contextBudget !== undefined && u.loadEligible) {
+      const { tokens, measured } = unitTokens(unitById.get(u.id) ?? ({} as Unit));
+      if (!measured) {
+        if (options.strict) {
+          skipped.push({ id: u.id, reason: "size undeclared — excluded under strict (declare size_tokens or bytes)" });
+          continue;
+        }
+        sawUnmeasured++;
+      } else if (usedTokens + (tokens ?? 0) > contextBudget + 1e-9) {
+        skipped.push({
+          id: u.id,
+          reason: `over context budget: ${fmtTokens(tokens ?? 0)} tokens would exceed remaining ${fmtTokens(contextBudget - usedTokens)} of ${fmtTokens(contextBudget)}`,
+        });
+        continue;
+      } else {
+        usedTokens += tokens ?? 0;
+      }
+    }
     capped.push(u);
   }
   if (beyondMax) {
     warnings.push(`${beyondMax} relevant unit(s) beyond maxUnits=${maxUnits} not selected`);
+  }
+  if (contextBudget !== undefined && sawUnmeasured > 0) {
+    warnings.push(`${sawUnmeasured} selected unit(s) declare no size — the context projection is a lower bound (unmeasured)`);
   }
 
   // federation: select sub-manifests by env context, note credential planning.
@@ -398,6 +494,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
   });
 
   const budgetPlan = planBudget(manifest, caps, capped, options.budget);
+  const contextPlan = planContext(manifest, capped, contextBudget);
 
   return {
     task,
@@ -418,11 +515,13 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       maxUnits,
       strict: !!options.strict,
       ...(budget ? { budget } : {}),
+      ...(contextBudget !== undefined ? { contextBudget } : {}),
     },
     selected: capped,
     skipped,
     federation,
     budget: budgetPlan,
+    context: contextPlan,
     warnings,
   };
 }

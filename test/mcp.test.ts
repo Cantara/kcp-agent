@@ -43,6 +43,18 @@ describe("MCP server", () => {
     expect(tree.plan.selected.length).toBeGreaterThan(0);
   });
 
+  it("kcp_plan surfaces the context budget over MCP", async () => {
+    const r = await call("kcp_plan", {
+      task: "sovereign compute award", manifest: "examples/fjordwire",
+      methods: ["free", "x402"], as_of: "2026-07-06", context_budget: 3000,
+    });
+    const tree = JSON.parse(r.result.content[0].text);
+    expect(tree.plan.context.ceiling).toBe(3000);
+    expect(tree.plan.context.projectedTokens).toBe(2900);
+    const skip = tree.plan.skipped.find((s: { id: string }) => s.id === "datacenter-power");
+    expect(skip.reason).toMatch(/over context budget: 900 tokens/);
+  });
+
   it("kcp_load returns unit contents for caller-side synthesis", async () => {
     const r = await call("kcp_load", { task: "how do I deploy?", manifest: "examples/demo-hub", env: "prod" });
     const payload = JSON.parse(r.result.content[0].text);
