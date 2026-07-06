@@ -18,8 +18,8 @@ on:
         default: "main"
 
 permissions:
-  contents: write
-  id-token: write # OIDC for npm Trusted Publishing + provenance attestation
+  contents: write # push the tag, create the GitHub release
+  actions: write # dispatch ci.yml to run the authorized npm publish
 
 jobs:
   release:
@@ -92,8 +92,13 @@ jobs:
           generate_release_notes: true
           files: dist-bin/*
 
-      # npm Trusted Publishing (OIDC) — no token secret; matches ci.yml's tag
-      # publish, which release.yml can't rely on because a GITHUB_TOKEN-pushed
-      # tag does not trigger other workflows. id-token: write is set above.
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      # Hand off publishing to ci.yml — the workflow npm authorizes as the
+      # package's Trusted Publisher. release.yml can't publish under its own
+      # identity (npm rejects its OIDC workflow claim), and its GITHUB_TOKEN tag
+      # push doesn't auto-trigger ci.yml, so dispatch ci.yml explicitly. It
+      # publishes the version on main (which is the release version, since
+      # releases are cut from main after the version bump merges).
+      - name: Hand off npm publish to ci.yml (authorized Trusted Publisher)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref main
