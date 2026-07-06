@@ -56,6 +56,19 @@ export {
 } from "./groundloop.js";
 export { planTree, plans, DEFAULT_MAX_NODES, type FollowOptions, type PlanNode, type NotFollowedRef } from "./follow.js";
 export { verifyManifestText, resolveLocation, type SignatureResult, type SignatureStatus, type VerifyOptions } from "./verify.js";
+export {
+  toEntry,
+  inMemoryStore,
+  fileStore,
+  recall,
+  type MemoryEntry,
+  type MemoryKind,
+  type MemoryStore,
+  type Recalled,
+  type RecallStatus,
+  type RecallReplay,
+  type RecallOptions,
+} from "./memory.js";
 export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";
 export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
 export {

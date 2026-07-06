@@ -114,6 +114,13 @@ units:
     audience: [agent, developer]
     triggers: [ground rounds, closed loop, re-navigate, convergence, evidence]
 
+  - id: episodic-memory
+    path: src/memory.ts
+    intent: "How episodic memory stores a plan/grounded-answer as a replayable artifact stripped of unit bytes — hash-addressed, content-free so recall can't bypass the access gate, replay-validated freshness on recall"
+    scope: project
+    audience: [agent, developer]
+    triggers: [memory, remember, recall, episode, replay, freshness]
+
   - id: demo-manifest
     path: examples/demo-hub/knowledge.yaml
     intent: "A worked example manifest exercising every planner stage — trust gating, temporal validity, payment, rate limits, federation"

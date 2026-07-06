@@ -225,6 +225,9 @@ planning sensibly.
 | `--ground-model <id>` | (`ask --ground`) verifier model — default `claude-haiku-4-5` |
 | `--ground-rounds <n>` | (`ask`) closed-loop grounding: a surfaced gap re-navigates for evidence (default 0) |
 | `--check-gaps` | (`replay`) re-navigate today's manifest to see if a grounded answer's surfaced gap now closes |
+| `--memory <dir>` | (`remember`/`recall`) episodic-memory directory — one hash-addressed entry per artifact |
+| `--replay` | (`recall`) re-verify each recalled episode against today's manifests (a drifted hit exits 1) |
+| `--limit <n>` | (`recall`) cap the number of episodes returned |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.
@@ -260,6 +263,29 @@ cross-examines it claim-by-claim instead: each grounded claim's cited unit is re
 not read as verified. With `--check-gaps` it re-navigates today's manifest to see whether a
 previously-surfaced gap now **closes** (the manifest grew the missing evidence since the answer)
 — gaps have a lifecycle, and a memory is a plan you can re-verify against a moved world.
+
+### `remember` / `recall` — episodic memory as replayable plans
+
+```bash
+node dist/cli.js ask "who won the exclusive story" --manifest examples/fjordwire --ground --json > ans.json
+node dist/cli.js remember ans.json --memory .kcp-memory        # log the episode (unit bytes stripped)
+node dist/cli.js recall "the exclusive story winner" --memory .kcp-memory --replay
+```
+
+A memory here is not a summary or an embedding — it is the plan/grounded-answer artifact itself,
+**stripped of the one thing that would make it dangerous to keep: the unit bytes.** Caching
+restricted or paid content in the memory log would let a later recall read it without re-passing
+the access gate, so `remember` keeps only what replay needs — each unit's `id`, `path`, `sha256`,
+and the citation table — and drops every `content` field. Entries are hash-addressed by their
+content-stripped artifact, so recording the same answer twice is idempotent.
+
+`recall` matches past episodes by lexical task-term overlap (the same tokenizer the planner
+scores with), ranked by overlap. Because the bytes are gone, a recalled episode carries **no
+freshness claim on its own**: with `--replay` each hit is re-verified against today's manifests —
+**valid** (every cited unit holds its pinned bytes), **drifted** (a citation moved — exit 1), or
+**unverifiable** (the replay could not run). Without `--replay`, every hit is reported
+`unverifiable` — memory never falsely claims a stale answer is still true. A memory is a plan you
+can re-verify against a moved world.
 
 ### `mcp` — serve the planner to any MCP client
 

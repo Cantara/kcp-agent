@@ -83,6 +83,18 @@
       ]
     },
     {
+      "layer": "Episodic memory — a memory is a replayable plan, stripped of unit bytes so recall can't bypass the access gate",
+      "section": "hardening",
+      "where": "memory.ts · toEntry / recall",
+      "impl": ["src/memory.ts"],
+      "proofs": [
+        { "file": "test/memory.test.ts", "test": "SECURITY: strips unit content on ingest but keeps id/path/sha for replay" },
+        { "file": "test/memory.test.ts", "test": "is hash-addressed: the same artifact yields the same id regardless of recordedAt" },
+        { "file": "test/memory.test.ts", "test": "attaches replay-validated status to each hit" },
+        { "file": "test/memory.test.ts", "test": "without a replay hook, hits are returned unverified (never falsely 'valid')" }
+      ]
+    },
+    {
       "layer": "Closed-loop grounding — a gap re-navigates for evidence, with a bounded convergence proof",
       "section": "hardening",
       "where": "groundloop.ts · groundingLoop",

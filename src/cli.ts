@@ -6,6 +6,8 @@
 //   kcp-agent validate <path|dir|url>                                 lint a knowledge.yaml
 //   kcp-agent replay   <artifact.json>                                re-verify a saved plan OR grounded-answer artifact (exit 1 on drift)
 //                                                                     --check-gaps: re-navigate to see if a surfaced gap now closes
+//   kcp-agent remember <artifact.json> --memory <dir>                 log a plan/grounded-answer artifact to episodic memory (unit bytes stripped)
+//   kcp-agent recall   "<task>" --memory <dir>                        recall past episodes by task overlap; --replay re-verifies each against today's world
 //   kcp-agent mcp                                                     serve the planner over MCP stdio
 //
 // Options (plan/ask):
@@ -36,12 +38,16 @@
 //   --ground              verify each answer claim against a loaded unit; surface unsubstantiated ones
 //   --ground-model <id>   verifier model for --ground (default: claude-haiku-4-5)
 //   --ground-rounds <n>   closed-loop grounding: a surfaced gap re-navigates for evidence (default 0)
+//   memory (remember/recall):
+//   --memory <dir>        episodic-memory directory (one hash-addressed entry per artifact)
+//   --replay              recall only: re-verify each hit against today's manifests (drifted → exit 1)
+//   --limit <n>           recall only: cap the number of episodes returned
 
 import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
 import type { FetchGuard } from "./fetch.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
-import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay } from "./format.js";
+import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay, formatRecall } from "./format.js";
 import { synthesize, loadAnthropicSdk, loadPlannedUnits, type SynthesisResult } from "./synthesize.js";
 import { groundAnswer, makeClaudeVerifier } from "./ground.js";
 import { replayGroundedAnswer } from "./replayground.js";
@@ -50,6 +56,7 @@ import { askLoop } from "./loop.js";
 import { validateLocation } from "./validate.js";
 import { replayArtifact } from "./replay.js";
 import { serveMcp } from "./mcp.js";
+import { toEntry, fileStore, recall, type MemoryEntry, type RecallReplay } from "./memory.js";
 
 interface Args {
   command: string;
@@ -81,10 +88,13 @@ interface Args {
   groundModel?: string;
   groundRounds?: number;
   checkGaps: boolean;
+  memory?: string;
+  replay: boolean;
+  limit?: number;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false, replay: false };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -118,6 +128,9 @@ function parseArgs(argv: string[]): Args {
       case "--ground-rounds": a.groundRounds = Number(next()); a.ground = true; break;
       case "--check-gaps": a.checkGaps = true; break;
       case "--json": a.json = true; break;
+      case "--memory": a.memory = next(); break;
+      case "--replay": a.replay = true; break;
+      case "--limit": a.limit = Number(next()); break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
         positionals.push(t);
@@ -163,6 +176,25 @@ function buildReground(artifact: unknown, a: Args, guard: FetchGuard): (task: st
   };
 }
 
+/** The `recall --replay` seam: re-verify a recalled episode against today's world, dispatching by kind. */
+function buildRecallReplay(guard: FetchGuard): RecallReplay {
+  return async (entry: MemoryEntry) => {
+    try {
+      if (entry.kind === "grounded-answer") {
+        const r = await replayGroundedAnswer(entry.artifact, entry.id, { fetchGuard: guard });
+        const drifted = r.claims.filter((c) => c.status !== "still-grounded").length;
+        return { ok: r.ok, detail: r.ok ? "every cited unit holds its pinned bytes" : `${drifted} cited unit(s) drifted or gone` };
+      }
+      const r = await replayArtifact(entry.artifact, entry.id, guard);
+      const changed = r.checks.filter((c) => c.status !== "identical").length;
+      return { ok: r.ok, detail: r.ok ? "plan re-verifies against the live manifest" : `${changed} node(s) drifted since recorded` };
+    } catch (err) {
+      // A replay that cannot run (network, gone manifest) is unverifiable — never falsely "valid".
+      return { ok: false, unverifiable: true, detail: `could not replay: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  };
+}
+
 function buildFollowOptions(a: Args): FollowOptions {
   return {
     planOptions: buildPlanOptions(a),
@@ -181,6 +213,8 @@ const USAGE =
   '  kcp-agent ask      "<task>" --manifest <path|dir|url> [options]\n' +
   '  kcp-agent validate <path|dir|url> [--json]\n' +
   '  kcp-agent replay   <plan.json> [--json]\n' +
+  '  kcp-agent remember <artifact.json> --memory <dir>\n' +
+  '  kcp-agent recall   "<task>" --memory <dir> [--replay] [--limit <n>]\n' +
   '  kcp-agent mcp\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
@@ -222,6 +256,31 @@ async function main() {
     const report = await replayArtifact(artifact, file, guard);
     console.log(a.json ? JSON.stringify(report, null, 2) : formatReplay(report));
     process.exit(report.ok ? 0 : 1);
+  }
+
+  if (a.command === "remember") {
+    const file = a.task ?? a.manifest;
+    if (!file) { console.error("Missing artifact path.\n\n" + USAGE); process.exit(2); }
+    if (!a.memory) { console.error("Missing --memory <dir>.\n\n" + USAGE); process.exit(2); }
+    const artifact = JSON.parse(readFileSync(file, "utf8"));
+    const entry = toEntry(artifact, new Date().toISOString());
+    await fileStore(a.memory).append(entry);
+    if (a.json) { console.log(JSON.stringify({ id: entry.id, kind: entry.kind, task: entry.task }, null, 2)); return; }
+    console.log(`Remembered ${entry.kind} ${entry.id.slice(0, 12)}… — "${entry.task}" (content stripped; only the replay skeleton is kept)`);
+    return;
+  }
+
+  if (a.command === "recall") {
+    if (!a.task) { console.error("Missing task.\n\n" + USAGE); process.exit(2); }
+    if (!a.memory) { console.error("Missing --memory <dir>.\n\n" + USAGE); process.exit(2); }
+    const guard = buildFetchGuard(a);
+    // --replay re-verifies each hit against the live world, dispatching by kind.
+    const replay: RecallReplay | undefined = a.replay ? buildRecallReplay(guard) : undefined;
+    const hits = await recall(fileStore(a.memory), a.task, { replay, limit: a.limit });
+    if (a.json) { console.log(JSON.stringify(hits, null, 2)); return; }
+    console.log(formatRecall(a.task, hits));
+    // Fail-closed exit: a drifted hit is a signal, not a clean recall.
+    process.exit(hits.some((h) => h.status === "drifted") ? 1 : 0);
   }
 
   if (a.command !== "plan" && a.command !== "ask") {

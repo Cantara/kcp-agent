@@ -6,6 +6,7 @@ import type { ValidationReport } from "./validate.js";
 import type { ReplayReport } from "./replay.js";
 import type { GroundedAnswer } from "./ground.js";
 import type { GroundedReplayReport } from "./replayground.js";
+import type { Recalled } from "./memory.js";
 
 const useColor = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const c = {
@@ -206,6 +207,29 @@ export function formatGroundedReplay(r: GroundedReplayReport): string {
       ? c.green("✓ still grounded — every cited unit holds its pinned bytes")
       : c.red("✗ stale — a cited unit drifted or is gone; re-run `ask --ground` against today's manifest")
   );
+  out.push("");
+  return out.join("\n");
+}
+
+/** Render recalled episodes — each with its lexical score and (if replayed) freshness. */
+export function formatRecall(task: string, hits: Recalled[]): string {
+  const out: string[] = [];
+  out.push("");
+  out.push(c.bold(`Recall: ${task}`));
+  if (hits.length === 0) {
+    out.push(c.dim("  (no episode overlaps this task)"));
+    out.push("");
+    return out.join("\n");
+  }
+  for (const h of hits) {
+    const mark =
+      h.status === "valid" ? c.green("✓") : h.status === "drifted" ? c.red("✗") : c.dim("?");
+    const label =
+      h.status === "valid" ? c.green(h.status) : h.status === "drifted" ? c.red(h.status) : c.dim(h.status);
+    out.push(`  ${mark} ${label} ${c.cyan(h.entry.kind)} ${c.dim("· score " + h.score)} ${c.bold(h.entry.task)}`);
+    out.push(`     ${c.dim(h.entry.id.slice(0, 12) + "… · " + h.entry.recordedAt + " · " + (h.entry.manifestSource ?? "?"))}`);
+    out.push(`     ${c.dim(h.detail)}`);
+  }
   out.push("");
   return out.join("\n");
 }
