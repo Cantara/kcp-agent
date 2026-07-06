@@ -1,0 +1,44 @@
+# Orion Business Systems — the external ERP vendor. A second publisher with
+# its own provenance, reachable only through the hub's identity-gated
+# federation edge (vendor_portal_token). The overview is free; the field-level
+# integration guide is subscription-only — an agent without a subscription
+# gets "needs subscription" in writing, and a subscribed agent lands in the
+# premium rate tier.
+
+kcp_version: "0.25"
+project: orion-erp-docs
+version: 5.2.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Orion Business Systems (example)"
+
+rate_limits:
+  default:
+    requests_per_minute: 10
+  premium:
+    requests_per_minute: unlimited
+  backoff: exponential
+
+units:
+  - id: erp-overview
+    path: docs/erp-overview.md
+    intent: "Orion ERP modules and release cadence at a glance: what the platform covers and where the integration surfaces are"
+    scope: global
+    audience: [agent, human]
+    triggers: [erp, orion, modules, release, overview]
+
+  - id: erp-integration-guide
+    path: docs/erp-integration-guide.md
+    intent: "The Orion ERP integration guide: field mappings, idempotency rules and error contracts for order and recipe master-data integration"
+    scope: global
+    audience: [agent, human]
+    triggers: [erp, integration, mapping, order, recipe, idempotency]
+    payment:
+      default_tier: partner
+      methods:
+        - type: subscription
+          provider: orion-portal
+          plans_url: "https://orion-systems.example/plans"

@@ -114,11 +114,11 @@ The same loop is available as a library (`runLoop` / `askLoop`, with an injectab
 [`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
 portable skill for agents that drive the CLI themselves.
 
-### Demos — eleven scenarios, no mocks
+### Demos — twelve scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all eleven, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · summer · dogfood
+node examples/demos.js            # all twelve, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · seal · incident · leash · summer · milky-way · dogfood
 node examples/demos.js vault      # one at a time
 ```
 
@@ -134,10 +134,11 @@ node examples/demos.js vault      # one at a time
 | **The Borrowed Leash** | a scripted foreign MCP client replans the incident over stdio — same gates, same ledger — then `kcp_replay` catches its falsified artifact | — |
 | **The Seal** | a signed manifest verifies; one unit appended after signing → fail-closed before planning | §3.2 |
 | **The Summer Plan** | a family vacation across four federated parties — a signed hub, timetable supersession, an identity-gated accessibility registry, x402 tour detail, and the `not_for` footgun caught by the validate lint ([`examples/summer/`](examples/summer/)) | §3.6/§4.11/§4.22 |
+| **The Milky Way** | a whole enterprise documentation estate — a signed hub over eight domains: env-sliced dev mirror, a future regulation dated out, human-only HR docs, HSM-attested formulations, an identity-gated ERP vendor with subscription rate tiers, and a CSRD annual handover ([`examples/milky-way/`](examples/milky-way/)) | §3.6/§4.14/§4.22 |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all eleven in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all twelve in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself

@@ -1,0 +1,38 @@
+# Quality & Food Safety — the domain a food company gets audited on. The
+# HACCP plan and the audit checklist are active; the 2027 hygiene regulation
+# is published ahead of force with valid_from, so an agent preparing today's
+# audit sees it in the plan as "not active until 2027-01-01" — visible,
+# dated, and deterministically excluded.
+
+kcp_version: "0.25"
+project: melkeveien-quality
+version: 3.0.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Quality & Food Safety (example)"
+
+units:
+  - id: haccp-plan
+    path: docs/haccp-plan.md
+    intent: "The HACCP plan for the Stjerneholmen plant: hazard analysis, critical control points, monitoring and corrective actions"
+    scope: global
+    audience: [agent, human]
+    triggers: [haccp, hazard, food, safety, control, plant, hygiene]
+
+  - id: audit-checklist
+    path: docs/audit-checklist.md
+    intent: "Preparing for a food safety authority audit: evidence to have ready, records to pull, who hosts the inspectors"
+    scope: global
+    audience: [agent, human]
+    triggers: [audit, inspection, authority, checklist, evidence]
+
+  - id: hygiene-regulation-2027
+    path: docs/hygiene-regulation-2027.md
+    intent: "The 2027 hygiene regulation: what changes for dairy plants when it enters into force, and the gap analysis against current practice"
+    scope: global
+    audience: [agent, human]
+    triggers: [hygiene, regulation, compliance, audit, gap]
+    temporal: {valid_from: "2027-01-01"}

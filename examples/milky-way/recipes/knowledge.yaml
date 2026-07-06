@@ -1,0 +1,37 @@
+# R&D — the crown jewels. Formulations are access: restricted and the
+# manifest requires attestation from the cooperative's own HSM-backed
+# provider, so an unattested agent gets a written gate, not a leak. The
+# not_for list is written in the excluded topics' OWN words (press releases,
+# marketing copy — never as a negation of this unit's own topic), so a
+# comms agent drafting a launch is deterministically turned away with a
+# reason it can quote.
+
+kcp_version: "0.25"
+project: melkeveien-rnd
+version: 1.4.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Research & Development (example)"
+  agent_requirements:
+    require_attestation: true
+    trusted_providers: [melkeveien-hsm]
+
+units:
+  - id: rnd-overview
+    path: docs/rnd-overview.md
+    intent: "The R&D programme at a glance: active product tracks, pilot plant capacity, and how projects graduate to production"
+    scope: global
+    audience: [agent, human]
+    triggers: [research, development, programme, pipeline, pilot]
+
+  - id: formulations
+    path: docs/formulations.md
+    intent: "Product formulations, ingredient specifications and pilot-batch results — including the oat drink programme"
+    scope: global
+    audience: [agent]
+    access: restricted
+    triggers: [formulation, recipe, ingredient, sugar, oat, batch]
+    not_for: ["press releases", "marketing copy", "supplier newsletters"]

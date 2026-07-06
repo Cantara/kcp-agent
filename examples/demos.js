@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — eleven narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — twelve narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all eleven in CI as regression tests.
+// all twelve in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -28,6 +28,7 @@ const ORG_HUB = path.join(EX, 'org', 'hub');
 const SEALED = path.join(EX, 'sealed');
 const INCIDENT = path.join(EX, 'incident');
 const SUMMER = path.join(EX, 'summer', 'tourism');
+const MILKY = path.join(EX, 'milky-way');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -57,6 +58,7 @@ function agent(args) {
     .replaceAll(ORG_HUB, 'examples/org/hub')
     .replaceAll(INCIDENT, 'examples/incident')
     .replaceAll(SUMMER, 'examples/summer/tourism')
+    .replaceAll(MILKY, 'examples/milky-way')
     .replaceAll(ROOT, '.');
   return {
     stdout: stripAnsi((r.stdout || '').toString()).replaceAll(ROOT + path.sep, ''),
@@ -548,6 +550,77 @@ const SCENARIOS = [
       'credentials, validity windows and prices the planner enforces deterministically. And the ' +
       'one authoring mistake that would silently hide the allergy unit from its own audience is ' +
       'caught twice: as a written skip reason at plan time, and by validate before it ships.',
+  },
+  {
+    id: 'milky-way',
+    title: 'The Milky Way — an enterprise documentation estate the agent can defend',
+    useCase:
+      'Melkeveien SA (fictional dairy cooperative — "the Milky Way") publishes its whole ' +
+      'documentation estate as nine manifests under one signed hub: an integration platform ' +
+      'and its dev mirror sliced by environment, quality & food safety, attested-only R&D ' +
+      'formulations, HR with human-only documents, an open brand kit, CSRD reporting mid ' +
+      'annual handover, and an external ERP vendor behind an identity gate. Five agents with ' +
+      'five different jobs walk the same estate — and every closed door has a written reason.',
+    run() {
+      const hub = (task, extra = []) =>
+        agent(['plan', task, '--manifest', path.join(MILKY, 'hub'), '--follow',
+               '--as-of', '2026-07-06', '--env', 'prod', ...extra]);
+      // 1. the audit agent, unprovisioned
+      const audit = hub('prepare for the food safety authority audit at the Stjerneholmen plant');
+      // 2. the comms agent drafting a launch
+      const press = hub('draft the press release for the oat drink launch');
+      // 3. the same HR question from an agent and from a human
+      const salaryTask = 'how does the annual salary review work';
+      const salaryAgent = agent(['plan', salaryTask, '--manifest', path.join(MILKY, 'people')]);
+      const salaryHuman = agent(['plan', salaryTask, '--manifest', path.join(MILKY, 'people'), '--role', 'human']);
+      // 4. the R&D agent, cold then fully provisioned
+      const rndTask = 'cut the sugar in the oat drink formulation and update the ERP recipe integration';
+      const rndCold = hub(rndTask);
+      const rndWarm = hub(rndTask, ['--attest', 'melkeveien-hsm',
+        '--credentials', 'sso_badge,vendor_portal_token', '--methods', 'free,subscription']);
+      // 5. the reporting agent hits the CSRD annual handover
+      const esg = agent(['plan', 'scope 3 emissions for the sustainability report',
+        '--manifest', path.join(MILKY, 'esg'), '--as-of', '2026-07-06']);
+      return { blocks: [
+        { command: audit.command, lines: [
+          'the audit agent — signed hub, eight domains, production context:',
+          ...pick(audit.stdout, [
+            'Signature: ✓', 'audit-checklist (', 'haccp-plan (',
+            'hygiene-regulation-2027:', "excludes env 'prod'", 'needs vendor_portal_token',
+          ]).map((l) => '  ' + l.trim()),
+        ]},
+        { command: press.command, lines: [
+          'the comms agent — R&D turns it away in its own words, brand catches it:',
+          ...pick(press.stdout, ['formulations:', 'press-kit (']).map((l) => '  ' + l.trim()),
+        ]},
+        { command: salaryAgent.command, lines: [
+          ...pick(salaryAgent.stdout, ['salary-review:']).map((l) => c.yellow('  ' + l.trim())),
+        ]},
+        { command: salaryHuman.command, lines: [
+          ...pick(salaryHuman.stdout, ['salary-review (']).map((l) => '  ' + l.trim()),
+        ]},
+        { command: rndCold.command, lines: [
+          'the R&D agent, unprovisioned — top-ranked but not load-eligible:',
+          ...pick(rndCold.stdout, ['○ 1. formulations', 'restricted: requires attestation']).map((l) => '  ' + l.trim()),
+        ]},
+        { command: rndWarm.command, lines: [
+          'attested against the cooperative HSM, vendor credential and subscription in hand:',
+          ...pick(rndWarm.stdout, [
+            'attestation required — agent can present it', '● 1. formulations',
+            'erp-integration-guide (', 'tier authenticated', 'tier premium',
+          ]).map((l) => '  ' + l.trim()),
+        ]},
+        { command: esg.command, lines: [
+          ...pick(esg.stdout, ['csrd-2026 (', 'csrd-2025:']).map((l) => '  ' + l.trim()),
+        ]},
+      ] };
+    },
+    verdict:
+      'One estate, five jobs, zero tribal knowledge: environment slicing, a future regulation ' +
+      'with a start date, audience targeting, not_for written in the excluded topic\'s own ' +
+      'words, HSM attestation for the crown jewels, an identity-gated vendor edge, and a ' +
+      'subscription that moves the agent into the premium rate tier — every gate deterministic, ' +
+      'every skip a sentence you could read to an auditor.',
   },
   {
     id: 'dogfood',

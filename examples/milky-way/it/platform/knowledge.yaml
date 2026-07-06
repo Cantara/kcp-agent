@@ -1,0 +1,61 @@
+# Melkeveien Integration Platform — the team that owns every integration
+# between the ERP, the plant MES systems, and logistics. Publishes the live
+# catalog, a machine-readable API schema (audience: agent), a superseded ADR
+# pair (§4.22 — the decision record IS the changelog), and the on-call
+# runbook. Manifest-level rate limits: anonymous agents get the default tier,
+# credentialed agents the authenticated tier.
+
+kcp_version: "0.25"
+project: melkeveien-platform
+version: 2.3.0
+updated: "2026-07-06"
+language: en
+
+trust:
+  provenance:
+    publisher: "Melkeveien SA Integration Platform (example)"
+
+rate_limits:
+  default:
+    requests_per_minute: 30
+  authenticated:
+    requests_per_minute: 300
+  backoff: exponential
+
+units:
+  - id: integration-catalog
+    path: catalog/integration-catalog.md
+    intent: "The live integration catalog: every interface between the ERP, plant MES systems and logistics, with owners and environments"
+    scope: global
+    audience: [agent, human]
+    triggers: [integration, catalog, erp, mes, logistics, interface]
+
+  - id: order-api-schema
+    path: apis/order-api.openapi.yaml
+    intent: "The order intake API, machine-readable: OpenAPI 3.1 schema with endpoints, payloads and error contracts"
+    scope: global
+    audience: [agent]
+    triggers: [api, openapi, schema, order, endpoint, payload]
+
+  - id: adr-007-esb
+    path: adr/adr-007-esb.md
+    intent: "ADR-007: route all plant integrations through the enterprise service bus (superseded)"
+    scope: global
+    audience: [agent, human]
+    triggers: [architecture, decision, adr, esb, integration]
+    temporal: {valid_until: "2026-03-31", superseded_by: adr-012-event-backbone}
+
+  - id: adr-012-event-backbone
+    path: adr/adr-012-event-backbone.md
+    intent: "ADR-012: replace the ESB with an event backbone; integration contracts move to published schemas"
+    scope: global
+    audience: [agent, human]
+    triggers: [architecture, decision, adr, event, backbone, integration]
+    temporal: {valid_from: "2026-03-01"}
+
+  - id: integration-oncall
+    path: runbooks/integration-oncall.md
+    intent: "The integration on-call runbook: escalation paths, health checks, and what to do when order flow stops"
+    scope: global
+    audience: [agent, human]
+    triggers: [oncall, runbook, incident, escalation, health]

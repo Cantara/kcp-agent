@@ -8,8 +8,8 @@
 
 kcp_version: "0.25"
 project: kcp-agent
-version: 0.4.0
-updated: "2026-07-05"
+version: 0.5.0
+updated: "2026-07-06"
 language: en
 
 trust:
@@ -116,7 +116,7 @@ units:
 
   - id: demo-suite
     path: examples/demos.js
-    intent: "Nine narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, the signature seal, the incident page, dogfood — each CI-asserted"
+    intent: "Twelve narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, the signature seal, the incident page, the summer plan, the milky-way estate, dogfood — each CI-asserted"
     scope: project
     audience: [agent, developer]
     triggers: [demos, scenarios, showcase, newsstand, vault, audit]
@@ -127,6 +127,13 @@ units:
     scope: project
     audience: [agent, developer]
     triggers: [incident, zero-day, cert, threat intel, tlp, response, use case]
+
+  - id: milky-way-world
+    path: examples/milky-way/README.md
+    intent: "The Milky Way enterprise documentation estate — a signed hub over eight domains (env-sliced IT, quality with a future regulation, HSM-attested R&D, human-only HR docs, brand, CSRD handover, identity-gated ERP vendor) walked by five different agents"
+    scope: project
+    audience: [agent, developer]
+    triggers: [enterprise, estate, milky-way, melkeveien, domains, documentation, use case]
 
   - id: arena-site
     path: docs/js/app.js

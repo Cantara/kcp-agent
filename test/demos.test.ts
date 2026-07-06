@@ -139,6 +139,35 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("contains the unit's own vocabulary (allergen, dining, free, nut)");
   });
 
+  it("milky-way: one enterprise estate, five jobs, every gate written down", () => {
+    const out = demo("milky-way");
+    // the signed hub verifies before planning
+    expect(out).toContain("ed25519 signature verified (envelope key) · key milkyway-2026");
+    // audit agent: quality units ranked, the 2027 regulation dated out, prod context slices dev away
+    expect(out).toContain("● 1. audit-checklist");
+    expect(out).toContain("hygiene-regulation-2027: not active until 2027-01-01");
+    expect(out).toContain(`context ["dev"] excludes env 'prod'`);
+    expect(out).toContain("vendor needs vendor_portal_token before fetch");
+    // comms agent: R&D's not_for turns it away in the excluded topic's own words
+    expect(out).toContain("formulations: not_for declares it does not serve 'press releases'");
+    expect(out).toContain("● 1. press-kit");
+    // audience targeting: the same question flips on --role
+    expect(out).toContain(`salary-review: audience ["human"] excludes role 'agent'`);
+    expect(out).toContain("● 1. salary-review");
+    // R&D agent cold: top-ranked but gated, with both reasons written
+    expect(out).toMatch(/○ 1\. formulations/);
+    expect(out).toContain("restricted: requires attestation the agent cannot present");
+    // provisioned: HSM attestation opens the gate, subscription buys the premium tier
+    expect(out).toContain("attestation required — agent can present it");
+    expect(out).toMatch(/● 1\. formulations/);
+    expect(out).toMatch(/● 1\. erp-integration-guide .* subscription/);
+    expect(out).toContain("tier premium · unlimited req/min");
+    expect(out).toContain("tier authenticated · 300 req/min");
+    // CSRD handover: overlap disambiguated by supersession
+    expect(out).toContain("csrd-2025: superseded by csrd-2026 (successor active)");
+    expect(out).toMatch(/● 1\. csrd-2026/);
+  });
+
   it("dogfood: the repo manifest validates and routes to the planner source", () => {
     const out = demo("dogfood");
     expect(out).toContain("✓ valid");
