@@ -27,7 +27,7 @@ export {
   type ContextPlan,
   type PaymentPlan,
 } from "./planner.js";
-export { formatPlan, formatPlanTree, formatValidation, formatGrounded, formatGroundedReplay } from "./format.js";
+export { formatPlan, formatPlanTree, formatValidation, formatGrounded, formatGroundedReplay, formatTrace, formatDiff } from "./format.js";
 export {
   replayGroundedAnswer,
   type GroundedReplayReport,
@@ -88,6 +88,23 @@ export {
   type DedupResult,
 } from "./session.js";
 export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";
+export {
+  trace,
+  GATE_ORDER,
+  type GateName,
+  type GateVerdict,
+  type UnitTrace,
+  type DecisionTrace,
+} from "./trace.js";
+export {
+  diffPlans,
+  type PlanDiff,
+  type UnitMove,
+  type ScoreChange,
+  type UnitPresence,
+  type BudgetShift,
+  type ReasonChange,
+} from "./diff.js";
 export { outcomeOf, runVector, type VectorOutcome, type ConformanceVector } from "./vectors.js";
 export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
 export {

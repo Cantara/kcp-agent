@@ -94,7 +94,7 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
 
   it("leash: a foreign MCP client gets the same gates, and replay cross-examines over the wire", () => {
     const out = demo("leash");
-    expect(out).toContain("tools: kcp_plan, kcp_load, kcp_validate, kcp_replay");
+    expect(out).toContain("tools: kcp_plan, kcp_load, kcp_validate, kcp_trace, kcp_replay");
     // unprovisioned over MCP: the same written reasons as the CLI
     expect(out).toContain("○ incident-runbook — restricted: requires attestation the agent cannot present; access 'restricted': agent holds no credentials");
     // provisioned over MCP: gate open, ledger committed

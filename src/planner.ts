@@ -183,7 +183,8 @@ function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function temporalStatus(unit: Unit, asOf: string): "active" | "future" | "expired" {
+/** @internal — exported for the trace module; not part of the public API contract. */
+export function temporalStatus(unit: Unit, asOf: string): "active" | "future" | "expired" {
   const t = unit.temporal;
   if (!t) return "active";
   if (t.valid_from && t.valid_from > asOf) return "future";
@@ -197,7 +198,8 @@ function temporalStatus(unit: Unit, asOf: string): "active" | "future" | "expire
  * whose declared successor is itself selectable SHOULD NOT be selected.
  * Returns the successor id when it is active as of `asOf` and audience-eligible.
  */
-function selectableSuccessor(unit: Unit, manifest: Manifest, asOf: string, role: string): string | undefined {
+/** @internal — exported for the trace module; not part of the public API contract. */
+export function selectableSuccessor(unit: Unit, manifest: Manifest, asOf: string, role: string): string | undefined {
   const succId = unit.temporal?.superseded_by;
   if (!succId) return undefined;
   const succ = manifest.units.find((u) => u.id === succId);
@@ -207,8 +209,9 @@ function selectableSuccessor(unit: Unit, manifest: Manifest, asOf: string, role:
   return succId;
 }
 
-/** Choose the first payment method the agent supports, from a unit/root payment block. */
-function planPayment(payment: Unit["payment"], caps: AgentCapabilities): PaymentPlan {
+/** Choose the first payment method the agent supports, from a unit/root payment block.
+ *  @internal — exported for the trace module; not part of the public API contract. */
+export function planPayment(payment: Unit["payment"], caps: AgentCapabilities): PaymentPlan {
   const methods = payment?.methods;
   if (!methods || methods.length === 0) {
     return { method: "free", cost: undefined, affordable: true }; // no payment declared = free

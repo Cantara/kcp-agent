@@ -231,6 +231,7 @@ planning sensibly.
 | `--no-verify` | skip manifest signature verification |
 | `--require-signature` | fail unless every manifest has a *verified* signature |
 | `--trust-key <loc>` | pinned ed25519 public key (path, URL, or inline) for verification |
+| `--trace` | (`plan`) show the decision trace: per-unit gate cascade — every gate each unit was evaluated against, in order |
 | `--json` | emit the plan (and, for `ask`, the answer) as JSON |
 | `--model <id>` | (`ask`) Claude model id — default `claude-opus-4-8` |
 | `--loop` | (`ask`) audited critique loop: plan → LLM gap critique → term gate → re-plan |
