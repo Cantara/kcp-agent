@@ -4,6 +4,7 @@ import type { AgentPlan } from "./planner.js";
 import type { PlanNode } from "./follow.js";
 import type { ValidationReport } from "./validate.js";
 import type { ReplayReport } from "./replay.js";
+import type { GroundedAnswer } from "./ground.js";
 
 const useColor = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const c = {
@@ -147,6 +148,34 @@ export function formatReplay(r: ReplayReport): string {
     r.ok
       ? c.green("✓ deterministic: every saved plan reproduced byte-identically")
       : c.red("✗ drift detected — the saved artifact no longer matches the world")
+  );
+  out.push("");
+  return out.join("\n");
+}
+
+/** Render a grounded answer: the grounded claims with their citations, then the surfaced gaps. */
+export function formatGrounded(g: GroundedAnswer): string {
+  const out: string[] = [];
+  out.push("");
+  out.push(c.bold(`Grounded (${g.grounded.length}/${g.claims.length} claim${g.claims.length === 1 ? "" : "s"}):`));
+  for (const claim of g.grounded) {
+    out.push(`  ${c.green("●")} ${claim.claim}`);
+    out.push(`     ${c.dim(`↳ ${claim.unitId} · sha ${(claim.sha256 ?? "").slice(0, 12)}`)}`);
+  }
+  if (g.gaps.length) {
+    out.push("");
+    out.push(c.bold(c.yellow(`Unsubstantiated (${g.gaps.length}):`)) + c.dim(" — could not be grounded in a loaded unit"));
+    for (const gap of g.gaps) {
+      out.push(`  ${c.yellow("○")} ${gap.claim}`);
+      out.push(`     ${c.dim(gap.reason)}`);
+    }
+    if (g.gapsTruncated > 0) out.push(c.dim(`  … and ${g.gapsTruncated} more (surfaced list capped)`));
+  }
+  out.push("");
+  out.push(
+    g.status === "grounded"
+      ? c.green("✓ grounded — every claim is backed by a loaded, hash-pinned unit")
+      : c.yellow(`⚠ partial-unsupported — ${g.gaps.length + g.gapsTruncated} claim(s) could not be substantiated`)
   );
   out.push("");
   return out.join("\n");

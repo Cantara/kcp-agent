@@ -25,7 +25,20 @@ export {
   type BudgetPlan,
   type PaymentPlan,
 } from "./planner.js";
-export { formatPlan, formatPlanTree, formatValidation } from "./format.js";
+export { formatPlan, formatPlanTree, formatValidation, formatGrounded } from "./format.js";
+export {
+  groundAnswer,
+  splitClaims,
+  makeClaudeVerifier,
+  DEFAULT_MAX_GAPS,
+  type GroundUnit,
+  type GroundedAnswer,
+  type ClaimVerdict,
+  type Gap,
+  type GroundStatus,
+  type Verifier,
+  type GroundOptions,
+} from "./ground.js";
 export { planTree, plans, DEFAULT_MAX_NODES, type FollowOptions, type PlanNode, type NotFollowedRef } from "./follow.js";
 export { verifyManifestText, resolveLocation, type SignatureResult, type SignatureStatus, type VerifyOptions } from "./verify.js";
 export { validateManifest, validateLocation, type Finding, type ValidationReport } from "./validate.js";

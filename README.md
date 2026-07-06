@@ -114,6 +114,34 @@ The same loop is available as a library (`runLoop` / `askLoop`, with an injectab
 [`skills/kcp-navigator/SKILL.md`](skills/kcp-navigator/SKILL.md) packages the discipline as a
 portable skill for agents that drive the CLI themselves.
 
+### `ask --ground` — verify the answer, surface what it can't substantiate
+
+```bash
+node dist/cli.js ask "who won, and what does it mean?" --manifest ./knowledge.yaml --ground
+```
+
+The plan's fail-closed gates decide what may be *loaded*; grounding extends the same discipline to
+what may be *asserted*. After synthesis, each claim in the answer is checked by a **separate
+verifier** — a distinct model call from the generator — that must attribute the claim to one of the
+loaded units or return nothing. The result is a two-part artifact:
+
+```
+Grounded (2/3 claims):
+  ● The award went to the Nordic bid.
+     ↳ chipfab-exclusive · sha 9f2c1a0b7e34
+Unsubstantiated (1): — could not be grounded in a loaded unit
+  ○ The datacenter runs on hydro power.
+     no loaded unit supports this claim
+⚠ partial-unsupported — 1 claim(s) could not be substantiated
+```
+
+A claim grounds **only** if the cited unit was actually loaded and its content hash matches — so a
+verifier that mis-attributes (or is prompt-injected into) citing a unit that was never loaded can
+never ground a claim: attribution is a proposal, grounding is adjudicated. Unsupported claims are
+**surfaced, never silently dropped** — the honest half of "every decision defensible". Each surfaced
+gap is also a signal to the *publisher*: the task needed evidence the manifest didn't provide. The
+surfaced list is capped to guard against a compromised generator flooding it with spurious gaps.
+
 ### Demos — twelve scenarios, no mocks
 
 ```bash
@@ -182,6 +210,8 @@ planning sensibly.
 | `--loop` | (`ask`) audited critique loop: plan → LLM gap critique → term gate → re-plan |
 | `--max-rounds <n>` | (`ask --loop`) max critique rounds (default 3) |
 | `--loop-model <id>` | (`ask --loop`) critic model — default `claude-haiku-4-5` |
+| `--ground` | (`ask`) verify each answer claim against a loaded unit; surface unsubstantiated ones |
+| `--ground-model <id>` | (`ask --ground`) verifier model — default `claude-haiku-4-5` |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.

@@ -32,13 +32,16 @@
 //   --loop                audited critique loop: plan → LLM gap critique → re-plan → answer
 //   --max-rounds <n>      max critique rounds for --loop (default 3)
 //   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
+//   --ground              verify each answer claim against a loaded unit; surface unsubstantiated ones
+//   --ground-model <id>   verifier model for --ground (default: claude-haiku-4-5)
 
 import { readFileSync } from "node:fs";
 import type { PlanOptions } from "./planner.js";
 import type { FetchGuard } from "./fetch.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
-import { formatPlan, formatPlanTree, formatValidation, formatReplay } from "./format.js";
-import { synthesize, type SynthesisResult } from "./synthesize.js";
+import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded } from "./format.js";
+import { synthesize, loadAnthropicSdk, type SynthesisResult } from "./synthesize.js";
+import { groundAnswer, makeClaudeVerifier } from "./ground.js";
 import { askLoop } from "./loop.js";
 import { validateLocation } from "./validate.js";
 import { replayArtifact } from "./replay.js";
@@ -70,10 +73,12 @@ interface Args {
   loop: boolean;
   maxRounds?: number;
   loopModel?: string;
+  ground: boolean;
+  groundModel?: string;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -102,6 +107,8 @@ function parseArgs(argv: string[]): Args {
       case "--loop": a.loop = true; break;
       case "--max-rounds": a.maxRounds = Number(next()); break;
       case "--loop-model": a.loopModel = next(); break;
+      case "--ground": a.ground = true; break;
+      case "--ground-model": a.groundModel = next(); break;
       case "--json": a.json = true; break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
@@ -224,11 +231,20 @@ async function main() {
   // ask: show the plan(s), then synthesize across every followed manifest.
   if (!a.json) console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
   const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
+
+  // --ground: verify the answer against the loaded units and surface the gaps.
+  const grounding = a.ground
+    ? await groundAnswer(a.task, result.answer, result.unitsLoaded, {
+        verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
+      })
+    : undefined;
+
   if (a.json) {
-    console.log(JSON.stringify({ plan: a.follow ? tree : allPlans[0], synthesis: result }, null, 2));
+    console.log(JSON.stringify({ plan: a.follow ? tree : allPlans[0], synthesis: result, grounding }, null, 2));
     return;
   }
   printAnswer(result);
+  if (grounding) console.log(formatGrounded(grounding));
 }
 
 function printAnswer(result: SynthesisResult) {
