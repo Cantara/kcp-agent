@@ -42,7 +42,15 @@ Try the knobs — each maps to a gate the planner enforces:
 node dist/cli.js plan "quarterly board numbers" --manifest examples/vault                 # restricted → fail-closed
 node dist/cli.js plan "quarterly board numbers" --manifest examples/vault --credentials mtls   # gate opens
 node dist/cli.js plan "buy the exclusive"        --manifest examples/fjordwire --budget 0.4 --methods free,x402
+node dist/cli.js plan "sovereign compute award"  --manifest examples/fjordwire --context-budget 3000 --methods free,x402   # a token ceiling
 ```
+
+**`--context-budget <n>`** budgets the actually-scarce resource when feeding a model: tokens. It
+works exactly like `--budget` but in tokens — greedy by score, and a unit that would blow the
+ceiling is skipped with the arithmetic (`over context budget: 900 tokens would exceed remaining
+100 of 3,000`), while a smaller one still fits. A unit's size comes from a declared `size_tokens`
+or `bytes/4`, weighed on metadata *before* any fetch. It composes with `--budget` — a unit must fit
+both. See the *Context Window* demo (`node examples/demos.js context-window`).
 
 Add `--json` and the plan becomes an artifact that pins the manifest's `sha256` and echoes
 every input — keep it; step 5 cross-examines it.
@@ -95,7 +103,7 @@ artifact by hand is drift too — the recomputed plan won't match it.
 
 ## Where to go next
 
-- **See it all run:** `node examples/demos.js` — sixteen narrated, offline scenarios, each a
+- **See it all run:** `node examples/demos.js` — seventeen narrated, offline scenarios, each a
   regression test.
 - **Publish your own manifest:** [make-your-repo-navigable.md](make-your-repo-navigable.md).
 - **Sign it:** [sign-your-manifest.md](sign-your-manifest.md) — ed25519 over exact bytes,
@@ -103,6 +111,8 @@ artifact by hand is drift too — the recomputed plan won't match it.
 - **Give the agent a memory:** [give-your-agent-memory.md](give-your-agent-memory.md) —
   record answers as replayable, byte-free episodes and reuse them only while they still hold.
 - **Cut a caller's context bill:** [cut-context-cost-with-dedup.md](cut-context-cost-with-dedup.md).
+- **Port the planner:** [build-a-conformant-implementation.md](build-a-conformant-implementation.md)
+  — the deterministic core is a pure function; validate a second implementation against the vectors.
 
 The theme throughout: **the deterministic planner is the environment, the model is a
 constrained proposer.** A manifest may influence what an agent knows, never what it does.

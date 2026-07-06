@@ -226,6 +226,13 @@ units:
     audience: [agent, human]
     triggers: [guide, dedup, session, kcp_load, known units, context cost, token savings]
 
+  - id: guide-porting
+    path: guides/build-a-conformant-implementation.md
+    intent: "How to build a second KCP planner implementation (e.g. a Go port for a small static binary) — the deterministic pipeline as a spec, and validating against the conformance vectors"
+    scope: global
+    audience: [agent, developer]
+    triggers: [guide, port, conformant, implementation, go, rust, second implementation, spec]
+
   - id: conformance-vectors
     path: vectors/README.md
     intent: "The spec conformance vector corpus — (manifest, task, options) → expected plan fixtures any KCP implementation must reproduce; the prerequisite for a second (e.g. Go) implementation"
