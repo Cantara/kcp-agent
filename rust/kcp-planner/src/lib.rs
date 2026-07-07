@@ -13,6 +13,8 @@
 
 pub mod budget;
 pub mod diff;
+#[cfg(feature = "network")]
+pub mod fetch;
 pub mod format;
 pub mod json;
 pub mod model;
@@ -24,6 +26,8 @@ pub mod verify;
 pub mod vectors;
 
 pub use diff::{diff_plans, PlanDiff};
+#[cfg(feature = "network")]
+pub use fetch::{guarded_fetch_text, is_private_address, FetchGuard};
 pub use format::{format_diff, format_plan, format_trace, format_validation, Colors};
 pub use json::{plan_to_json, plan_to_value, trace_to_json};
 pub use model::{parse_manifest, Manifest, Unit};

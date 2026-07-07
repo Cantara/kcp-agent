@@ -11,8 +11,14 @@ repository = "https://github.com/Cantara/kcp-agent"
 # build turns it off — a browser has no filesystem to read a local `.sig`, so
 # verification is dead weight there, and dropping it removes the curve25519/
 # ed25519 dependencies from the module.
-default = ["verify-ed25519"]
+#
+# `network` adds the remote layer (HTTPS fetch with SSRF guards, federation walk,
+# MCP server, replay) — tokio + reqwest. Also default-on for the CLI; the WASM
+# build (`default-features = false`) drops it, since tokio/reqwest don't target
+# wasm32 and a browser has no raw sockets.
+default = ["verify-ed25519", "network"]
 verify-ed25519 = ["dep:ed25519-dalek"]
+network = ["verify-ed25519", "dep:tokio", "dep:reqwest"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -20,9 +26,12 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml = "0.9"
 sha2 = "0.10"
 # Offline ed25519 manifest-signature verification (base64/hex/SPKI parsing is
-# hand-rolled to avoid extra deps). Remote fetch of signature/key files is
-# deferred to the network phase (#50). Optional — see the `verify-ed25519` feature.
+# hand-rolled to avoid extra deps). Optional — see the `verify-ed25519` feature.
 ed25519-dalek = { version = "2", default-features = false, optional = true }
+# The remote layer (`network` feature). rustls (no OpenSSL) keeps the build
+# self-contained; manual redirect handling enforces the SSRF guard on every hop.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "io-std", "io-util"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"], optional = true }
 
 [dev-dependencies]
 glob = "0.3"
