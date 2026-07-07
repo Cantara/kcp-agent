@@ -213,7 +213,7 @@ fn decode_bytes(material: &str) -> Option<Vec<u8>> {
     }
     let stripped = strip_ws(s);
     let is_hex = !stripped.is_empty() && stripped.bytes().all(|b| b.is_ascii_hexdigit());
-    if is_hex && stripped.len() % 2 == 0 && stripped.len() >= 64 {
+    if is_hex && stripped.len().is_multiple_of(2) && stripped.len() >= 64 {
         return hex_decode(&stripped);
     }
     let is_b64 = !stripped.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'=' || b.is_ascii_whitespace());
@@ -244,7 +244,7 @@ fn strip_ws(s: &str) -> String {
 
 #[cfg(feature = "verify-ed25519")]
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return None;
     }
     let bytes = s.as_bytes();

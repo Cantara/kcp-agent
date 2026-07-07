@@ -17,7 +17,7 @@ pub fn fmt_tokens(n: i64) -> String {
     let bytes = digits.as_bytes();
     let mut out = String::new();
     for (i, c) in bytes.iter().enumerate() {
-        if i > 0 && (bytes.len() - i) % 3 == 0 {
+        if i > 0 && (bytes.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(*c as char);
@@ -80,7 +80,7 @@ pub fn unit_tokens(unit: &Unit) -> TokenInfo {
     TokenInfo { tokens: None, approximate: false, measured: false }
 }
 
-fn tier_block<'a>(m: &'a Manifest, tier: &str) -> Option<Option<Count>> {
+fn tier_block(m: &Manifest, tier: &str) -> Option<Option<Count>> {
     let rl = m.rate_limits.as_ref()?;
     let t = match tier {
         "premium" => rl.premium.as_ref(),
@@ -94,9 +94,9 @@ fn tier_block<'a>(m: &'a Manifest, tier: &str) -> Option<Option<Count>> {
 pub fn plan_budget(manifest: &Manifest, caps: &AgentCapabilities, selected: &[PlannedUnit], budget: Option<&BudgetInput>) -> BudgetPlan {
     let rl = manifest.rate_limits.as_ref();
     let mut tier = "default".to_string();
-    if caps.payment_methods.iter().any(|m| m == "subscription") && rl.map_or(false, |r| r.premium.is_some()) {
+    if caps.payment_methods.iter().any(|m| m == "subscription") && rl.is_some_and(|r| r.premium.is_some()) {
         tier = "premium".to_string();
-    } else if !caps.credentials.is_empty() && rl.map_or(false, |r| r.authenticated.is_some()) {
+    } else if !caps.credentials.is_empty() && rl.is_some_and(|r| r.authenticated.is_some()) {
         tier = "authenticated".to_string();
     }
     let requests_per_minute = tier_block(manifest, &tier).flatten();

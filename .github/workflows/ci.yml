@@ -36,7 +36,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - run: cargo test --manifest-path rust/kcp-planner/Cargo.toml --locked
+      - run: cargo clippy --manifest-path rust/kcp-planner/Cargo.toml --all-targets -- -D warnings
 
   # The browser WASM module must plan byte-identically to the native CLI — the
   # same Rust core, whether it targets a 0.8 MB binary or a 445 KB WASM module.

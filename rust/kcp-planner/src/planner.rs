@@ -241,9 +241,9 @@ pub fn temporal_status(unit: &Unit, as_of: &str) -> TemporalStatus {
     match &unit.temporal {
         None => TemporalStatus::Active,
         Some(t) => {
-            if t.valid_from.as_deref().map_or(false, |v| v > as_of) {
+            if t.valid_from.as_deref().is_some_and(|v| v > as_of) {
                 TemporalStatus::Future
-            } else if t.valid_until.as_deref().map_or(false, |v| v < as_of) {
+            } else if t.valid_until.as_deref().is_some_and(|v| v < as_of) {
                 TemporalStatus::Expired
             } else {
                 TemporalStatus::Active
