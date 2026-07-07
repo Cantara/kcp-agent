@@ -1,0 +1,16 @@
+{
+  "name": "access-restricted-gated",
+  "manifest": "kcp_version: \"0.25\"\nproject: vault\nversion: 1.0.0\nunits:\n  - id: board-memo\n    path: memos/board.md\n    intent: \"Board memo on the merger deal terms\"\n    audience: [agent]\n    triggers: [merger, deal, board]\n    access: restricted\n    auth_scope: \"read:board\"\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.30\"}] }\n  - id: public-brief\n    path: briefs/public.md\n    intent: \"Public brief on the merger deal\"\n    audience: [agent]\n    triggers: [merger, deal, brief]\n",
+  "task": "merger deal terms",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": "{\n  \"task\": \"merger deal terms\",\n  \"manifest\": {\n    \"project\": \"vault\",\n    \"version\": \"1.0.0\",\n    \"kcpVersion\": \"0.25\",\n    \"source\": \"access-restricted-gated\"\n  },\n  \"trust\": {\n    \"requiresAttestation\": false,\n    \"agentCanAttest\": true,\n    \"note\": \"no manifest-level attestation requirement\"\n  },\n  \"asOf\": \"2026-07-06\",\n  \"options\": {\n    \"capabilities\": {\n      \"role\": \"agent\",\n      \"paymentMethods\": [\n        \"free\",\n        \"x402\"\n      ],\n      \"credentials\": []\n    },\n    \"maxUnits\": 5,\n    \"strict\": false\n  },\n  \"selected\": [\n    {\n      \"id\": \"board-memo\",\n      \"path\": \"memos/board.md\",\n      \"intent\": \"Board memo on the merger deal terms\",\n      \"score\": 17,\n      \"reasons\": [\n        \"intent matches 3 term(s)\",\n        \"triggers match 2 term(s)\",\n        \"access 'restricted': agent holds no credentials\",\n        \"hint: 'restricted' + x402 — if this unit is anonymous-paid the manifest should mark it public (spec §4.11, v0.25.1)\"\n      ],\n      \"payment\": {\n        \"method\": \"x402\",\n        \"cost\": \"0.30 USDC/request\",\n        \"pricePerRequest\": 0.3,\n        \"currency\": \"USDC\",\n        \"affordable\": true\n      },\n      \"requiresAttestation\": false,\n      \"loadEligible\": false\n    },\n    {\n      \"id\": \"public-brief\",\n      \"path\": \"briefs/public.md\",\n      \"intent\": \"Public brief on the merger deal\",\n      \"score\": 14,\n      \"reasons\": [\n        \"intent matches 2 term(s)\",\n        \"triggers match 2 term(s)\"\n      ],\n      \"payment\": {\n        \"method\": \"free\",\n        \"affordable\": true\n      },\n      \"requiresAttestation\": false,\n      \"loadEligible\": true\n    }\n  ],\n  \"skipped\": [],\n  \"federation\": [],\n  \"budget\": {\n    \"rateTier\": \"default\",\n    \"perRequestCosts\": [],\n    \"note\": \"all selected units are free to load at the resolved tier.\"\n  },\n  \"context\": {\n    \"approximate\": false,\n    \"unmeasured\": 1,\n    \"note\": \"no context budget set.\"\n  },\n  \"warnings\": []\n}"
+}

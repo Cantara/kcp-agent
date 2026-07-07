@@ -53,6 +53,21 @@ for (const f of vectors) {
 }
 console.log(`wrote ${vectors.length} trace fixtures`);
 
+// Plan-JSON fixtures (Java only — the Rust port has its own json.rs tests). `expect`
+// is the exact `JSON.stringify(plan, null, 2)` of the pure plan (no loader-added
+// sha256/signature), so the Java plan serializer can be checked byte-for-byte.
+const JAVA_PLAN = path.join(OUT_DIRS[1], 'plan');
+mkdirSync(JAVA_PLAN, { recursive: true });
+for (const f of vectors) {
+  const v = JSON.parse(readFileSync(path.join(VDIR, f), 'utf8'));
+  const p = plan(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
+  writeFileSync(
+    path.join(JAVA_PLAN, f),
+    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: JSON.stringify(p, null, 2) }, null, 2) + '\n'
+  );
+}
+console.log(`wrote ${vectors.length} plan-json fixtures`);
+
 // Diff fixtures: same manifest, two option sets (a → b), plus one identical pair.
 const manifestOf = (name) => JSON.parse(readFileSync(path.join(VDIR, `${name}.json`), 'utf8')).manifest;
 const cap = (extra = {}) => ({ role: 'agent', paymentMethods: ['free', 'x402'], ...extra });
