@@ -11,9 +11,10 @@
 //! hitting a WASM abort.
 
 use kcp_planner::{
-    diff_plans as core_diff, parse_manifest, plan as core_plan, plan_from_artifact, plan_to_json, trace as core_trace, trace_to_json, validate_manifest,
-    verify_manifest_text, Finding, PlanOptions, ValidationReport,
+    diff_plans as core_diff, format_plan as core_format_plan, parse_manifest as core_parse, plan as core_plan, plan_from_artifact, plan_to_json,
+    trace as core_trace, trace_to_json, validate_manifest, verify_manifest_text, Colors, Finding, Manifest, PlanOptions, ValidationReport,
 };
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use wasm_bindgen::prelude::*;
 
@@ -42,7 +43,7 @@ fn parse_options(options_json: &str) -> Result<PlanOptions, String> {
 /// pretty JSON — byte-identical to `kcp-planner plan --json` for the same inputs.
 #[wasm_bindgen]
 pub fn plan(manifest_yaml: &str, task: &str, options_json: &str) -> String {
-    let manifest = match parse_manifest(manifest_yaml, Some(SOURCE)) {
+    let manifest = match core_parse(manifest_yaml, Some(SOURCE)) {
         Ok(m) => m,
         Err(e) => return error_json(format!("manifest does not parse: {}", e)),
     };
@@ -64,7 +65,7 @@ pub fn plan(manifest_yaml: &str, task: &str, options_json: &str) -> String {
 /// to `kcp-planner plan --trace --json`.
 #[wasm_bindgen]
 pub fn trace(manifest_yaml: &str, task: &str, options_json: &str) -> String {
-    let manifest = match parse_manifest(manifest_yaml, Some(SOURCE)) {
+    let manifest = match core_parse(manifest_yaml, Some(SOURCE)) {
         Ok(m) => m,
         Err(e) => return error_json(format!("manifest does not parse: {}", e)),
     };
@@ -99,7 +100,7 @@ pub fn diff_plans(plan_a_json: &str, plan_b_json: &str) -> String {
 #[wasm_bindgen]
 pub fn validate(manifest_yaml: &str) -> String {
     let today = today_utc();
-    let manifest = match parse_manifest(manifest_yaml, Some(SOURCE)) {
+    let manifest = match core_parse(manifest_yaml, Some(SOURCE)) {
         Ok(m) => m,
         Err(e) => {
             let report = ValidationReport {
@@ -116,6 +117,64 @@ pub fn validate(manifest_yaml: &str) -> String {
     let ok = !findings.iter().any(|f| f.level == "error");
     let report = ValidationReport { source: SOURCE.to_string(), project: Some(manifest.project.clone()), findings, ok };
     serde_json::to_string_pretty(&report).unwrap_or_else(|e| error_json(e.to_string()))
+}
+
+/// Parse a YAML manifest and return the fields the playground introspects — the
+/// units and their payment methods — as JSON. Hand-built so it needs no Serialize
+/// on the core model. Errors return `{"error":"..."}`.
+#[wasm_bindgen]
+pub fn parse_manifest(manifest_yaml: &str) -> String {
+    match core_parse(manifest_yaml, Some(SOURCE)) {
+        Ok(m) => manifest_to_json(&m).to_string(),
+        Err(e) => error_json(format!("manifest does not parse: {}", e)),
+    }
+}
+
+fn manifest_to_json(m: &Manifest) -> Value {
+    let units: Vec<Value> = m
+        .units
+        .iter()
+        .map(|u| {
+            let methods: Vec<Value> = u
+                .payment
+                .as_ref()
+                .and_then(|p| p.methods.as_ref())
+                .map(|ms| {
+                    ms.iter()
+                        .map(|pm| {
+                            let mut o = json!({ "type": pm.r#type });
+                            if let Some(c) = &pm.currency {
+                                o["currency"] = json!(c);
+                            }
+                            if let Some(ppr) = &pm.price_per_request {
+                                o["price_per_request"] = json!(ppr);
+                            }
+                            o
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            json!({ "id": u.id, "path": u.path, "intent": u.intent, "payment": { "methods": methods } })
+        })
+        .collect();
+    json!({ "project": m.project, "version": m.version, "units": units })
+}
+
+/// Format a plan as the human-readable text the CLI prints (no color — the output
+/// is escaped into HTML). Re-plans from the manifest, matching `kcp-planner plan`.
+#[wasm_bindgen]
+pub fn format_plan(manifest_yaml: &str, task: &str, options_json: &str) -> String {
+    let manifest = match core_parse(manifest_yaml, Some(SOURCE)) {
+        Ok(m) => m,
+        Err(e) => return format!("manifest does not parse: {}", e),
+    };
+    let options = match parse_options(options_json) {
+        Ok(o) => o,
+        Err(e) => return e,
+    };
+    let p = core_plan(&manifest, task, &options);
+    let sig = verify_manifest_text(manifest_yaml, manifest.signing.as_ref(), Some(SOURCE));
+    core_format_plan(&p, manifest.kcp_version.as_deref(), Some(SOURCE), Some(&sig), &Colors::plain())
 }
 
 /// Today (UTC) as YYYY-MM-DD, read from the JS `Date` — the one clock the linter

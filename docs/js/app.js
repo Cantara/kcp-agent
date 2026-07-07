@@ -3,7 +3,47 @@
 // shipping code, live. Right pane: an honest simulation whose numbers are
 // computed from the same real manifest.
 
-import { parseManifest, plan, formatPlan, gateTerms, validateManifest, groundAnswer } from "./kcp-agent.js";
+// The deterministic planner runs as WebAssembly — the same Rust core the CLI
+// binary runs, compiled for the browser (docs/pkg). The LLM-adjacent demos
+// (term gate + grounding) are the only JS left, bundled into kcp-demos.js.
+import initWasm, {
+  plan as wasmPlan,
+  validate as wasmValidate,
+  parse_manifest as wasmParseManifest,
+  format_plan as wasmFormatPlan,
+} from "../pkg/kcp_planner_wasm.js";
+import { gateTerms, groundAnswer } from "./kcp-demos.js";
+
+// Ready once the WASM module is instantiated. Every planner call below is
+// synchronous after this resolves.
+const wasmReady = initWasm();
+
+// Thin shims that preserve the old bundle's API so the arena code is unchanged:
+// a "manifest" is the parsed model plus the raw YAML (planner calls need the
+// bytes). The planner returns the plan artifact JSON — a superset of the old
+// AgentPlan object, so every field the arena reads is present.
+function parseManifest(yaml, _source) {
+  const model = JSON.parse(wasmParseManifest(yaml));
+  if (model.error) throw new Error(model.error);
+  model.__yaml = yaml;
+  return model;
+}
+function plan(manifest, task, options = {}) {
+  const yaml = manifest.__yaml;
+  const optionsJson = JSON.stringify(options ?? {});
+  const p = JSON.parse(wasmPlan(yaml, task, optionsJson));
+  if (p.error) throw new Error(p.error);
+  // The "raw CLI output" panel wants the human render; compute it once here.
+  p.__text = wasmFormatPlan(yaml, task, optionsJson);
+  return p;
+}
+function formatPlan(p) {
+  return p.__text ?? "";
+}
+function validateManifest(manifest) {
+  const report = JSON.parse(wasmValidate(manifest.__yaml));
+  return report.findings ?? [];
+}
 
 const esc = (s) =>
   String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -673,11 +713,12 @@ function init() {
   mountScenario(SCENARIOS[0]);
 }
 
-loadManifests()
+wasmReady
+  .then(loadManifests)
   .then(init)
   .catch((e) => {
     $("pane-kcp").textContent =
-      `Could not load the example manifests (${e.message}). ` +
+      `Could not load the planner (${e.message}). ` +
       "If you opened this file directly, serve the docs/ directory instead: npx serve docs";
   })
   // The playground and receipts have no arena dependency — they run even if

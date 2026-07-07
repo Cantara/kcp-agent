@@ -35,10 +35,25 @@ jobs:
         with:
           node-version: 22
 
+      - name: Setup Rust (wasm target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.126
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Build site (real planner bundle + example manifests)
+      - name: Install wasm-opt (binaryen)
+        run: npm i -g binaryen
+
+      - name: Build the WASM planner module (docs/pkg)
+        run: npm run build:wasm
+
+      - name: Build site (demos bundle + example manifests)
         run: npm run build:site
 
       - name: Setup Pages

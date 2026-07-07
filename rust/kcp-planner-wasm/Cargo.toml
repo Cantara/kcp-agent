@@ -10,7 +10,9 @@ repository = "https://github.com/Cantara/kcp-agent"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-kcp-planner = { path = "../kcp-planner" }
+# No signature verification in the browser (no filesystem) — this drops the
+# curve25519/ed25519 dependencies from the WASM module.
+kcp-planner = { path = "../kcp-planner", default-features = false }
 # preserve_order keeps JSON field order identical to the CLI (and the TS reference).
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"

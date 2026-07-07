@@ -11,13 +11,15 @@ targets a ~0.8 MB static binary or a ~445 KB WASM module.
 The boundary is deliberately thin — strings in, JSON strings out:
 
 ```js
-import init, { plan, trace, diff_plans, validate } from "./pkg/kcp_planner_wasm.js";
+import init, { plan, trace, diff_plans, validate, parse_manifest, format_plan } from "./pkg/kcp_planner_wasm.js";
 await init();
 
-plan(manifestYaml, task, optionsJson);   // → plan artifact JSON  (== `kcp-planner plan --json`)
-trace(manifestYaml, task, optionsJson);   // → decision trace JSON (== `plan --trace --json`)
-diff_plans(planAJson, planBJson);         // → plan diff JSON      (== `diff --json`)
-validate(manifestYaml);                    // → lint report JSON    (== `validate --json`)
+plan(manifestYaml, task, optionsJson);      // → plan artifact JSON  (== `kcp-planner plan --json`)
+trace(manifestYaml, task, optionsJson);     // → decision trace JSON (== `plan --trace --json`)
+diff_plans(planAJson, planBJson);           // → plan diff JSON      (== `diff --json`)
+validate(manifestYaml);                      // → lint report JSON    (== `validate --json`)
+format_plan(manifestYaml, task, optionsJson);// → the human text `kcp-planner plan` prints
+parse_manifest(manifestYaml);                // → { project, version, units:[…] } for introspection
 ```
 
 `optionsJson` is the same camelCase shape the conformance vectors use

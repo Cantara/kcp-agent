@@ -231,10 +231,11 @@ final plan: datacenter-power, subsea-cable-feature
         <tbody><tr><td colspan="4">loading conformance.json…</td></tr></tbody>
       </table>
     </div>
-    <p class="capture__note">Browser bundle integrity — the arena and playground run
-      <code>docs/js/kcp-agent.js</code>, sha256 <code id="bundle-sha">(serve the built site to compute)</code>.
-      Reproduce it: <code>npm ci &amp;&amp; npm run build:site &amp;&amp; sha256sum docs/js/kcp-agent.js</code> —
-      CI asserts the published hash matches the bundle it just built.</p>
+    <p class="capture__note">Planner integrity — the arena and playground run the planner as
+      WebAssembly, <code>docs/pkg/kcp_planner_wasm_bg.wasm</code>, sha256 <code id="bundle-sha">(serve the built site to compute)</code>.
+      It is the same Rust core the CLI binary runs, compiled for the browser. Reproduce it:
+      <code>npm run build:wasm &amp;&amp; sha256sum docs/pkg/kcp_planner_wasm_bg.wasm</code> —
+      CI asserts the WASM plans byte-identically to the native CLI.</p>
   </section>
 
   <!-- ================= INSTALL ================= -->

@@ -10,7 +10,7 @@ import { readFileSync, existsSync, writeFileSync, mkdtempSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import init, { plan, trace, diff_plans, validate } from "../docs/pkg/kcp_planner_wasm.js";
+import init, { plan, trace, diff_plans, validate, parse_manifest, format_plan } from "../docs/pkg/kcp_planner_wasm.js";
 
 const BIN = process.argv[2] || "rust/kcp-planner/target/release/kcp-planner";
 const wasmBytes = readFileSync("docs/pkg/kcp_planner_wasm_bg.wasm");
@@ -80,15 +80,25 @@ for (const dir of MANIFESTS) {
       if (opt.budget) cliArgs.push("--budget", String(opt.budget.amount), "--currency", opt.budget.currency);
       check(`plan ${dir} "${task}" ${JSON.stringify(opt)}`, plan(yaml, task, optionsJson), cli(cliArgs));
 
-      // trace (only for the plain option set — keeps the matrix small)
+      // trace + format_plan (only for the plain option set — keeps the matrix small)
       if (Object.keys(opt).length === 0) {
         const traceArgs = ["plan", task, "--manifest", file, "--as-of", ASOF, "--trace", "--json"];
         check(`trace ${dir} "${task}"`, trace(yaml, task, optionsJson), cli(traceArgs));
+        // format_plan → the human render `kcp-planner plan` prints (source label differs).
+        const human = format_plan(yaml, task, optionsJson);
+        const cliHuman = cli(["plan", task, "--manifest", file, "--as-of", ASOF]);
+        const stripSrc = (s) => s.replaceAll(file, "<SRC>").replaceAll("playground.yaml", "<SRC>");
+        if (stripSrc(human.trim()) === stripSrc(cliHuman.trim())) pass++;
+        else { fail++; failures.push({ name: `format_plan ${dir} "${task}"`, wasmOut: human, cliOut: cliHuman }); }
       }
     }
   }
   // validate
   check(`validate ${dir}`, validate(yaml), cli(["validate", file, "--json"]));
+  // parse_manifest: sanity — the units the playground introspects are present.
+  const parsed = JSON.parse(parse_manifest(yaml));
+  if (parsed.units && parsed.units.length > 0) pass++;
+  else { fail++; failures.push({ name: `parse_manifest ${dir}`, wasmOut: parse_manifest(yaml), cliOut: "(expected units[])" }); }
 }
 
 // diff: build two plan artifacts with the CLI, diff them both ways

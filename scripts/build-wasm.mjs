@@ -13,7 +13,8 @@
 //   npm i -g binaryen                        # provides wasm-opt (optional but recommended)
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, statSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -71,3 +72,10 @@ if (gzip >= MAX_GZIP) {
 }
 if (over) process.exit(1);
 console.log(`✓ within size budget (< ${kb(MAX_RAW)} raw, < ${kb(MAX_GZIP)} gzipped)`);
+
+// The WASM module is the shipping planner — record its integrity hash for the
+// site's Receipts section (anyone can reproduce it from source).
+const sha256 = createHash("sha256").update(readFileSync(WASM_OUT)).digest("hex");
+mkdirSync(join(ROOT, "docs", "js"), { recursive: true });
+writeFileSync(join(ROOT, "docs", "js", "bundle-info.json"), JSON.stringify({ file: "pkg/kcp_planner_wasm_bg.wasm", sha256 }, null, 2) + "\n");
+console.log(`wrote docs/js/bundle-info.json (sha256 ${sha256.slice(0, 12)}…)`);

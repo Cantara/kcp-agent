@@ -6,6 +6,14 @@ description = "The deterministic KCP planner — a Rust port of the kcp-agent re
 license = "Apache-2.0"
 repository = "https://github.com/Cantara/kcp-agent"
 
+[features]
+# ed25519 manifest-signature verification. On by default (the CLI); the WASM
+# build turns it off — a browser has no filesystem to read a local `.sig`, so
+# verification is dead weight there, and dropping it removes the curve25519/
+# ed25519 dependencies from the module.
+default = ["verify-ed25519"]
+verify-ed25519 = ["dep:ed25519-dalek"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
@@ -13,8 +21,8 @@ serde_yaml = "0.9"
 sha2 = "0.10"
 # Offline ed25519 manifest-signature verification (base64/hex/SPKI parsing is
 # hand-rolled to avoid extra deps). Remote fetch of signature/key files is
-# deferred to the network phase (#50).
-ed25519-dalek = { version = "2", default-features = false }
+# deferred to the network phase (#50). Optional — see the `verify-ed25519` feature.
+ed25519-dalek = { version = "2", default-features = false, optional = true }
 
 [dev-dependencies]
 glob = "0.3"

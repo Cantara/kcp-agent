@@ -8,8 +8,15 @@
 //! build resolves everything offline — inline material and local `.sig`/key files.
 //! Fetching a signature or key over HTTPS lands with the network phase (#50); a
 //! remote location is reported `unverifiable` (never fail-open).
+//!
+//! The ed25519 verification is behind the default `verify-ed25519` feature. The
+//! WASM build disables it (no filesystem to read a local `.sig`, and it drops the
+//! curve25519/ed25519 dependencies): the offline branches — unsigned / no
+//! signature location / unsupported scheme — still resolve, and a locatable
+//! signature reports `unverifiable` rather than fail open.
 
 use crate::model::Signing;
+#[cfg(feature = "verify-ed25519")]
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
 /// Mirrors the TS `SignatureResult` (`{ status, detail, keyId? }`).
@@ -33,7 +40,7 @@ pub fn verify_manifest_text(text: &str, signing: Option<&Signing>, source: Optio
         None => return SignatureResult::new("unsigned", "manifest declares no signature", None),
         Some(s) => s,
     };
-    let mut key_id = s.key_id.clone();
+    let key_id = s.key_id.clone();
     let signature = match &s.signature {
         None => {
             return SignatureResult::new(
@@ -50,7 +57,13 @@ pub fn verify_manifest_text(text: &str, signing: Option<&Signing>, source: Optio
             return SignatureResult::new("unverifiable", format!("unsupported signing scheme '{}'", scheme), key_id);
         }
     }
+    verify_signature_material(text, s, signature, source, key_id)
+}
 
+/// Load the signature (and key), then run the ed25519 check. Only compiled with
+/// the `verify-ed25519` feature (the CLI); the WASM stub is below.
+#[cfg(feature = "verify-ed25519")]
+fn verify_signature_material(text: &str, s: &Signing, signature: &str, source: Option<&str>, mut key_id: Option<String>) -> SignatureResult {
     // Locate the signature material (and possibly an embedded key + key id).
     let raw_sig = match load_material(signature, source) {
         Ok(v) => v,
@@ -112,12 +125,22 @@ pub fn verify_manifest_text(text: &str, signing: Option<&Signing>, source: Optio
     SignatureResult::new("invalid", "ed25519 signature does not match manifest bytes", key_id)
 }
 
+/// No-crypto build (WASM): the manifest declares a signature but this build has no
+/// verifier and no filesystem to fetch a local one — report `unverifiable`, never
+/// fail open.
+#[cfg(not(feature = "verify-ed25519"))]
+fn verify_signature_material(_text: &str, _s: &Signing, _signature: &str, _source: Option<&str>, key_id: Option<String>) -> SignatureResult {
+    SignatureResult::new("unverifiable", "signature present but this build has no ed25519 verifier (offline)", key_id)
+}
+
 /// `text.replace(/\n*$/, "\n")` — strip all trailing newlines, add exactly one.
+#[cfg(feature = "verify-ed25519")]
 fn normalize_trailing_newline(text: &str) -> String {
     let trimmed = text.trim_end_matches('\n');
     format!("{}\n", trimmed)
 }
 
+#[cfg(feature = "verify-ed25519")]
 fn val_to_string(v: &serde_json::Value) -> String {
     match v {
         serde_json::Value::String(s) => s.clone(),
@@ -128,6 +151,7 @@ fn val_to_string(v: &serde_json::Value) -> String {
 
 /// Resolve inline-or-local material to a string. Inline material and local file
 /// paths are read offline; an HTTPS location is refused (deferred to #50).
+#[cfg(feature = "verify-ed25519")]
 fn load_material(value: &str, source: Option<&str>) -> Result<String, String> {
     if looks_url(value) {
         return Err("remote fetch not available in this build (see #50)".to_string());
@@ -139,6 +163,7 @@ fn load_material(value: &str, source: Option<&str>) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("{}: {}", path, e))
 }
 
+#[cfg(feature = "verify-ed25519")]
 fn looks_url(value: &str) -> bool {
     let v = value.trim_start();
     v.starts_with("https://") || v.starts_with("http://")
@@ -146,6 +171,7 @@ fn looks_url(value: &str) -> bool {
 
 /// Resolve a possibly-relative local location against the manifest's source dir
 /// (mirrors TS `resolveLocation` for the non-URL case: `join(dirname(base), loc)`).
+#[cfg(feature = "verify-ed25519")]
 fn resolve_location(base: Option<&str>, loc: &str) -> String {
     if std::path::Path::new(loc).is_absolute() {
         return loc.to_string();
@@ -164,6 +190,7 @@ fn resolve_location(base: Option<&str>, loc: &str) -> String {
 
 /// Is this inline key/signature material rather than a URL/path? Mirrors TS
 /// `looksInline`: PEM markers, or raw material of a telltale ed25519 size.
+#[cfg(feature = "verify-ed25519")]
 fn looks_inline(value: &str) -> bool {
     if looks_url(value) {
         return false;
@@ -178,6 +205,7 @@ fn looks_inline(value: &str) -> bool {
 }
 
 /// Decode PEM/base64/hex material to bytes — a port of TS `decodeBytes`.
+#[cfg(feature = "verify-ed25519")]
 fn decode_bytes(material: &str) -> Option<Vec<u8>> {
     let s = material.trim();
     if let Some(inner) = pem_body(s) {
@@ -196,6 +224,7 @@ fn decode_bytes(material: &str) -> Option<Vec<u8>> {
 }
 
 /// Extract the body between PEM `-----BEGIN ...-----` / `-----END ...-----`.
+#[cfg(feature = "verify-ed25519")]
 fn pem_body(s: &str) -> Option<String> {
     let begin = s.find("-----BEGIN")?;
     let after_begin = &s[begin..];
@@ -208,10 +237,12 @@ fn pem_body(s: &str) -> Option<String> {
     Some(body_and_end[..end].to_string())
 }
 
+#[cfg(feature = "verify-ed25519")]
 fn strip_ws(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
+#[cfg(feature = "verify-ed25519")]
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
     if s.len() % 2 != 0 {
         return None;
@@ -228,6 +259,7 @@ fn hex_decode(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
+#[cfg(feature = "verify-ed25519")]
 fn base64_decode(s: &str) -> Option<Vec<u8>> {
     fn val(c: u8) -> Option<u8> {
         match c {
@@ -256,6 +288,7 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
 }
 
 /// Import an ed25519 public key from raw (32) or SPKI-DER (44) bytes.
+#[cfg(feature = "verify-ed25519")]
 fn import_public_key(material: &str) -> Result<VerifyingKey, String> {
     let bytes = decode_bytes(material).ok_or_else(|| "unrecognized public key encoding".to_string())?;
     let raw: [u8; 32] = if bytes.len() == 32 {

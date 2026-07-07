@@ -19,6 +19,11 @@ impl Colors {
     pub fn auto() -> Colors {
         Colors { on: std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none() }
     }
+    /// Never color — for environments with no TTY concept (e.g. the WASM module,
+    /// whose output is escaped into HTML).
+    pub fn plain() -> Colors {
+        Colors { on: false }
+    }
     fn wrap(&self, code: &str, s: &str) -> String {
         if self.on {
             format!("\x1b[{}m{}\x1b[0m", code, s)
