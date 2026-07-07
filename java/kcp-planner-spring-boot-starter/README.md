@@ -7,7 +7,7 @@ Add the starter, point it at a `knowledge.yaml`, inject the planner — done.
 <dependency>
   <groupId>no.cantara.kcp</groupId>
   <artifactId>kcp-planner-spring-boot-starter</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
