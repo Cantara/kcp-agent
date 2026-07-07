@@ -12,7 +12,7 @@ use kcp_planner::validate::load_local_manifest_text;
 use sha2::{Digest, Sha256};
 use std::process::exit;
 
-const USAGE: &str = "Usage:\n  kcp-planner plan     \"<task>\" --manifest <path|dir> [options] [--trace]\n  kcp-planner validate <path|dir> [--json]\n  kcp-planner diff     <a.json> <b.json> [--json]\n\nRun `kcp-planner plan --help` for options.";
+const USAGE: &str = "Usage:\n  kcp-planner plan     \"<task>\" --manifest <path|dir|url> [options] [--trace] [--follow]\n  kcp-planner validate <path|dir|url> [--json]\n  kcp-planner diff     <a.json> <b.json> [--json]\n  kcp-planner replay   <plan.json> [--json]\n  kcp-planner mcp\n\nNetwork options: --follow --max-depth N --max-nodes N --no-verify\n  --require-signature --trust-key <path|url|inline> --allow-private-hosts\n\nRun `kcp-planner plan --help` for options.";
 
 struct Args {
     command: String,
@@ -31,6 +31,14 @@ struct Args {
     context_budget: Option<i64>,
     json: bool,
     trace: bool,
+    // network
+    follow: bool,
+    max_depth: Option<usize>,
+    max_nodes: Option<usize>,
+    no_verify: bool,
+    require_signature: bool,
+    trust_key: Option<String>,
+    allow_private: bool,
 }
 
 fn parse_args(argv: &[String]) -> Args {
@@ -40,6 +48,8 @@ fn parse_args(argv: &[String]) -> Args {
         manifest: None, env: None, as_of: None, max_units: None, strict: false,
         role: None, methods: None, credentials: None, attest: None,
         budget: None, currency: None, context_budget: None, json: false, trace: false,
+        follow: false, max_depth: None, max_nodes: None, no_verify: false,
+        require_signature: false, trust_key: None, allow_private: false,
     };
     let rest = &argv[argv.len().min(1)..];
     let list = |s: &str| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect::<Vec<_>>();
@@ -65,6 +75,13 @@ fn parse_args(argv: &[String]) -> Args {
             "--context-budget" => a.context_budget = next().parse().ok(),
             "--trace" => a.trace = true,
             "--json" => a.json = true,
+            "--follow" => a.follow = true,
+            "--max-depth" => a.max_depth = next().parse().ok(),
+            "--max-nodes" => a.max_nodes = next().parse().ok(),
+            "--no-verify" => a.no_verify = true,
+            "--require-signature" => a.require_signature = true,
+            "--trust-key" => a.trust_key = Some(next()),
+            "--allow-private-hosts" => a.allow_private = true,
             "--help" | "-h" => {}
             other if other.starts_with("--") => {
                 eprintln!("Unknown option: {}", other);
@@ -119,6 +136,10 @@ fn main() {
         "plan" => cmd_plan(&a),
         "validate" => cmd_validate(&a),
         "diff" => cmd_diff(&a),
+        #[cfg(feature = "network")]
+        "mcp" => net::cmd_mcp(),
+        #[cfg(feature = "network")]
+        "replay" => net::cmd_replay(&a),
         "" | "--help" | "-h" | "help" => {
             println!("{}", USAGE);
             exit(if a.command.is_empty() { 2 } else { 0 });
@@ -143,6 +164,14 @@ fn cmd_plan(a: &Args) {
             exit(2);
         }
     };
+    // A URL manifest or --follow routes through the network layer (fetch + federation).
+    #[cfg(feature = "network")]
+    {
+        if a.follow || location.starts_with("http://") || location.starts_with("https://") {
+            net::cmd_plan_follow(a, &location, &task);
+            return;
+        }
+    }
     let (text, source) = match load_local_manifest_text(&location) {
         Ok(v) => v,
         Err(e) => {
@@ -229,4 +258,96 @@ fn cmd_diff(a: &Args) {
         println!("{}", format_diff(&d, &Colors::auto()));
     }
     exit(if d.identical { 0 } else { 1 });
+}
+
+/// Network commands (behind the default `network` feature): federated plan, MCP
+/// server, and replay. A tokio runtime is created only when one of these runs, so
+/// the offline commands stay synchronous.
+#[cfg(feature = "network")]
+mod net {
+    use super::{build_options, Args};
+    use kcp_planner::follow::PlanNode;
+    use kcp_planner::{format_plan, node_to_json, plan_tree, replay_artifact, serve_mcp, Colors, FetchGuard, FollowOptions};
+    use std::process::exit;
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().expect("tokio runtime")
+    }
+
+    fn follow_options(a: &Args) -> FollowOptions {
+        FollowOptions {
+            plan_options: build_options(a),
+            max_depth: if a.follow { a.max_depth.unwrap_or(1) } else { 0 },
+            max_nodes: a.max_nodes,
+            no_verify: a.no_verify,
+            require_signature: a.require_signature,
+            trusted_key: a.trust_key.clone(),
+            fetch_guard: FetchGuard { allow_private: a.allow_private, ..Default::default() },
+        }
+    }
+
+    fn print_tree_human(node: &PlanNode, c: &Colors) {
+        if let Some(p) = &node.plan {
+            println!("{}", format_plan(p, node.kcp_version.as_deref(), Some(&node.location), node.signature.as_ref(), c));
+        } else if let Some(e) = &node.error {
+            println!("✗ {}: {}", node.location, e);
+        }
+        for child in &node.children {
+            print_tree_human(child, c);
+        }
+    }
+
+    pub fn cmd_plan_follow(a: &Args, location: &str, task: &str) {
+        let opts = follow_options(a);
+        let tree = runtime().block_on(plan_tree(location, task, &opts));
+        if let Some(e) = &tree.error {
+            eprintln!("kcp-planner: {}: {}", tree.location, e);
+            exit(1);
+        }
+        if a.json {
+            println!("{}", serde_json::to_string_pretty(&node_to_json(&tree, &opts.plan_options)).unwrap());
+        } else {
+            print_tree_human(&tree, &Colors::auto());
+        }
+    }
+
+    pub fn cmd_replay(a: &Args) {
+        let path = match a.positionals.first() {
+            Some(p) => p.clone(),
+            None => {
+                eprintln!("Usage: kcp-planner replay <plan.json> [--json]");
+                exit(2);
+            }
+        };
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            eprintln!("kcp-planner: {}: {}", path, e);
+            exit(1);
+        });
+        let artifact: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| {
+            eprintln!("kcp-planner: {}: not JSON: {}", path, e);
+            exit(1);
+        });
+        let guard = FetchGuard { allow_private: a.allow_private, ..Default::default() };
+        let report = runtime().block_on(replay_artifact(&artifact, &path, &guard));
+        if a.json {
+            println!("{}", serde_json::to_string_pretty(&report).unwrap());
+        } else {
+            for chk in &report.checks {
+                let mark = match chk.status.as_str() {
+                    "identical" => "✓",
+                    "drifted" => "⚠",
+                    _ => "✗",
+                };
+                println!("{} {} ({})\n  {}", mark, chk.source, chk.project, chk.detail);
+            }
+        }
+        exit(if report.ok { 0 } else { 1 });
+    }
+
+    pub fn cmd_mcp() {
+        if let Err(e) = runtime().block_on(serve_mcp()) {
+            eprintln!("kcp-planner: mcp: {}", e);
+            exit(1);
+        }
+    }
 }
