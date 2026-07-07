@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — seventeen narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — eighteen narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all seventeen in CI as regression tests.
+// all eighteen in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -246,6 +246,85 @@ const SCENARIOS = [
       'Same manifest, same task, one capability flipped — and the diff shows precisely which ' +
       'gate moved and what it costs. This audit-before-action property is what makes it safe ' +
       'to put an LLM loop AROUND the planner: the model proposes, the plan disposes.',
+  },
+  {
+    id: 'trace',
+    title: 'The Trace — every gate decision, written down',
+    useCase:
+      'plan --trace exposes the full gate cascade for every unit in the manifest: which gates ' +
+      'passed, which rejected, and what detail the planner recorded. Combined with diff, it gives ' +
+      'you a complete before/after story: on July 4 the rumour was live and the exclusive was ' +
+      'future; by July 6 the rumour expired and the exclusive took over. The trace shows WHY ' +
+      'each unit landed where it did; the diff shows WHAT moved.',
+    async run() {
+      const { trace } = await import(pathToFileURL(path.join(ROOT, 'dist', 'trace.js')).href);
+      const { loadManifest } = await import(pathToFileURL(path.join(ROOT, 'dist', 'client.js')).href);
+      const { diffPlans } = await import(pathToFileURL(path.join(ROOT, 'dist', 'diff.js')).href);
+
+      const TASK = 'sovereign compute award';
+      const baseOpts = { capabilities: { role: 'agent', paymentMethods: ['free', 'x402'] } };
+      const manifest = await loadManifest(FJORDWIRE);
+
+      // Trace on July 6: the exclusive is selected, the rumour is expired.
+      const t6 = trace(manifest, TASK, { ...baseOpts, asOf: '2026-07-06' });
+      const exclusive = t6.units.find((u) => u.id === 'chipfab-exclusive');
+      const rumour = t6.units.find((u) => u.id === 'chipfab-rumour');
+
+      // Two plans for the diff: July 4 (rumour live) vs July 6 (exclusive live).
+      const { plan: p4 } = planJson([
+        'plan', TASK, '--manifest', FJORDWIRE,
+        '--methods', 'free,x402', '--as-of', '2026-07-04',
+      ]);
+      const { plan: p6 } = planJson([
+        'plan', TASK, '--manifest', FJORDWIRE,
+        '--methods', 'free,x402', '--as-of', '2026-07-06',
+      ]);
+      const d = diffPlans(p4, p6);
+
+      // Format the trace cascade for the two featured units.
+      const fmtGates = (u) =>
+        u.gates.map((g) => {
+          const gMark = g.passed ? c.green('✓') : c.yellow('✗');
+          return `      ${gMark} ${g.gate.padEnd(16)} ${c.dim(g.detail)}`;
+        });
+
+      const lines = [
+        c.bold('gate cascade (as-of 2026-07-06):'),
+        '',
+        `  ${c.green('●')} ${c.bold('chipfab-exclusive')} — ${exclusive.outcome}`,
+        ...fmtGates(exclusive),
+        '',
+        `  ${c.yellow('○')} ${c.bold('chipfab-rumour')} — ${rumour.outcome} (rejected by ${rumour.rejectedBy})`,
+        ...fmtGates(rumour),
+        '',
+        c.bold('plan diff (2026-07-04 → 2026-07-06):'),
+        ...d.moves.map((m) => {
+          const arrow = m.direction === 'selected_to_skipped'
+            ? c.yellow('selected → skipped')
+            : c.green('skipped → selected');
+          const detail = m.from.reason
+            ? c.dim(`was: ${m.from.reason}`)
+            : m.to.reason
+              ? c.dim(`now: ${m.to.reason}`)
+              : '';
+          return `  ${c.bold(m.id)}: ${arrow}${detail ? '  ' + detail : ''}`;
+        }),
+        '',
+        c.dim(`${d.moves.length} move(s), ${d.identical ? 'identical' : 'changed'}`),
+      ];
+      return { blocks: [{
+        command:
+          'kcp-agent plan "sovereign compute award" --manifest examples/fjordwire ' +
+          '--methods free,x402 --as-of 2026-07-06 --trace',
+        lines,
+      }] };
+    },
+    verdict:
+      'Transparent decisions matter because every skip is a sentence, not a silence. The trace ' +
+      'shows the rumour failed at the temporal gate — expired, with its successor named — while ' +
+      'the exclusive passed every gate in order. The diff confirms the swap: one unit in, one out, ' +
+      'with the reason attached. An auditor, a postmortem, or a downstream agent can read the ' +
+      'receipts without re-running the planner.',
   },
   {
     id: 'loop',
