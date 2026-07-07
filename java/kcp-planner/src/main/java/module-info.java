@@ -18,4 +18,7 @@ module no.cantara.kcp.planner {
     exports no.cantara.kcp.planner.client;
     exports no.cantara.kcp.planner.json;
     exports no.cantara.kcp.planner.mcp;
+    exports no.cantara.kcp.planner.validate;
+    exports no.cantara.kcp.planner.content;
+    exports no.cantara.kcp.planner.replay;
 }

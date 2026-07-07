@@ -49,13 +49,14 @@ class McpServerTest {
     }
 
     @Test
-    void toolsListExposesPlanAndTrace() {
+    void toolsListExposesAllFiveTools() {
         Map<String, Object> resp = McpServer.handleMessage(Map.of("id", 2, "method", "tools/list"));
         Map<?, ?> result = (Map<?, ?>) resp.get("result");
         List<?> tools = (List<?>) result.get("tools");
-        assertEquals(2, tools.size());
-        assertTrue(tools.stream().anyMatch(t -> "kcp_plan".equals(((Map<?, ?>) t).get("name"))));
-        assertTrue(tools.stream().anyMatch(t -> "kcp_trace".equals(((Map<?, ?>) t).get("name"))));
+        assertEquals(5, tools.size());
+        for (String name : List.of("kcp_plan", "kcp_load", "kcp_validate", "kcp_trace", "kcp_replay")) {
+            assertTrue(tools.stream().anyMatch(t -> name.equals(((Map<?, ?>) t).get("name"))), "missing tool " + name);
+        }
     }
 
     @Test
@@ -90,6 +91,68 @@ class McpServerTest {
         String text = (String) ((Map<?, ?>) ((List<?>) result.get("content")).get(0)).get("text");
         assertTrue(text.contains("\"gateSummary\""));
         assertTrue(text.contains("\"context_budget\""));
+    }
+
+    @Test
+    void kcpValidateToolReportsFindings(@TempDir Path dir) throws IOException {
+        Path manifest = dir.resolve("knowledge.yaml");
+        // No kcp_version and no triggers → warnings; the report should still be ok (no errors).
+        Files.writeString(manifest, """
+                project: docs
+                version: 1.0.0
+                units:
+                  - id: a
+                    path: knowledge.yaml
+                    intent: "x"
+                    audience: [agent]
+                """);
+        String text = callToolText("kcp_validate", Map.of("manifest", manifest.toString()));
+        assertTrue(text.contains("\"findings\""));
+        assertTrue(text.contains("missing 'kcp_version'"));
+        assertTrue(text.contains("\"ok\": true"));
+    }
+
+    @Test
+    void kcpLoadToolReturnsUnitContent(@TempDir Path dir) throws IOException {
+        Files.createDirectories(dir.resolve("docs"));
+        Files.writeString(dir.resolve("docs/deploy.md"), "Run make deploy.\n");
+        Path manifest = dir.resolve("knowledge.yaml");
+        Files.writeString(manifest, """
+                kcp_version: "0.25"
+                project: docs
+                version: 1.0.0
+                units:
+                  - id: deploy-guide
+                    path: docs/deploy.md
+                    intent: "How to deploy to production"
+                    audience: [agent]
+                    triggers: [deploy, production]
+                """);
+        String text = callToolText("kcp_load",
+                Map.of("manifest", manifest.toString(), "task", "how do I deploy to production"));
+        assertTrue(text.contains("Run make deploy."), "load should return the unit content");
+        assertTrue(text.contains("\"bytesSaved\""));
+        assertTrue(text.contains("\"unavailable\""));
+    }
+
+    @Test
+    void kcpReplayToolCrossExaminesAnArtifact(@TempDir Path dir) throws IOException {
+        Path manifest = dir.resolve("knowledge.yaml");
+        Files.writeString(manifest, MANIFEST);
+        // Produce a plan artifact via kcp_plan, then replay it — it must reproduce identically.
+        String planText = callToolText("kcp_plan",
+                Map.of("manifest", manifest.toString(), "task", "how do I deploy to production", "as_of", "2026-07-06"));
+        String replayText = callToolText("kcp_replay", Map.of("artifact", planText));
+        assertTrue(replayText.contains("\"identical\""), "an unchanged manifest replays identical: " + replayText);
+        assertTrue(replayText.contains("\"ok\": true"));
+    }
+
+    private static String callToolText(String name, Map<String, Object> arguments) {
+        Map<String, Object> resp = McpServer.handleMessage(Map.of(
+                "id", 9, "method", "tools/call", "params", Map.of("name", name, "arguments", arguments)));
+        Map<?, ?> result = (Map<?, ?>) resp.get("result");
+        assertFalse((Boolean) result.get("isError"), name + " should not error: " + result);
+        return (String) ((Map<?, ?>) ((List<?>) result.get("content")).get(0)).get("text");
     }
 
     @Test

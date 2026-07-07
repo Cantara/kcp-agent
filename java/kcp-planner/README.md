@@ -117,12 +117,19 @@ dependency:
 java -jar kcp-planner.jar          # reads JSON-RPC from stdin, writes to stdout
 ```
 
-Tools: `kcp_plan` (the inspectable load plan, with the manifest's SHA-256) and
-`kcp_trace` (the plan plus per-unit gate verdicts). Their JSON output is byte-for-byte
-identical to the TypeScript reference. `McpServer.handleMessage` is a pure
-request → response function; the `initialize` handshake, `tools/list`, and `tools/call`
-are unit-tested. (`kcp_load` / `kcp_validate` / `kcp_replay` land with their supporting
-ports.)
+Five tools:
+
+| Tool | What it does |
+|---|---|
+| `kcp_plan` | the inspectable load plan (with the manifest's SHA-256) |
+| `kcp_trace` | the plan plus per-unit gate verdicts |
+| `kcp_load` | the plan plus the *content* of load-eligible units (with `known`-unit session dedup) |
+| `kcp_validate` | lint a knowledge.yaml — structural errors and navigation-weakening warnings |
+| `kcp_replay` | cross-examine a saved plan artifact: re-fetch, compare sha256, re-plan, report drift |
+
+`kcp_plan` and `kcp_trace` output is byte-for-byte identical to the TypeScript reference.
+`McpServer.handleMessage` is a pure request → response function; the `initialize`
+handshake, `tools/list`, and every `tools/call` are unit-tested.
 
 ## Network & signature verification
 
@@ -170,7 +177,7 @@ mvn clean test
 
 ## Scope
 
-This is the deterministic core — `plan`, `trace`, `diff`, a manifest client with SSRF
-guard and Ed25519 verification, and (in later phases) `validate`, an MCP server, and a
-Spring Boot starter. There is no LLM synthesis, episodic memory, or `ask` command; those
-remain in the TypeScript agent.
+This is the deterministic core — `plan`, `trace`, `diff`, `validate`, a manifest client
+with SSRF guard and Ed25519 verification, unit-content loading, replay, and a five-tool
+MCP server. Remaining: a Spring Boot starter. There is no LLM synthesis, episodic memory,
+or `ask` command; those remain in the TypeScript agent.
