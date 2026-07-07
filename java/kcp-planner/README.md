@@ -77,12 +77,44 @@ verbatim, human-readable reason (the "every decision is a sentence" contract):
 
 Currency arithmetic uses `BigDecimal`; token arithmetic is integer.
 
+## Trace & diff
+
+`KcpPlanner.trace` makes the reasoning transparent — it produces the canonical plan
+and then annotates every unit with a structured verdict for each gate it was
+evaluated against (the trace is a read, not a fork):
+
+```java
+DecisionTrace t = KcpPlanner.trace(manifest, "deploy to production");
+for (UnitTrace u : t.units()) {
+    System.out.println(u.id() + " → " + u.outcome()
+        + (u.rejectedBy() != null ? " (rejected by " + u.rejectedBy().wire() + ")" : ""));
+}
+t.gateSummary().forEach(g ->
+    System.out.println(g.gate().wire() + ": " + g.passed() + " passed, " + g.failed() + " failed"));
+```
+
+`KcpPlanner.diffPlans` compares two plan artifacts and reports what moved — units
+that flipped selected/skipped, score changes, presence changes, budget/context
+shifts, skip-reason changes, warning changes:
+
+```java
+PlanDiff d = KcpPlanner.diffPlans(planA, planB);
+if (!d.identical()) {
+    d.moves().forEach(m -> System.out.println(m.id() + ": " + m.direction()));
+}
+```
+
+Both are pure. Because the planner is deterministic, every difference has a cause —
+the diff names the symptoms; the trace explains them.
+
 ## Conformance
 
 The proof is the [`vectors/`](../../vectors) corpus: `(manifest, task, options) →
 expected outcome`. `mvn test` runs every vector through the planner and deep-equals the
-result against the expected outcome. Two independent implementations that agree on every
-decision validate the spec, not just the code.
+result against the expected outcome. The decision trace and plan diff are held to the
+same standard by golden fixtures generated from the TypeScript reference (per-gate
+verdicts and detail strings included). Two independent implementations that agree on
+every decision validate the spec, not just the code.
 
 ```bash
 mvn clean test
@@ -90,7 +122,7 @@ mvn clean test
 
 ## Scope
 
-This is the deterministic core — `plan`, and (in later phases) `trace`, `diff`,
+This is the deterministic core — `plan`, `trace`, `diff`, and (in later phases)
 `validate`, a manifest client with signature verification, an MCP server, and a Spring
 Boot starter. There is no LLM synthesis, episodic memory, or `ask` command; those remain
 in the TypeScript agent.

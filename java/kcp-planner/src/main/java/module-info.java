@@ -11,4 +11,6 @@ module no.cantara.kcp.planner {
 
     exports no.cantara.kcp.planner;
     exports no.cantara.kcp.planner.model;
+    exports no.cantara.kcp.planner.trace;
+    exports no.cantara.kcp.planner.diff;
 }

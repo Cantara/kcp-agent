@@ -7,10 +7,18 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
+import no.cantara.kcp.planner.diff.BudgetShift;
+import no.cantara.kcp.planner.diff.PlanDiff;
+import no.cantara.kcp.planner.diff.ReasonChange;
+import no.cantara.kcp.planner.diff.ScoreChange;
+import no.cantara.kcp.planner.diff.UnitMove;
+import no.cantara.kcp.planner.diff.UnitPresence;
 import no.cantara.kcp.planner.model.Manifest;
 import no.cantara.kcp.planner.model.ManifestRef;
 import no.cantara.kcp.planner.model.Payment;
@@ -20,6 +28,10 @@ import no.cantara.kcp.planner.model.RateLimits;
 import no.cantara.kcp.planner.model.RequestCount;
 import no.cantara.kcp.planner.model.Temporal;
 import no.cantara.kcp.planner.model.Unit;
+import no.cantara.kcp.planner.trace.DecisionTrace;
+import no.cantara.kcp.planner.trace.GateName;
+import no.cantara.kcp.planner.trace.GateVerdict;
+import no.cantara.kcp.planner.trace.UnitTrace;
 
 /**
  * The deterministic KCP planner — the LLM-free heart of the agent, ported from
@@ -468,6 +480,429 @@ public final class KcpPlanner {
     /** Plan with default options. */
     public static AgentPlan plan(Manifest manifest, String task) {
         return plan(manifest, task, PlanOptions.defaults());
+    }
+
+    // --- decision trace (ported from src/trace.ts) ---
+
+    /** A unit's evolving trace state as it walks the two-phase gate cascade. */
+    private static final class Candidate {
+        final Unit unit;
+        final List<GateVerdict> gates = new ArrayList<>();
+        boolean rejected;
+        GateName rejectedBy;
+        int score;
+        boolean loadEligible = true;
+        PaymentPlan payment;
+
+        Candidate(Unit unit, PaymentPlan payment) {
+            this.unit = unit;
+            this.payment = payment;
+        }
+
+        void reject(GateName gate, String detail) {
+            gates.add(new GateVerdict(gate, false, detail));
+            rejected = true;
+            rejectedBy = gate;
+        }
+
+        void pass(GateName gate, String detail) {
+            gates.add(new GateVerdict(gate, true, detail));
+        }
+    }
+
+    /**
+     * Produce a decision trace: the canonical plan annotated with per-unit gate
+     * records. Pure — no I/O, no model. The embedded plan is the authority; the
+     * trace re-walks the cascade only to record why each unit landed where it did.
+     *
+     * @param manifest the parsed manifest
+     * @param task     the task to plan for
+     * @param options  the planning options
+     * @return the decision trace
+     */
+    public static DecisionTrace trace(Manifest manifest, String task, PlanOptions options) {
+        AgentPlan p = plan(manifest, task, options);
+        AgentCapabilities caps = options.capabilities();
+        String asOf = options.asOf() != null ? options.asOf() : todayUtc();
+        List<String> taskTerms = terms(task);
+        int maxUnits = options.maxUnits();
+        PlanOptions.Budget budget = options.budget();
+        String budgetCurrency = budget != null && budget.currency() != null ? budget.currency() : "USDC";
+        BigDecimal upstreamSpent = budget != null && budget.spent() != null
+                ? BigDecimal.valueOf(budget.spent()) : BigDecimal.ZERO;
+        Integer contextBudget = options.contextBudget();
+
+        Set<String> selectedIds = new java.util.HashSet<>();
+        for (PlannedUnit u : p.selected()) {
+            selectedIds.add(u.id());
+        }
+
+        boolean requiresAttestation = manifest.trust() != null
+                && manifest.trust().agentRequirements() != null
+                && Boolean.TRUE.equals(manifest.trust().agentRequirements().requireAttestation());
+        List<String> trustedProviders = requiresAttestation && manifest.trust().agentRequirements().trustedProviders() != null
+                ? manifest.trust().agentRequirements().trustedProviders()
+                : List.of();
+        boolean agentCanAttest = !requiresAttestation
+                || (caps.attestationProvider() != null && trustedProviders.contains(caps.attestationProvider()));
+
+        // Phase 1: pre-selection gates (audience → strict), in manifest order.
+        List<Candidate> candidates = new ArrayList<>();
+        for (Unit unit : manifest.units()) {
+            Candidate c = new Candidate(unit,
+                    planPayment(unit.payment() != null ? unit.payment() : manifest.payment(), caps));
+
+            // 1. audience
+            if (!unit.audience().isEmpty() && !unit.audience().contains(caps.role())) {
+                c.reject(GateName.AUDIENCE, "audience " + jsonArr(unit.audience()) + " excludes role '" + caps.role() + "'");
+            } else {
+                c.pass(GateName.AUDIENCE, unit.audience().isEmpty()
+                        ? "no audience restriction"
+                        : "role '" + caps.role() + "' in " + jsonArr(unit.audience()));
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 2. not_for
+            String nf = firstNotFor(unit.notFor(), taskTerms);
+            if (nf != null) {
+                c.reject(GateName.NOT_FOR, "not_for declares it does not serve '" + nf + "'");
+            } else {
+                c.pass(GateName.NOT_FOR, unit.notFor().isEmpty()
+                        ? "no not_for declarations"
+                        : "task terms do not match " + jsonArr(unit.notFor()));
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 3. temporal
+            TemporalStatus ts = temporalStatus(unit, asOf);
+            if (ts == TemporalStatus.FUTURE) {
+                c.reject(GateName.TEMPORAL, "not active until " + orEmpty(unit.temporal() != null ? unit.temporal().validFrom() : null));
+            } else if (ts == TemporalStatus.EXPIRED) {
+                String succ = unit.temporal() != null && unit.temporal().supersededBy() != null
+                        ? " (superseded by " + unit.temporal().supersededBy() + ")" : "";
+                c.reject(GateName.TEMPORAL, "expired " + orEmpty(unit.temporal() != null ? unit.temporal().validUntil() : null) + succ);
+            } else {
+                c.pass(GateName.TEMPORAL, unit.temporal() != null ? "active as-of " + asOf : "no temporal constraint");
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 4. deprecated
+            if (Boolean.TRUE.equals(unit.deprecated())) {
+                c.reject(GateName.DEPRECATED, "deprecated");
+            } else {
+                c.pass(GateName.DEPRECATED, "not deprecated");
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 5. supersession
+            String successor = selectableSuccessor(unit, manifest, asOf, caps.role());
+            if (successor != null) {
+                c.reject(GateName.SUPERSESSION, "superseded by " + successor + " (successor active)");
+            } else {
+                c.pass(GateName.SUPERSESSION, unit.temporal() != null && unit.temporal().supersededBy() != null
+                        ? "successor '" + unit.temporal().supersededBy() + "' not active"
+                        : "no supersession declared");
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 6. relevance
+            ScoreResult sr = scoreUnit(unit, taskTerms);
+            c.score = sr.score();
+            if (c.score == 0) {
+                c.reject(GateName.RELEVANCE, "no task-relevance match");
+            } else {
+                c.pass(GateName.RELEVANCE, "score " + c.score + ": " + String.join("; ", sr.reasons()));
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 7. attestation
+            boolean unitRequiresAttestation = requiresAttestation && "restricted".equals(unit.access());
+            if (unitRequiresAttestation && !agentCanAttest) {
+                c.loadEligible = false;
+                c.pass(GateName.ATTESTATION, "restricted: requires attestation the agent cannot present (loadEligible=false)");
+            } else {
+                c.pass(GateName.ATTESTATION, unitRequiresAttestation
+                        ? "agent can present required attestation" : "no attestation required");
+            }
+            // 8. payment
+            if (!c.payment.affordable()) {
+                c.loadEligible = false;
+                c.pass(GateName.PAYMENT, "unaffordable: " + c.payment.method() + " (loadEligible=false)");
+            } else {
+                c.pass(GateName.PAYMENT, "free".equals(c.payment.method())
+                        ? "free" : c.payment.method() + ": " + c.payment.cost());
+            }
+            // 9. access
+            String access = unit.access();
+            if (("authenticated".equals(access) || "restricted".equals(access)) && caps.credentials().isEmpty()) {
+                if ("restricted".equals(access)) {
+                    c.loadEligible = false;
+                }
+                c.pass(GateName.ACCESS, "access '" + access + "': agent holds no credentials"
+                        + ("restricted".equals(access) ? " (loadEligible=false)" : ""));
+            } else {
+                c.pass(GateName.ACCESS, access != null
+                        ? "access '" + access + "' — agent has credentials" : "public access");
+            }
+            // 10. strict
+            if (options.strict() && !c.loadEligible) {
+                c.reject(GateName.STRICT, "not load-eligible under strict mode");
+            } else {
+                c.pass(GateName.STRICT, options.strict() ? "load-eligible under strict mode" : "non-strict mode");
+            }
+            candidates.add(c);
+        }
+
+        // Phase 2: greedy-loop gates (max_units, money_budget, context_budget).
+        List<Candidate> passed = new ArrayList<>();
+        for (Candidate c : candidates) {
+            if (!c.rejected) {
+                passed.add(c);
+            }
+        }
+        passed.sort((a, b) -> {
+            int byScore = Integer.compare(b.score, a.score);
+            return byScore != 0 ? byScore : a.unit.id().compareTo(b.unit.id());
+        });
+
+        int accepted = 0;
+        BigDecimal spend = BigDecimal.ZERO;
+        long usedTokens = 0;
+        for (Candidate c : passed) {
+            // 11. max_units
+            if (accepted >= maxUnits) {
+                c.reject(GateName.MAX_UNITS, "position " + (accepted + 1) + " exceeds cap of " + maxUnits);
+                continue;
+            }
+            c.pass(GateName.MAX_UNITS, "position " + (accepted + 1) + " within cap of " + maxUnits);
+            // 12. money_budget
+            BigDecimal price = c.payment.pricePerRequest();
+            if (budget != null && c.loadEligible && price != null && price.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal amount = BigDecimal.valueOf(budget.amount());
+                if (!budgetCurrency.equals(c.payment.currency())) {
+                    c.reject(GateName.MONEY_BUDGET, "costs " + orEmpty(c.payment.cost()) + ", budget is in " + budgetCurrency);
+                    continue;
+                }
+                if (upstreamSpent.add(spend).add(price).compareTo(amount.add(EPSILON)) > 0) {
+                    c.reject(GateName.MONEY_BUDGET, fmtNum(price) + " would exceed remaining "
+                            + fmtNum(money(amount.subtract(upstreamSpent).subtract(spend))) + " of "
+                            + fmtNum(amount) + " " + budgetCurrency);
+                    continue;
+                }
+                spend = spend.add(price);
+                c.pass(GateName.MONEY_BUDGET, fmtNum(price) + " within budget (" + fmtNum(money(spend))
+                        + " of " + fmtNum(amount) + " " + budgetCurrency + " spent)");
+            } else {
+                c.pass(GateName.MONEY_BUDGET, budget != null ? "free unit" : "no budget ceiling set");
+            }
+            // 13. context_budget
+            if (contextBudget != null && c.loadEligible) {
+                long cb = contextBudget;
+                TokenInfo info = unitTokens(c.unit);
+                if (!info.measured()) {
+                    if (options.strict()) {
+                        c.reject(GateName.CONTEXT_BUDGET, "size undeclared — excluded under strict");
+                        continue;
+                    }
+                    c.pass(GateName.CONTEXT_BUDGET, "unmeasured (admitted, projection is a lower bound)");
+                } else {
+                    long tokens = info.tokens() != null ? info.tokens() : 0;
+                    if (usedTokens + tokens > cb) {
+                        c.reject(GateName.CONTEXT_BUDGET, fmtTokens(tokens) + " tokens would exceed remaining "
+                                + fmtTokens(cb - usedTokens) + " of " + fmtTokens(cb));
+                        continue;
+                    }
+                    usedTokens += tokens;
+                    c.pass(GateName.CONTEXT_BUDGET, fmtTokens(tokens) + " tokens ("
+                            + fmtTokens(usedTokens) + " of " + fmtTokens(cb) + " used)");
+                }
+            } else {
+                c.pass(GateName.CONTEXT_BUDGET, contextBudget != null ? "not load-eligible" : "no context budget set");
+            }
+            accepted++;
+        }
+
+        // Build UnitTrace from candidates, in manifest order.
+        List<UnitTrace> unitTraces = new ArrayList<>();
+        for (Candidate c : candidates) {
+            String outcome = selectedIds.contains(c.unit.id()) ? "selected" : "skipped";
+            Integer score = c.score > 0 ? c.score : null;
+            UnitTrace.Tokens tokens = null;
+            UnitTrace.Cost cost = null;
+            if (outcome.equals("selected")) {
+                TokenInfo ti = unitTokens(c.unit);
+                String source = ti.measured() ? (ti.approximate() ? "estimated" : "declared") : "unmeasured";
+                tokens = new UnitTrace.Tokens(ti.tokens(), source);
+                if (!"free".equals(c.payment.method()) && c.payment.pricePerRequest() != null) {
+                    cost = new UnitTrace.Cost(c.payment.pricePerRequest().doubleValue(),
+                            c.payment.currency(), c.payment.method());
+                }
+            }
+            unitTraces.add(new UnitTrace(c.unit.id(), c.unit.path(), c.unit.intent(), outcome,
+                    List.copyOf(c.gates), c.rejectedBy, score, tokens, cost));
+        }
+
+        // Gate summary: pass/fail counts per gate across all units.
+        List<DecisionTrace.GateCount> gateSummary = new ArrayList<>();
+        for (GateName gate : GateName.ORDER) {
+            int gpassed = 0;
+            int gfailed = 0;
+            for (UnitTrace ut : unitTraces) {
+                for (GateVerdict v : ut.gates()) {
+                    if (v.gate() == gate) {
+                        if (v.passed()) {
+                            gpassed++;
+                        } else {
+                            gfailed++;
+                        }
+                        break;
+                    }
+                }
+            }
+            gateSummary.add(new DecisionTrace.GateCount(gate, gpassed, gfailed));
+        }
+
+        return new DecisionTrace(task, taskTerms, p.asOf(), caps, p, unitTraces, gateSummary);
+    }
+
+    /** Trace with default options. */
+    public static DecisionTrace trace(Manifest manifest, String task) {
+        return trace(manifest, task, PlanOptions.defaults());
+    }
+
+    // --- plan diff (ported from src/diff.ts) ---
+
+    /**
+     * Compare two plan artifacts and report what changed: units that flipped
+     * selected/skipped, score shifts, presence changes, budget/context shifts, skip
+     * reason changes, and warning changes. Pure. The planner is deterministic, so
+     * every difference has a cause.
+     *
+     * @param a the first plan
+     * @param b the second plan
+     * @return the diff
+     */
+    public static PlanDiff diffPlans(AgentPlan a, AgentPlan b) {
+        Map<String, Integer> aSel = new HashMap<>();
+        Map<String, String> aSkip = new HashMap<>();
+        Map<String, Integer> bSel = new HashMap<>();
+        Map<String, String> bSkip = new HashMap<>();
+        for (PlannedUnit u : a.selected()) {
+            aSel.putIfAbsent(u.id(), u.score());
+        }
+        for (SkippedUnit s : a.skipped()) {
+            aSkip.putIfAbsent(s.id(), s.reason());
+        }
+        for (PlannedUnit u : b.selected()) {
+            bSel.putIfAbsent(u.id(), u.score());
+        }
+        for (SkippedUnit s : b.skipped()) {
+            bSkip.putIfAbsent(s.id(), s.reason());
+        }
+
+        // Ordered, deduped union of ids: a.selected, a.skipped, then b — matches the TS Set order.
+        Set<String> allIds = new LinkedHashSet<>();
+        for (PlannedUnit u : a.selected()) {
+            allIds.add(u.id());
+        }
+        for (SkippedUnit s : a.skipped()) {
+            allIds.add(s.id());
+        }
+        for (PlannedUnit u : b.selected()) {
+            allIds.add(u.id());
+        }
+        for (SkippedUnit s : b.skipped()) {
+            allIds.add(s.id());
+        }
+
+        List<UnitMove> moves = new ArrayList<>();
+        List<ScoreChange> scoreChanges = new ArrayList<>();
+        List<UnitPresence> presence = new ArrayList<>();
+        List<ReasonChange> reasonChanges = new ArrayList<>();
+
+        for (String id : allIds) {
+            boolean inA = aSel.containsKey(id) || aSkip.containsKey(id);
+            boolean inB = bSel.containsKey(id) || bSkip.containsKey(id);
+            if (inA && !inB) {
+                presence.add(new UnitPresence(id, "a_only"));
+                continue;
+            }
+            if (!inA && inB) {
+                presence.add(new UnitPresence(id, "b_only"));
+                continue;
+            }
+            Integer selA = aSel.get(id);
+            Integer selB = bSel.get(id);
+            String skipA = aSkip.get(id);
+            String skipB = bSkip.get(id);
+            if (selA != null && skipB != null) {
+                moves.add(new UnitMove(id, "selected_to_skipped",
+                        new UnitMove.MoveSide(selA, null), new UnitMove.MoveSide(null, skipB)));
+            } else if (skipA != null && selB != null) {
+                moves.add(new UnitMove(id, "skipped_to_selected",
+                        new UnitMove.MoveSide(null, skipA), new UnitMove.MoveSide(selB, null)));
+            } else if (selA != null && selB != null && !selA.equals(selB)) {
+                scoreChanges.add(new ScoreChange(id, selA, selB, selB - selA));
+            } else if (skipA != null && skipB != null && !skipA.equals(skipB)) {
+                reasonChanges.add(new ReasonChange(id, skipA, skipB));
+            }
+        }
+
+        List<BudgetShift> budgetShifts = new ArrayList<>();
+        addShift(budgetShifts, "budget.ceiling", toDouble(a.budget().ceiling()), toDouble(b.budget().ceiling()));
+        addShift(budgetShifts, "budget.projectedSpend", toDouble(a.budget().projectedSpend()), toDouble(b.budget().projectedSpend()));
+        addShift(budgetShifts, "budget.remaining", toDouble(a.budget().remaining()), toDouble(b.budget().remaining()));
+        addShift(budgetShifts, "context.ceiling", toDouble(a.context().ceiling()), toDouble(b.context().ceiling()));
+        addShift(budgetShifts, "context.projectedTokens", toDouble(a.context().projectedTokens()), toDouble(b.context().projectedTokens()));
+        addShift(budgetShifts, "context.remaining", toDouble(a.context().remaining()), toDouble(b.context().remaining()));
+
+        List<String> added = new ArrayList<>();
+        for (String w : b.warnings()) {
+            if (!a.warnings().contains(w)) {
+                added.add(w);
+            }
+        }
+        List<String> removed = new ArrayList<>();
+        for (String w : a.warnings()) {
+            if (!b.warnings().contains(w)) {
+                removed.add(w);
+            }
+        }
+
+        boolean identical = moves.isEmpty() && scoreChanges.isEmpty() && presence.isEmpty()
+                && budgetShifts.isEmpty() && reasonChanges.isEmpty() && added.isEmpty() && removed.isEmpty();
+
+        return new PlanDiff(
+                new PlanDiff.DiffEnd(a.manifest().project(), a.manifest().version(), a.task(), a.asOf()),
+                new PlanDiff.DiffEnd(b.manifest().project(), b.manifest().version(), b.task(), b.asOf()),
+                identical, moves, scoreChanges, presence, budgetShifts, reasonChanges,
+                new PlanDiff.WarningChanges(added, removed));
+    }
+
+    private static void addShift(List<BudgetShift> shifts, String field, Double before, Double after) {
+        if (!Objects.equals(before, after)) {
+            shifts.add(new BudgetShift(field, before, after));
+        }
+    }
+
+    private static Double toDouble(BigDecimal v) {
+        return v == null ? null : v.doubleValue();
+    }
+
+    private static Double toDouble(Long v) {
+        return v == null ? null : v.doubleValue();
     }
 
     // --- budget / context projection (ported from budget.rs) ---
