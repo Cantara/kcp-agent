@@ -2,8 +2,10 @@
 //! renderers in `src/format.ts`. Colors respect `NO_COLOR` and TTY detection.
 
 use crate::budget::fmt_tokens;
+use crate::diff::PlanDiff;
 use crate::planner::{fmt_num, AgentPlan};
 use crate::model::Count;
+use crate::trace::DecisionTrace;
 use crate::validate::ValidationReport;
 use crate::verify::SignatureResult;
 use std::io::IsTerminal;
@@ -187,6 +189,139 @@ pub fn format_validation(report: &ValidationReport, c: &Colors) -> String {
         out.push(format!("{}{}", c.red("✗ invalid"), c.dim(&format!(" — {} error(s), {} warning(s)", errors, warnings))));
     }
     out.push(String::new());
+
+    out.join("\n")
+}
+
+fn gate_str(g: &crate::trace::GateName) -> String {
+    serde_json::to_value(g).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default()
+}
+
+pub fn format_trace(t: &DecisionTrace, c: &Colors) -> String {
+    let mut out: Vec<String> = Vec::new();
+    out.push(String::new());
+    out.push(c.bold("Decision Trace"));
+    out.push(c.dim(&format!("  {} units evaluated · {} search terms: {}", t.units.len(), t.task_terms.len(), t.task_terms.join(", "))));
+    out.push(String::new());
+
+    // Gate summary
+    out.push(c.bold("Gate summary:"));
+    for gs in &t.gate_summary {
+        if gs.passed == 0 && gs.failed == 0 {
+            continue; // gate never reached
+        }
+        let bar = if gs.failed > 0 {
+            format!("{} passed, {} rejected", c.green(&gs.passed.to_string()), c.red(&gs.failed.to_string()))
+        } else {
+            c.green(&format!("{} passed", gs.passed))
+        };
+        out.push(format!("  {} {}", c.dim(&format!("{:<16}", gate_str(&gs.gate))), bar));
+    }
+    out.push(String::new());
+
+    // Per-unit cascade
+    for u in &t.units {
+        let mark = if u.outcome == "selected" { c.green("●") } else { c.red("○") };
+        let score_part = u.score.map(|s| c.dim(&format!(" (score {})", s))).unwrap_or_default();
+        out.push(format!("{} {}{} {}", mark, c.bold(&u.id), score_part, c.dim(&u.path)));
+        for g in &u.gates {
+            let g_mark = if g.passed { c.green("  ✓") } else { c.red("  ✗") };
+            out.push(format!("{} {} {}", g_mark, c.dim(&format!("{:<16}", gate_str(&g.gate))), g.detail));
+        }
+        out.push(String::new());
+    }
+
+    let selected = t.units.iter().filter(|u| u.outcome == "selected").count();
+    let skipped = t.units.iter().filter(|u| u.outcome == "skipped").count();
+    out.push(c.dim(&format!("{} selected, {} skipped", selected, skipped)));
+    out.push(String::new());
+    out.join("\n")
+}
+
+/// Render a plan diff: what changed between two plan artifacts.
+pub fn format_diff(d: &PlanDiff, c: &Colors) -> String {
+    let mut out: Vec<String> = Vec::new();
+    out.push(String::new());
+    out.push(c.bold("Plan Diff"));
+    out.push(c.dim(&format!("  A: {} v{} · \"{}\" · {}", d.a.project, d.a.version, d.a.task, d.a.as_of)));
+    out.push(c.dim(&format!("  B: {} v{} · \"{}\" · {}", d.b.project, d.b.version, d.b.task, d.b.as_of)));
+    out.push(String::new());
+
+    if d.identical {
+        out.push(c.green("✓ plans are identical"));
+        out.push(String::new());
+        return out.join("\n");
+    }
+
+    if !d.moves.is_empty() {
+        out.push(c.bold(&format!("Moves ({}):", d.moves.len())));
+        for m in &d.moves {
+            let arrow = if m.direction == "selected_to_skipped" { c.red("selected → skipped") } else { c.green("skipped → selected") };
+            out.push(format!("  {}: {}", c.bold(&m.id), arrow));
+            if let Some(sc) = m.from.score {
+                out.push(format!("    {}", c.dim(&format!("was: score {}", sc))));
+            }
+            if let Some(r) = &m.from.reason {
+                out.push(format!("    {}", c.dim(&format!("was: {}", r))));
+            }
+            if let Some(sc) = m.to.score {
+                out.push(format!("    {}", c.dim(&format!("now: score {}", sc))));
+            }
+            if let Some(r) = &m.to.reason {
+                out.push(format!("    {}", c.dim(&format!("now: {}", r))));
+            }
+        }
+        out.push(String::new());
+    }
+
+    if !d.score_changes.is_empty() {
+        out.push(c.bold(&format!("Score changes ({}):", d.score_changes.len())));
+        for s in &d.score_changes {
+            let dir = if s.delta > 0 { c.green(&format!("+{}", s.delta)) } else { c.red(&s.delta.to_string()) };
+            out.push(format!("  {}: {} → {} ({})", c.bold(&s.id), s.before, s.after, dir));
+        }
+        out.push(String::new());
+    }
+
+    if !d.presence.is_empty() {
+        out.push(c.bold(&format!("Units added/removed ({}):", d.presence.len())));
+        for p in &d.presence {
+            let mark = if p.side == "b_only" { c.green("+") } else { c.red("-") };
+            out.push(format!("  {} {} {}", mark, p.id, c.dim(if p.side == "b_only" { "(new in B)" } else { "(removed in B)" })));
+        }
+        out.push(String::new());
+    }
+
+    if !d.budget_shifts.is_empty() {
+        out.push(c.bold("Budget/context shifts:"));
+        for b in &d.budget_shifts {
+            let before = b.before.map(fmt_num).unwrap_or_else(|| "—".to_string());
+            let after = b.after.map(fmt_num).unwrap_or_else(|| "—".to_string());
+            out.push(format!("  {}: {} → {}", c.dim(&b.field), before, after));
+        }
+        out.push(String::new());
+    }
+
+    if !d.reason_changes.is_empty() {
+        out.push(c.bold(&format!("Reason changes ({}):", d.reason_changes.len())));
+        for r in &d.reason_changes {
+            out.push(format!("  {}", c.bold(&r.id)));
+            out.push(format!("    {}", c.dim(&format!("was: {}", r.before))));
+            out.push(format!("    {}", c.dim(&format!("now: {}", r.after))));
+        }
+        out.push(String::new());
+    }
+
+    if !d.warning_changes.added.is_empty() || !d.warning_changes.removed.is_empty() {
+        out.push(c.bold("Warning changes:"));
+        for w in &d.warning_changes.added {
+            out.push(format!("  {} {}", c.green("+"), w));
+        }
+        for w in &d.warning_changes.removed {
+            out.push(format!("  {} {}", c.red("-"), w));
+        }
+        out.push(String::new());
+    }
 
     out.join("\n")
 }

@@ -4,6 +4,7 @@
 
 use crate::model::{Count, Manifest};
 use crate::planner::{AgentPlan, PlanOptions};
+use crate::trace::DecisionTrace;
 use crate::verify::SignatureResult;
 use serde_json::{Map, Value};
 
@@ -42,17 +43,34 @@ fn signature_block(s: &SignatureResult) -> Value {
     obj(p)
 }
 
-/// Build the full plan artifact, matching the TypeScript CLI's `--json` output.
+/// Build the full plan artifact, matching the TypeScript CLI's `plan --json`.
 pub fn plan_to_json(p: &AgentPlan, manifest: &Manifest, options: &PlanOptions, source: &str, sha256: &str, signature: &SignatureResult) -> Value {
+    plan_to_value(p, manifest, options, source, Some(sha256), Some(signature))
+}
+
+/// Build a plan object matching the TS `AgentPlan` on the wire. `sha256` and
+/// `signature` are attached by the loading layer, so they're present in the
+/// `plan --json` artifact but absent from the raw plan embedded in a `--trace`
+/// (where the reference serializes `plan()` output directly).
+pub fn plan_to_value(
+    p: &AgentPlan,
+    manifest: &Manifest,
+    options: &PlanOptions,
+    source: &str,
+    sha256: Option<&str>,
+    signature: Option<&SignatureResult>,
+) -> Value {
     let caps = options.caps();
 
-    // manifest { project, version, kcpVersion?, source, sha256 }
+    // manifest { project, version, kcpVersion?, source, sha256? }
     let mut man = vec![("project", Value::from(manifest.project.clone())), ("version", Value::from(manifest.version.clone()))];
     if let Some(kv) = &manifest.kcp_version {
         man.push(("kcpVersion", Value::from(kv.clone())));
     }
     man.push(("source", Value::from(source)));
-    man.push(("sha256", Value::from(sha256)));
+    if let Some(sha) = sha256 {
+        man.push(("sha256", Value::from(sha)));
+    }
 
     // options { capabilities, maxUnits, strict, budget?, contextBudget? }
     let mut cap_pairs = vec![
@@ -192,7 +210,24 @@ pub fn plan_to_json(p: &AgentPlan, manifest: &Manifest, options: &PlanOptions, s
     top.push(("budget", obj(bud)));
     top.push(("context", obj(ctx)));
     top.push(("warnings", Value::from(p.warnings.clone())));
-    top.push(("signature", signature_block(signature)));
+    if let Some(sig) = signature {
+        top.push(("signature", signature_block(sig)));
+    }
 
     obj(top)
+}
+
+/// Build the decision-trace artifact, matching the TS CLI's `plan --trace --json`.
+/// The embedded `plan` is the *raw* plan (no sha256/signature — the reference
+/// serializes `plan()` output directly, before the loading layer augments it).
+pub fn trace_to_json(t: &DecisionTrace, manifest: &Manifest, options: &PlanOptions, source: &str) -> Value {
+    obj(vec![
+        ("task", Value::from(t.task.clone())),
+        ("taskTerms", Value::from(t.task_terms.clone())),
+        ("asOf", Value::from(t.as_of.clone())),
+        ("capabilities", serde_json::to_value(&t.capabilities).unwrap_or(Value::Null)),
+        ("plan", plan_to_value(&t.plan, manifest, options, source, None, None)),
+        ("units", serde_json::to_value(&t.units).unwrap_or(Value::Null)),
+        ("gateSummary", serde_json::to_value(&t.gate_summary).unwrap_or(Value::Null)),
+    ])
 }

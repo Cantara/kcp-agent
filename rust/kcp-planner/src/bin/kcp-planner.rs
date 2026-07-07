@@ -1,15 +1,18 @@
 //! `kcp-planner` — the deterministic KCP planner as a small static binary.
-//! Commands: `plan`, `validate` (this build; `trace`/`diff` land in the next
-//! Phase-5 commit). Human-readable colored output, or `--json` for machines.
-//! Exit codes: 0 success, 1 failure/invalid, 2 usage error.
+//! Commands: `plan` (with `--trace`), `validate`, `diff`. Human-readable colored
+//! output, or `--json` for machines. Exit codes: 0 success, 1 failure/invalid/
+//! differing, 2 usage error.
 
-use kcp_planner::{format_plan, format_validation, parse_manifest, plan, plan_to_json, validate_location, verify_manifest_text, Colors, PlanOptions};
+use kcp_planner::{
+    diff_plans, format_diff, format_plan, format_trace, format_validation, parse_manifest, plan, plan_from_artifact, plan_to_json, trace, trace_to_json,
+    validate_location, verify_manifest_text, Colors, PlanOptions,
+};
 use kcp_planner::planner::{BudgetInput, CapabilitiesInput};
 use kcp_planner::validate::load_local_manifest_text;
 use sha2::{Digest, Sha256};
 use std::process::exit;
 
-const USAGE: &str = "Usage:\n  kcp-planner plan     \"<task>\" --manifest <path|dir> [options]\n  kcp-planner validate <path|dir> [--json]\n\nRun `kcp-planner plan --help` for options.";
+const USAGE: &str = "Usage:\n  kcp-planner plan     \"<task>\" --manifest <path|dir> [options] [--trace]\n  kcp-planner validate <path|dir> [--json]\n  kcp-planner diff     <a.json> <b.json> [--json]\n\nRun `kcp-planner plan --help` for options.";
 
 struct Args {
     command: String,
@@ -27,6 +30,7 @@ struct Args {
     currency: Option<String>,
     context_budget: Option<i64>,
     json: bool,
+    trace: bool,
 }
 
 fn parse_args(argv: &[String]) -> Args {
@@ -35,7 +39,7 @@ fn parse_args(argv: &[String]) -> Args {
         positionals: Vec::new(),
         manifest: None, env: None, as_of: None, max_units: None, strict: false,
         role: None, methods: None, credentials: None, attest: None,
-        budget: None, currency: None, context_budget: None, json: false,
+        budget: None, currency: None, context_budget: None, json: false, trace: false,
     };
     let rest = &argv[argv.len().min(1)..];
     let list = |s: &str| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect::<Vec<_>>();
@@ -59,6 +63,7 @@ fn parse_args(argv: &[String]) -> Args {
             "--budget" => a.budget = next().parse().ok(),
             "--currency" => a.currency = Some(next()),
             "--context-budget" => a.context_budget = next().parse().ok(),
+            "--trace" => a.trace = true,
             "--json" => a.json = true,
             "--help" | "-h" => {}
             other if other.starts_with("--") => {
@@ -113,6 +118,7 @@ fn main() {
     match a.command.as_str() {
         "plan" => cmd_plan(&a),
         "validate" => cmd_validate(&a),
+        "diff" => cmd_diff(&a),
         "" | "--help" | "-h" | "help" => {
             println!("{}", USAGE);
             exit(if a.command.is_empty() { 2 } else { 0 });
@@ -153,6 +159,22 @@ fn cmd_plan(a: &Args) {
         }
     };
     let options = build_options(a);
+
+    // --trace: the gate cascade for every unit, re-derived from the manifest.
+    if a.trace {
+        let t = trace(&manifest, &task, &options);
+        if a.json {
+            let v = trace_to_json(&t, &manifest, &options, &source);
+            println!("{}", serde_json::to_string_pretty(&v).unwrap());
+        } else {
+            let c = Colors::auto();
+            // The trace's plan is signature-free (raw plan() output), matching the reference.
+            println!("{}", format_plan(&t.plan, manifest.kcp_version.as_deref(), Some(&source), None, &c));
+            println!("{}", format_trace(&t, &c));
+        }
+        return;
+    }
+
     let p = plan(&manifest, &task, &options);
     // The CLI verifies the manifest signature by default and attaches the result
     // to the plan (mirrors the TS reference); the pure planner stays signature-free.
@@ -181,4 +203,30 @@ fn cmd_validate(a: &Args) {
         println!("{}", format_validation(&report, &Colors::auto()));
     }
     exit(if report.ok { 0 } else { 1 });
+}
+
+fn cmd_diff(a: &Args) {
+    if a.positionals.len() < 2 {
+        eprintln!("Usage: kcp-planner diff <a.json> <b.json> [--json]\n\n{}", USAGE);
+        exit(2);
+    }
+    let load = |path: &str| -> kcp_planner::AgentPlan {
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| {
+            eprintln!("kcp-planner: {}: {}", path, e);
+            exit(1);
+        });
+        plan_from_artifact(&text).unwrap_or_else(|e| {
+            eprintln!("kcp-planner: {}: {}", path, e);
+            exit(1);
+        })
+    };
+    let plan_a = load(&a.positionals[0]);
+    let plan_b = load(&a.positionals[1]);
+    let d = diff_plans(&plan_a, &plan_b);
+    if a.json {
+        println!("{}", serde_json::to_string_pretty(&d).unwrap());
+    } else {
+        println!("{}", format_diff(&d, &Colors::auto()));
+    }
+    exit(if d.identical { 0 } else { 1 });
 }
