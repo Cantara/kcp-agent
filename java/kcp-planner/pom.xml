@@ -4,9 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>no.cantara.kcp</groupId>
+  <parent>
+    <groupId>no.cantara.kcp</groupId>
+    <artifactId>kcp-planner-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
   <artifactId>kcp-planner</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>KCP Planner</name>
@@ -19,21 +23,7 @@
   </description>
   <url>https://github.com/Cantara/kcp-agent</url>
 
-  <licenses>
-    <license>
-      <name>Apache-2.0</name>
-      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
-    </license>
-  </licenses>
-
-  <scm>
-    <connection>scm:git:https://github.com/Cantara/kcp-agent.git</connection>
-    <url>https://github.com/Cantara/kcp-agent</url>
-  </scm>
-
   <properties>
-    <maven.compiler.release>17</maven.compiler.release>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <snakeyaml-engine.version>2.7</snakeyaml-engine.version>
     <junit.version>5.11.3</junit.version>
   </properties>
@@ -61,18 +51,7 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.13.0</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.2</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.4.1</version>
         <configuration>
           <archive>
             <!-- The MCP stdio server entry point. A self-contained runnable jar
