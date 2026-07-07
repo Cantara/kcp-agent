@@ -18,10 +18,12 @@
   "scripts": {
     "build": "tsc",
     "build:site": "node scripts/build-site.mjs",
+    "build:wasm": "node scripts/build-wasm.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:vectors": "node scripts/gen-vectors.mjs",
     "gen:rust-fixtures": "node scripts/gen-rust-fixtures.mjs",
+    "wasm:parity": "node scripts/wasm-parity.mjs",
     "agent": "node dist/cli.js"
   },
   "keywords": [
