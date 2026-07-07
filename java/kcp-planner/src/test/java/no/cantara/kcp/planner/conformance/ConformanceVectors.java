@@ -173,6 +173,16 @@ public final class ConformanceVectors {
                 parseExpect(asMap(m.get("expect"))));
     }
 
+    /** Parse a JSON (or YAML) string into a generic object tree. */
+    public static Object parseJson(String text) {
+        return new Load(LoadSettings.builder().build()).loadFromString(text);
+    }
+
+    /** Build {@link PlanOptions} from a parsed options map (shared with the trace/diff harness). */
+    public static PlanOptions optionsFromMap(Map<?, ?> o) {
+        return parseOptions(o);
+    }
+
     private static PlanOptions parseOptions(Map<?, ?> o) {
         PlanOptions.Builder b = PlanOptions.builder();
         if (o == null) {

@@ -19,9 +19,21 @@ const { trace } = await load('trace.js');
 const { diffPlans } = await load('diff.js');
 
 const VDIR = path.join(ROOT, 'vectors');
-const OUT = path.join(ROOT, 'rust', 'kcp-planner', 'fixtures');
-mkdirSync(path.join(OUT, 'trace'), { recursive: true });
-mkdirSync(path.join(OUT, 'diff'), { recursive: true });
+// The golden fixtures back the trace/diff conformance tests in BOTH ports; write
+// a copy into each so each module's tests stay self-contained (Rust reads from
+// its crate dir, Java from its classpath test resources).
+const OUT_DIRS = [
+  path.join(ROOT, 'rust', 'kcp-planner', 'fixtures'),
+  path.join(ROOT, 'java', 'kcp-planner', 'src', 'test', 'resources', 'fixtures'),
+];
+for (const out of OUT_DIRS) {
+  mkdirSync(path.join(out, 'trace'), { recursive: true });
+  mkdirSync(path.join(out, 'diff'), { recursive: true });
+}
+const writeFixture = (kind, file, data) => {
+  const body = JSON.stringify(data, null, 2) + '\n';
+  for (const out of OUT_DIRS) writeFileSync(path.join(out, kind, file), body);
+};
 
 // A trace fixture omits the embedded canonical `plan` (already conformance-
 // tested via vectors/) and keeps the trace-specific projection.
@@ -37,12 +49,38 @@ const vectors = readdirSync(VDIR).filter((f) => f.endsWith('.json')).sort();
 for (const f of vectors) {
   const v = JSON.parse(readFileSync(path.join(VDIR, f), 'utf8'));
   const t = trace(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
-  writeFileSync(
-    path.join(OUT, 'trace', f),
-    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: traceOutcome(t) }, null, 2) + '\n'
-  );
+  writeFixture('trace', f, { name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: traceOutcome(t) });
 }
 console.log(`wrote ${vectors.length} trace fixtures`);
+
+// Plan-JSON fixtures (Java only — the Rust port has its own json.rs tests). `expect`
+// is the exact `JSON.stringify(plan, null, 2)` of the pure plan (no loader-added
+// sha256/signature), so the Java plan serializer can be checked byte-for-byte.
+const JAVA_PLAN = path.join(OUT_DIRS[1], 'plan');
+mkdirSync(JAVA_PLAN, { recursive: true });
+for (const f of vectors) {
+  const v = JSON.parse(readFileSync(path.join(VDIR, f), 'utf8'));
+  const p = plan(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
+  writeFileSync(
+    path.join(JAVA_PLAN, f),
+    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: JSON.stringify(p, null, 2) }, null, 2) + '\n'
+  );
+}
+console.log(`wrote ${vectors.length} plan-json fixtures`);
+
+// Trace-JSON fixtures (Java only) — the full `JSON.stringify(trace, null, 2)` the
+// kcp_trace MCP tool returns, embedded plan and all.
+const JAVA_TRACEJSON = path.join(OUT_DIRS[1], 'tracejson');
+mkdirSync(JAVA_TRACEJSON, { recursive: true });
+for (const f of vectors) {
+  const v = JSON.parse(readFileSync(path.join(VDIR, f), 'utf8'));
+  const t = trace(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
+  writeFileSync(
+    path.join(JAVA_TRACEJSON, f),
+    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: JSON.stringify(t, null, 2) }, null, 2) + '\n'
+  );
+}
+console.log(`wrote ${vectors.length} trace-json fixtures`);
 
 // Diff fixtures: same manifest, two option sets (a → b), plus one identical pair.
 const manifestOf = (name) => JSON.parse(readFileSync(path.join(VDIR, `${name}.json`), 'utf8')).manifest;
@@ -83,9 +121,6 @@ for (const c of diffCases) {
   const m = parseManifest(c.manifest, c.name);
   const pa = plan(m, c.task, c.a);
   const pb = plan(m, c.task, c.b);
-  writeFileSync(
-    path.join(OUT, 'diff', `${c.name}.json`),
-    JSON.stringify({ name: c.name, manifest: c.manifest, task: c.task, a: c.a, b: c.b, expect: diffPlans(pa, pb) }, null, 2) + '\n'
-  );
+  writeFixture('diff', `${c.name}.json`, { name: c.name, manifest: c.manifest, task: c.task, a: c.a, b: c.b, expect: diffPlans(pa, pb) });
 }
 console.log(`wrote ${diffCases.length} diff fixtures`);

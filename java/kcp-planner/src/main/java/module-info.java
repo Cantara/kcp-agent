@@ -8,7 +8,17 @@
  */
 module no.cantara.kcp.planner {
     requires org.snakeyaml.engine.v2;
+    requires java.net.http;
 
     exports no.cantara.kcp.planner;
     exports no.cantara.kcp.planner.model;
+    exports no.cantara.kcp.planner.trace;
+    exports no.cantara.kcp.planner.diff;
+    exports no.cantara.kcp.planner.verify;
+    exports no.cantara.kcp.planner.client;
+    exports no.cantara.kcp.planner.json;
+    exports no.cantara.kcp.planner.mcp;
+    exports no.cantara.kcp.planner.validate;
+    exports no.cantara.kcp.planner.content;
+    exports no.cantara.kcp.planner.replay;
 }

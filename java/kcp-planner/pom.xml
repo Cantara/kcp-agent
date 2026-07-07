@@ -73,6 +73,16 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>3.4.1</version>
+        <configuration>
+          <archive>
+            <!-- The MCP stdio server entry point. A self-contained runnable jar
+                 (with the snakeyaml-engine dependency bundled) is assembled in the
+                 release phase (#68); the Main-Class is declared here. -->
+            <manifest>
+              <mainClass>no.cantara.kcp.planner.mcp.McpServer</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
       </plugin>
     </plugins>
   </build>

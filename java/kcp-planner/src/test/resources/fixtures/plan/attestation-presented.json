@@ -1,0 +1,20 @@
+{
+  "name": "attestation-presented",
+  "manifest": "kcp_version: \"0.25\"\nproject: cert\nversion: 1.0.0\ntrust:\n  agent_requirements:\n    require_attestation: true\n    trusted_providers: [soc.cert.example]\nunits:\n  - id: advisory\n    path: advisories/zero-day.md\n    intent: \"Zero-day advisory for the incident response team\"\n    audience: [agent]\n    triggers: [zero-day, advisory, incident]\n    access: restricted\n",
+  "task": "zero-day incident advisory",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ],
+      "attestationProvider": "soc.cert.example",
+      "credentials": [
+        "mtls"
+      ]
+    }
+  },
+  "expect": "{\n  \"task\": \"zero-day incident advisory\",\n  \"manifest\": {\n    \"project\": \"cert\",\n    \"version\": \"1.0.0\",\n    \"kcpVersion\": \"0.25\",\n    \"source\": \"attestation-presented\"\n  },\n  \"trust\": {\n    \"requiresAttestation\": true,\n    \"agentCanAttest\": true,\n    \"note\": \"manifest requires attestation; the agent can present it\"\n  },\n  \"asOf\": \"2026-07-06\",\n  \"options\": {\n    \"capabilities\": {\n      \"role\": \"agent\",\n      \"paymentMethods\": [\n        \"free\",\n        \"x402\"\n      ],\n      \"credentials\": [\n        \"mtls\"\n      ],\n      \"attestationProvider\": \"soc.cert.example\"\n    },\n    \"maxUnits\": 5,\n    \"strict\": false\n  },\n  \"selected\": [\n    {\n      \"id\": \"advisory\",\n      \"path\": \"advisories/zero-day.md\",\n      \"intent\": \"Zero-day advisory for the incident response team\",\n      \"score\": 34,\n      \"reasons\": [\n        \"intent matches 4 term(s)\",\n        \"triggers match 4 term(s)\",\n        \"id/path matches 3 term(s)\"\n      ],\n      \"payment\": {\n        \"method\": \"free\",\n        \"affordable\": true\n      },\n      \"requiresAttestation\": true,\n      \"loadEligible\": true\n    }\n  ],\n  \"skipped\": [],\n  \"federation\": [],\n  \"budget\": {\n    \"rateTier\": \"default\",\n    \"perRequestCosts\": [],\n    \"note\": \"all selected units are free to load at the resolved tier.\"\n  },\n  \"context\": {\n    \"approximate\": false,\n    \"unmeasured\": 1,\n    \"note\": \"no context budget set.\"\n  },\n  \"warnings\": []\n}"
+}

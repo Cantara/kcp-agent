@@ -1,0 +1,16 @@
+{
+  "name": "audience-role-excludes",
+  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n",
+  "task": "merger salary review",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": "{\n  \"task\": \"merger salary review\",\n  \"manifest\": {\n    \"project\": \"hr\",\n    \"version\": \"1.0.0\",\n    \"kcpVersion\": \"0.25\",\n    \"source\": \"audience-role-excludes\"\n  },\n  \"trust\": {\n    \"requiresAttestation\": false,\n    \"agentCanAttest\": true,\n    \"note\": \"no manifest-level attestation requirement\"\n  },\n  \"asOf\": \"2026-07-06\",\n  \"options\": {\n    \"capabilities\": {\n      \"role\": \"agent\",\n      \"paymentMethods\": [\n        \"free\",\n        \"x402\"\n      ],\n      \"credentials\": []\n    },\n    \"maxUnits\": 5,\n    \"strict\": false\n  },\n  \"selected\": [],\n  \"skipped\": [\n    {\n      \"id\": \"salary-review\",\n      \"reason\": \"audience [\\\"human\\\"] excludes role 'agent'\"\n    },\n    {\n      \"id\": \"press-kit\",\n      \"reason\": \"not_for declares it does not serve 'salary negotiation'\"\n    }\n  ],\n  \"federation\": [],\n  \"budget\": {\n    \"rateTier\": \"default\",\n    \"perRequestCosts\": [],\n    \"note\": \"all selected units are free to load at the resolved tier.\"\n  },\n  \"context\": {\n    \"approximate\": false,\n    \"unmeasured\": 0,\n    \"note\": \"no context budget set.\"\n  },\n  \"warnings\": []\n}"
+}

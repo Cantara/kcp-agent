@@ -1,0 +1,16 @@
+{
+  "name": "temporal-supersession-overlap",
+  "manifest": "kcp_version: \"0.25\"\nproject: newsroom\nversion: 1.0.0\nunits:\n  - id: award-rumour\n    path: stories/rumour.md\n    intent: \"Rumour round-up: who is favourite for the sovereign compute award?\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, rumour]\n    temporal:\n      valid_from: \"2026-06-28\"\n      valid_until: \"2026-07-05\"\n      superseded_by: award-exclusive\n  - id: award-exclusive\n    path: stories/award.md\n    intent: \"Exclusive: the sovereign compute award decision\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, exclusive]\n    temporal:\n      valid_from: \"2026-07-05\"\n",
+  "task": "sovereign compute award",
+  "options": {
+    "asOf": "2026-07-05",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": "{\n  \"task\": \"sovereign compute award\",\n  \"manifest\": {\n    \"project\": \"newsroom\",\n    \"version\": \"1.0.0\",\n    \"kcpVersion\": \"0.25\",\n    \"source\": \"temporal-supersession-overlap\"\n  },\n  \"trust\": {\n    \"requiresAttestation\": false,\n    \"agentCanAttest\": true,\n    \"note\": \"no manifest-level attestation requirement\"\n  },\n  \"asOf\": \"2026-07-05\",\n  \"options\": {\n    \"capabilities\": {\n      \"role\": \"agent\",\n      \"paymentMethods\": [\n        \"free\",\n        \"x402\"\n      ],\n      \"credentials\": []\n    },\n    \"maxUnits\": 5,\n    \"strict\": false\n  },\n  \"selected\": [\n    {\n      \"id\": \"award-exclusive\",\n      \"path\": \"stories/award.md\",\n      \"intent\": \"Exclusive: the sovereign compute award decision\",\n      \"score\": 23,\n      \"reasons\": [\n        \"intent matches 3 term(s)\",\n        \"triggers match 3 term(s)\",\n        \"id/path matches 1 term(s)\"\n      ],\n      \"payment\": {\n        \"method\": \"free\",\n        \"affordable\": true\n      },\n      \"requiresAttestation\": false,\n      \"loadEligible\": true\n    }\n  ],\n  \"skipped\": [\n    {\n      \"id\": \"award-rumour\",\n      \"reason\": \"superseded by award-exclusive (successor active)\"\n    }\n  ],\n  \"federation\": [],\n  \"budget\": {\n    \"rateTier\": \"default\",\n    \"perRequestCosts\": [],\n    \"note\": \"all selected units are free to load at the resolved tier.\"\n  },\n  \"context\": {\n    \"approximate\": false,\n    \"unmeasured\": 1,\n    \"note\": \"no context budget set.\"\n  },\n  \"warnings\": []\n}"
+}

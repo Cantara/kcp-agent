@@ -1,0 +1,17 @@
+{
+  "name": "federation-context-identity",
+  "manifest": "kcp_version: \"0.25\"\nproject: platform-hub\nversion: 1.0.0\nunits:\n  - id: deploy-guide\n    path: docs/deploy.md\n    intent: \"How to deploy to production\"\n    audience: [agent]\n    triggers: [deploy, production, release]\nmanifests:\n  - id: platform-prod\n    url: https://prod.example.com/knowledge.yaml\n    context: [prod]\n  - id: platform-dev\n    url: https://dev.example.com/knowledge.yaml\n    context: [dev, test]\n  - id: vendor\n    url: https://vendor.example.com/knowledge.yaml\n    agent_identity: { required: true, credential_hint: vendor_token }\n",
+  "task": "deploy to production",
+  "options": {
+    "env": "prod",
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": "{\n  \"task\": \"deploy to production\",\n  \"manifest\": {\n    \"project\": \"platform-hub\",\n    \"version\": \"1.0.0\",\n    \"kcpVersion\": \"0.25\",\n    \"source\": \"federation-context-identity\"\n  },\n  \"trust\": {\n    \"requiresAttestation\": false,\n    \"agentCanAttest\": true,\n    \"note\": \"no manifest-level attestation requirement\"\n  },\n  \"environment\": \"prod\",\n  \"asOf\": \"2026-07-06\",\n  \"options\": {\n    \"capabilities\": {\n      \"role\": \"agent\",\n      \"paymentMethods\": [\n        \"free\",\n        \"x402\"\n      ],\n      \"credentials\": []\n    },\n    \"maxUnits\": 5,\n    \"strict\": false\n  },\n  \"selected\": [\n    {\n      \"id\": \"deploy-guide\",\n      \"path\": \"docs/deploy.md\",\n      \"intent\": \"How to deploy to production\",\n      \"score\": 16,\n      \"reasons\": [\n        \"intent matches 2 term(s)\",\n        \"triggers match 2 term(s)\",\n        \"id/path matches 1 term(s)\"\n      ],\n      \"payment\": {\n        \"method\": \"free\",\n        \"affordable\": true\n      },\n      \"requiresAttestation\": false,\n      \"loadEligible\": true\n    }\n  ],\n  \"skipped\": [],\n  \"federation\": [\n    {\n      \"id\": \"platform-prod\",\n      \"url\": \"https://prod.example.com/knowledge.yaml\",\n      \"selected\": true,\n      \"reason\": \"eligible\"\n    },\n    {\n      \"id\": \"platform-dev\",\n      \"url\": \"https://dev.example.com/knowledge.yaml\",\n      \"selected\": false,\n      \"reason\": \"context [\\\"dev\\\",\\\"test\\\"] excludes env 'prod'\"\n    },\n    {\n      \"id\": \"vendor\",\n      \"url\": \"https://vendor.example.com/knowledge.yaml\",\n      \"selected\": true,\n      \"reason\": \"needs vendor_token before fetch\",\n      \"credentialNeeded\": \"vendor_token\"\n    }\n  ],\n  \"budget\": {\n    \"rateTier\": \"default\",\n    \"perRequestCosts\": [],\n    \"note\": \"all selected units are free to load at the resolved tier.\"\n  },\n  \"context\": {\n    \"approximate\": false,\n    \"unmeasured\": 1,\n    \"note\": \"no context budget set.\"\n  },\n  \"warnings\": []\n}"
+}
