@@ -135,3 +135,23 @@ export {
   type PlanDigest,
   type Convergence,
 } from "./loop.js";
+export { startServer, type ServeOptions } from "./serve.js";
+export { runCycle, watchManifest, type WatchOptions, type WatchEvent, type WatchCycleResult } from "./watch.js";
+export { initManifest, type InitOptions } from "./init.js";
+export {
+  discoverManifest,
+  crawlSite,
+  generateWebManifest,
+  extractTitle,
+  extractHeadings,
+  extractLinks,
+  parseRobotsTxt,
+  isDisallowed,
+  wellKnownPaths,
+  slugify,
+  type DiscoverResult,
+  type CrawlOptions,
+  type CrawlResult,
+  type PageInfo,
+  type GenOptions,
+} from "./discover.js";

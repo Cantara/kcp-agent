@@ -266,6 +266,10 @@ const USAGE =
   '  kcp-agent recall   "<task>" --memory <dir> [--replay] [--limit <n>]\n' +
   '  kcp-agent diff     <a.json> <b.json> [--json]\n' +
   '  kcp-agent mcp\n' +
+  '  kcp-agent serve    [--port <n>] [--api-key <key>]\n' +
+  '  kcp-agent watch    <path|dir> [--task "<task>"] [--diff] [--once] [--json]\n' +
+  '  kcp-agent init     [dir] [--publisher <name>] [--dry-run] [--force]\n' +
+  '  kcp-agent discover <url>\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
 async function main() {
@@ -278,6 +282,65 @@ async function main() {
 
   if (a.command === "mcp") {
     await serveMcp();
+    return;
+  }
+
+  if (a.command === "serve") {
+    const { startServer } = await import("./serve.js");
+    const port = a.maxUnits ?? 3100; // reuse --max-units slot for port, or check positionals
+    const portNum = a.positionals.length ? Number(a.positionals[0]) : port;
+    const server = startServer(isNaN(portNum) || portNum === 0 ? 3100 : portNum, { apiKey: a.apiKey });
+    const addr = server.address();
+    const p = typeof addr === "object" && addr ? addr.port : portNum;
+    console.log(`kcp-agent HTTP server listening on port ${p}`);
+    return;
+  }
+
+  if (a.command === "watch") {
+    const { watchManifest, runCycle } = await import("./watch.js");
+    const location = a.manifest ?? a.task ?? a.positionals[0];
+    if (!location) { console.error("Missing manifest location.\n\n" + USAGE); process.exit(2); }
+    const task = a.task && a.positionals.length > 0 ? a.positionals.join(" ") : a.task;
+    const opts = { task, diff: process.argv.includes("--diff"), json: a.json, planOptions: buildPlanOptions(a), fetchGuard: buildFetchGuard(a) };
+    if (process.argv.includes("--once")) {
+      const result = await runCycle(location, undefined, opts);
+      if (a.json) { console.log(JSON.stringify(result)); }
+      else {
+        if (!result.validation.ok) { console.error("Manifest validation failed."); process.exit(1); }
+        console.log("Manifest valid.");
+      }
+      process.exit(result.validation.ok ? 0 : 1);
+    }
+    await watchManifest(location, opts);
+    return;
+  }
+
+  if (a.command === "init") {
+    const { initManifest } = await import("./init.js");
+    const dir = a.positionals[0] ?? ".";
+    const dryRun = process.argv.includes("--dry-run");
+    const force = process.argv.includes("--force");
+    const publisher = a.attest; // reuse --attest for publisher name
+    const yaml = await initManifest(dir, { publisher, dryRun, force });
+    if (dryRun) { console.log(yaml); } else { console.log(`knowledge.yaml written to ${dir}`); }
+    return;
+  }
+
+  if (a.command === "discover") {
+    const { discoverManifest, crawlSite, generateWebManifest } = await import("./discover.js");
+    const url = a.task ?? a.positionals[0];
+    if (!url) { console.error("Missing URL.\n\n" + USAGE); process.exit(2); }
+    const guard = buildFetchGuard(a);
+    const result = await discoverManifest(url, guard);
+    if (result.found) {
+      console.log(`Found manifest at ${result.url}`);
+      if (a.json) console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(`No manifest found. Crawling ${url}...`);
+      const crawl = await crawlSite(url, { maxPages: 20 }, guard);
+      const yaml = generateWebManifest(crawl);
+      if (a.json) { console.log(JSON.stringify({ crawl, yaml }, null, 2)); } else { console.log(yaml); }
+    }
     return;
   }
 
