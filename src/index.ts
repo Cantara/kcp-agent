@@ -36,19 +36,6 @@ export {
   type GroundedReplayOptions,
 } from "./replayground.js";
 export {
-  groundAnswer,
-  splitClaims,
-  makeClaudeVerifier,
-  DEFAULT_MAX_GAPS,
-  type GroundUnit,
-  type GroundedAnswer,
-  type ClaimVerdict,
-  type Gap,
-  type GroundStatus,
-  type Verifier,
-  type GroundOptions,
-} from "./ground.js";
-export {
   groundingLoop,
   type GroundRoundFn,
   type GroundLoopStatus,
@@ -106,13 +93,39 @@ export {
   type ReasonChange,
 } from "./diff.js";
 export { outcomeOf, runVector, type VectorOutcome, type ConformanceVector } from "./vectors.js";
-export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
+export {
+  resolveProvider,
+  AnthropicProvider,
+  OpenAICompatProvider,
+  type SynthesisProvider,
+  type Message,
+  type CompletionOptions,
+  type ResolveOptions,
+} from "./provider.js";
+export { synthesize, loadPlannedUnits, loadAnthropicSdk, buildSynthesisMessages, SYSTEM_PROMPT, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
+export {
+  groundAnswer,
+  splitClaims,
+  makeClaudeVerifier,
+  makeProviderVerifier,
+  makeVerifier,
+  DEFAULT_MAX_GAPS,
+  type GroundUnit,
+  type GroundedAnswer,
+  type ClaimVerdict,
+  type Gap,
+  type GroundStatus,
+  type Verifier,
+  type GroundOptions,
+} from "./ground.js";
 export {
   runLoop,
   askLoop,
   gateTerms,
   digestPlans,
   claudeCritic,
+  providerCritic,
+  makeCritic,
   type LoopOptions,
   type LoopResult,
   type LoopRound,
@@ -122,3 +135,23 @@ export {
   type PlanDigest,
   type Convergence,
 } from "./loop.js";
+export { startServer, type ServeOptions } from "./serve.js";
+export { runCycle, watchManifest, type WatchOptions, type WatchEvent, type WatchCycleResult } from "./watch.js";
+export { initManifest, type InitOptions } from "./init.js";
+export {
+  discoverManifest,
+  crawlSite,
+  generateWebManifest,
+  extractTitle,
+  extractHeadings,
+  extractLinks,
+  parseRobotsTxt,
+  isDisallowed,
+  wellKnownPaths,
+  slugify,
+  type DiscoverResult,
+  type CrawlOptions,
+  type CrawlResult,
+  type PageInfo,
+  type GenOptions,
+} from "./discover.js";

@@ -34,7 +34,9 @@
 //   --trace               show the decision trace: per-unit gate cascade (plan only)
 //   --json                emit the result as JSON
 //   ask only:
-//   --model <id>          Claude model id (default: claude-opus-4-8)
+//   --model <id>          model id: provider/model (e.g. openai/gpt-4o, anthropic/claude-opus-4-8)
+//   --base-url <url>      base URL for OpenAI-compatible endpoints (overrides provider default)
+//   --api-key <key>       API key (alternative to env vars ANTHROPIC_API_KEY / OPENAI_API_KEY)
 //   --loop                audited critique loop: plan → LLM gap critique → re-plan → answer
 //   --max-rounds <n>      max critique rounds for --loop (default 3)
 //   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
@@ -53,7 +55,7 @@ import { planTree, plans, type FollowOptions } from "./follow.js";
 import { loadManifest } from "./client.js";
 import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay, formatRecall, formatTrace, formatDiff } from "./format.js";
 import { synthesize, loadAnthropicSdk, loadPlannedUnits, type SynthesisResult } from "./synthesize.js";
-import { groundAnswer, makeClaudeVerifier } from "./ground.js";
+import { groundAnswer, makeClaudeVerifier, makeVerifier } from "./ground.js";
 import { replayGroundedAnswer } from "./replayground.js";
 import { groundingLoop, type GroundRoundFn } from "./groundloop.js";
 import { askLoop } from "./loop.js";
@@ -64,6 +66,7 @@ import { toEntry, fileStore, recall, type MemoryEntry, type RecallReplay } from 
 import { reuse } from "./reuse.js";
 import { trace as traceDecision } from "./trace.js";
 import { diffPlans } from "./diff.js";
+import { type ResolveOptions } from "./provider.js";
 
 interface Args {
   command: string;
@@ -100,6 +103,8 @@ interface Args {
   replay: boolean;
   limit?: number;
   trace: boolean;
+  baseUrl?: string;
+  apiKey?: string;
   positionals: string[];
 }
 
@@ -143,6 +148,8 @@ function parseArgs(argv: string[]): Args {
       case "--replay": a.replay = true; break;
       case "--limit": a.limit = Number(next()); break;
       case "--trace": a.trace = true; break;
+      case "--base-url": a.baseUrl = next(); break;
+      case "--api-key": a.apiKey = next(); break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
         positionals.push(t);
@@ -172,6 +179,11 @@ function buildPlanOptions(a: Args): PlanOptions {
 
 function buildFetchGuard(a: Args): FetchGuard {
   return { allowPrivate: a.allowPrivateHosts };
+}
+
+function buildProviderOptions(a: Args): ResolveOptions | undefined {
+  if (!a.baseUrl && !a.apiKey) return undefined;
+  return { baseUrl: a.baseUrl, apiKey: a.apiKey };
 }
 
 /** The `--check-gaps` reground seam: re-plan the artifact's manifest today and see which gap claims now ground. */
@@ -254,6 +266,10 @@ const USAGE =
   '  kcp-agent recall   "<task>" --memory <dir> [--replay] [--limit <n>]\n' +
   '  kcp-agent diff     <a.json> <b.json> [--json]\n' +
   '  kcp-agent mcp\n' +
+  '  kcp-agent serve    [--port <n>] [--api-key <key>]\n' +
+  '  kcp-agent watch    <path|dir> [--task "<task>"] [--diff] [--once] [--json]\n' +
+  '  kcp-agent init     [dir] [--publisher <name>] [--dry-run] [--force]\n' +
+  '  kcp-agent discover <url>\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
 async function main() {
@@ -266,6 +282,65 @@ async function main() {
 
   if (a.command === "mcp") {
     await serveMcp();
+    return;
+  }
+
+  if (a.command === "serve") {
+    const { startServer } = await import("./serve.js");
+    const port = a.maxUnits ?? 3100; // reuse --max-units slot for port, or check positionals
+    const portNum = a.positionals.length ? Number(a.positionals[0]) : port;
+    const server = startServer(isNaN(portNum) || portNum === 0 ? 3100 : portNum, { apiKey: a.apiKey });
+    const addr = server.address();
+    const p = typeof addr === "object" && addr ? addr.port : portNum;
+    console.log(`kcp-agent HTTP server listening on port ${p}`);
+    return;
+  }
+
+  if (a.command === "watch") {
+    const { watchManifest, runCycle } = await import("./watch.js");
+    const location = a.manifest ?? a.task ?? a.positionals[0];
+    if (!location) { console.error("Missing manifest location.\n\n" + USAGE); process.exit(2); }
+    const task = a.task && a.positionals.length > 0 ? a.positionals.join(" ") : a.task;
+    const opts = { task, diff: process.argv.includes("--diff"), json: a.json, planOptions: buildPlanOptions(a), fetchGuard: buildFetchGuard(a) };
+    if (process.argv.includes("--once")) {
+      const result = await runCycle(location, undefined, opts);
+      if (a.json) { console.log(JSON.stringify(result)); }
+      else {
+        if (!result.validation.ok) { console.error("Manifest validation failed."); process.exit(1); }
+        console.log("Manifest valid.");
+      }
+      process.exit(result.validation.ok ? 0 : 1);
+    }
+    await watchManifest(location, opts);
+    return;
+  }
+
+  if (a.command === "init") {
+    const { initManifest } = await import("./init.js");
+    const dir = a.positionals[0] ?? ".";
+    const dryRun = process.argv.includes("--dry-run");
+    const force = process.argv.includes("--force");
+    const publisher = a.attest; // reuse --attest for publisher name
+    const yaml = await initManifest(dir, { publisher, dryRun, force });
+    if (dryRun) { console.log(yaml); } else { console.log(`knowledge.yaml written to ${dir}`); }
+    return;
+  }
+
+  if (a.command === "discover") {
+    const { discoverManifest, crawlSite, generateWebManifest } = await import("./discover.js");
+    const url = a.task ?? a.positionals[0];
+    if (!url) { console.error("Missing URL.\n\n" + USAGE); process.exit(2); }
+    const guard = buildFetchGuard(a);
+    const result = await discoverManifest(url, guard);
+    if (result.found) {
+      console.log(`Found manifest at ${result.url}`);
+      if (a.json) console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(`No manifest found. Crawling ${url}...`);
+      const crawl = await crawlSite(url, { maxPages: 20 }, guard);
+      const yaml = generateWebManifest(crawl);
+      if (a.json) { console.log(JSON.stringify({ crawl, yaml }, null, 2)); } else { console.log(yaml); }
+    }
     return;
   }
 
@@ -348,6 +423,7 @@ async function main() {
       loopModel: a.loopModel,
       synthesisModel: a.model,
       followOptions: buildFollowOptions(a),
+      providerOptions: buildProviderOptions(a),
     });
     if (a.json) { console.log(JSON.stringify(r, null, 2)); return; }
     console.log(formatPlan(r.basePlans[0]));
@@ -373,13 +449,13 @@ async function main() {
       const budgetBlocked = ps.some((p) => p.skipped.some((s) => /over budget/.test(s.reason)));
       // Synthesis answers the ORIGINAL task; expansion only steered discovery.
       const synthPlans = ps.map((p, i) => (i === 0 ? { ...p, task: a.task! } : p));
-      const syn = await synthesize(synthPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
+      const syn = await synthesize(synthPlans, { model: a.model, fetchGuard: buildFetchGuard(a), providerOptions: buildProviderOptions(a) });
       return { units: syn.unitsLoaded, answer: syn.answer, budgetBlocked };
     };
     const loop = await groundingLoop({
       task: a.task,
       navigate,
-      verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
+      verifier: makeVerifier(a.groundModel, buildProviderOptions(a)),
       maxRounds: a.groundRounds,
     });
     if (a.json) { console.log(JSON.stringify(loop, null, 2)); return; }
@@ -462,12 +538,12 @@ async function main() {
     if (!a.json && d.status === "drifted") console.log(`\n⚠ cached answer stale (${d.detail}) — re-answering.`);
   }
 
-  const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
+  const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a), providerOptions: buildProviderOptions(a) });
 
   // --ground: verify the answer against the loaded units and surface the gaps.
   const grounding = a.ground
     ? await groundAnswer(a.task, result.answer, result.unitsLoaded, {
-        verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
+        verifier: makeVerifier(a.groundModel, buildProviderOptions(a)),
       })
     : undefined;
 
