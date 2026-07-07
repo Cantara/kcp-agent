@@ -8,9 +8,12 @@
  */
 module no.cantara.kcp.planner {
     requires org.snakeyaml.engine.v2;
+    requires java.net.http;
 
     exports no.cantara.kcp.planner;
     exports no.cantara.kcp.planner.model;
     exports no.cantara.kcp.planner.trace;
     exports no.cantara.kcp.planner.diff;
+    exports no.cantara.kcp.planner.verify;
+    exports no.cantara.kcp.planner.client;
 }

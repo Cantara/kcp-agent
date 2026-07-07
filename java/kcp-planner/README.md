@@ -107,6 +107,37 @@ if (!d.identical()) {
 Both are pure. Because the planner is deterministic, every difference has a cause —
 the diff names the symptoms; the trace explains them.
 
+## Network & signature verification
+
+`ManifestClient` loads a manifest from a local path, a directory, or an `https://`
+URL, computes the SHA-256 of the exact bytes, and can verify its Ed25519 signature:
+
+```java
+ManifestClient client = ManifestClient.builder()
+    .timeout(Duration.ofSeconds(10))
+    .build();                         // HTTPS-only to public hosts by default
+LoadedManifest lm = client.load("https://example.com/knowledge.yaml", true /* verify */);
+if (lm.signature() != null && !lm.signature().verified()) {
+    throw new IllegalStateException("untrusted manifest: " + lm.signature().detail());
+}
+AgentPlan plan = KcpPlanner.plan(lm.manifest(), "how do I deploy?");
+```
+
+Every remote read funnels through an **SSRF guard** (`SsrfGuard`): cleartext `http://`
+to remote hosts is refused, private / loopback / link-local / multicast addresses are
+refused, and the host is resolved and every resolved address checked *before* the
+connection — so a name that rebinds to `127.0.0.1` or `169.254.169.254` is refused.
+Redirects are followed manually and re-checked at each hop; the response is bounded in
+size and time. No external HTTP dependency — `java.net.http.HttpClient`.
+
+`ManifestVerifier` verifies Ed25519 signatures (JDK-native) over the exact manifest
+bytes, fail-closed: a present-but-wrong signature is always `invalid`; a signature that
+can't be fetched is `unverifiable`, never silently downgraded to `unsigned`.
+
+`FederationWalker` walks a federated manifest tree — planning the root, then following
+each selected, un-credential-gated sub-manifest through the same guard — and propagates
+the spend committed upstream so the money budget is enforced tree-wide.
+
 ## Conformance
 
 The proof is the [`vectors/`](../../vectors) corpus: `(manifest, task, options) →
@@ -122,7 +153,7 @@ mvn clean test
 
 ## Scope
 
-This is the deterministic core — `plan`, `trace`, `diff`, and (in later phases)
-`validate`, a manifest client with signature verification, an MCP server, and a Spring
-Boot starter. There is no LLM synthesis, episodic memory, or `ask` command; those remain
-in the TypeScript agent.
+This is the deterministic core — `plan`, `trace`, `diff`, a manifest client with SSRF
+guard and Ed25519 verification, and (in later phases) `validate`, an MCP server, and a
+Spring Boot starter. There is no LLM synthesis, episodic memory, or `ask` command; those
+remain in the TypeScript agent.
