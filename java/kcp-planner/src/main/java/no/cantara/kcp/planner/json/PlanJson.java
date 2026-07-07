@@ -36,6 +36,16 @@ public final class PlanJson {
         return Json.write(toValue(p, options));
     }
 
+    /** Serialize a plan with the manifest's SHA-256 attached (as the loader adds it). */
+    @SuppressWarnings("unchecked")
+    public static String toJson(AgentPlan p, PlanOptions options, String sha256) {
+        Map<String, Object> root = toValue(p, options);
+        if (sha256 != null) {
+            ((Map<String, Object>) root.get("manifest")).put("sha256", sha256);
+        }
+        return Json.write(root);
+    }
+
     /** Build the ordered value tree for an {@link AgentPlan}. */
     public static Map<String, Object> toValue(AgentPlan p, PlanOptions options) {
         Map<String, Object> root = new LinkedHashMap<>();

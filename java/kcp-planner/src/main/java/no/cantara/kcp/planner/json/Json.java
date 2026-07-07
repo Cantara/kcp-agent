@@ -26,6 +26,48 @@ public final class Json {
         return sb.toString();
     }
 
+    /** Serialize to compact single-line JSON, matching {@code JSON.stringify(v)}. Used for the JSON-RPC framing. */
+    public static String writeCompact(Object value) {
+        StringBuilder sb = new StringBuilder();
+        writeCompact(value, sb);
+        return sb.toString();
+    }
+
+    private static void writeCompact(Object v, StringBuilder sb) {
+        if (v == null) {
+            sb.append("null");
+        } else if (v instanceof String s) {
+            writeString(s, sb);
+        } else if (v instanceof Boolean b) {
+            sb.append(b ? "true" : "false");
+        } else if (v instanceof Number n) {
+            sb.append(number(n));
+        } else if (v instanceof Map<?, ?> m) {
+            sb.append('{');
+            int i = 0;
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                if (i++ > 0) {
+                    sb.append(',');
+                }
+                writeString(e.getKey().toString(), sb);
+                sb.append(':');
+                writeCompact(e.getValue(), sb);
+            }
+            sb.append('}');
+        } else if (v instanceof List<?> l) {
+            sb.append('[');
+            for (int i = 0; i < l.size(); i++) {
+                if (i > 0) {
+                    sb.append(',');
+                }
+                writeCompact(l.get(i), sb);
+            }
+            sb.append(']');
+        } else {
+            throw new IllegalArgumentException("cannot serialize " + v.getClass());
+        }
+    }
+
     private static void write(Object v, StringBuilder sb, int indent) {
         if (v == null) {
             sb.append("null");

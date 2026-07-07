@@ -107,6 +107,23 @@ if (!d.identical()) {
 Both are pure. Because the planner is deterministic, every difference has a cause —
 the diff names the symptoms; the trace explains them.
 
+## MCP server
+
+The planner is exposed to any MCP client (Claude Desktop, Claude Code, custom agents)
+over stdio JSON-RPC 2.0 — newline-delimited framing, implemented directly, no SDK
+dependency:
+
+```bash
+java -jar kcp-planner.jar          # reads JSON-RPC from stdin, writes to stdout
+```
+
+Tools: `kcp_plan` (the inspectable load plan, with the manifest's SHA-256) and
+`kcp_trace` (the plan plus per-unit gate verdicts). Their JSON output is byte-for-byte
+identical to the TypeScript reference. `McpServer.handleMessage` is a pure
+request → response function; the `initialize` handshake, `tools/list`, and `tools/call`
+are unit-tested. (`kcp_load` / `kcp_validate` / `kcp_replay` land with their supporting
+ports.)
+
 ## Network & signature verification
 
 `ManifestClient` loads a manifest from a local path, a directory, or an `https://`

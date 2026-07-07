@@ -68,6 +68,20 @@ for (const f of vectors) {
 }
 console.log(`wrote ${vectors.length} plan-json fixtures`);
 
+// Trace-JSON fixtures (Java only) — the full `JSON.stringify(trace, null, 2)` the
+// kcp_trace MCP tool returns, embedded plan and all.
+const JAVA_TRACEJSON = path.join(OUT_DIRS[1], 'tracejson');
+mkdirSync(JAVA_TRACEJSON, { recursive: true });
+for (const f of vectors) {
+  const v = JSON.parse(readFileSync(path.join(VDIR, f), 'utf8'));
+  const t = trace(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
+  writeFileSync(
+    path.join(JAVA_TRACEJSON, f),
+    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: JSON.stringify(t, null, 2) }, null, 2) + '\n'
+  );
+}
+console.log(`wrote ${vectors.length} trace-json fixtures`);
+
 // Diff fixtures: same manifest, two option sets (a → b), plus one identical pair.
 const manifestOf = (name) => JSON.parse(readFileSync(path.join(VDIR, `${name}.json`), 'utf8')).manifest;
 const cap = (extra = {}) => ({ role: 'agent', paymentMethods: ['free', 'x402'], ...extra });
