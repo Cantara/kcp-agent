@@ -48,14 +48,18 @@ jobs:
   # trace/diff/JSON/verify fixtures and the starter's @SpringBootTest.
   java-conformance:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [17, 21] # the LTS baseline and the current LTS — the port must build on both
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: ${{ matrix.java }}
           cache: maven
-      - run: mvn -B -f java/pom.xml clean test
+      - run: mvn -B -f java/pom.xml clean verify
 
   # The browser WASM module must plan byte-identically to the native CLI — the
   # same Rust core, whether it targets a 0.8 MB binary or a 445 KB WASM module.
