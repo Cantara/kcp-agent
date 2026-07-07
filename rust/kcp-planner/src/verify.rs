@@ -301,3 +301,137 @@ fn import_public_key(material: &str) -> Result<VerifyingKey, String> {
     };
     VerifyingKey::from_bytes(&raw).map_err(|e| e.to_string())
 }
+
+// ── network verification ─────────────────────────────────────────────────────
+// The full path (a port of the complete verify.ts): fetch a remote signature/key
+// through the SSRF guard, and honor a pinned `trusted_key`. Reuses the sync crypto
+// helpers above; the offline `verify_manifest_text` stays untouched.
+
+/// Options for network verification (a port of TS `VerifyOptions`).
+#[cfg(feature = "network")]
+#[derive(Debug, Clone, Default)]
+pub struct VerifyOptions {
+    /// Pinned key material (path/URL/inline) — overrides any manifest/envelope key.
+    pub trusted_key: Option<String>,
+    pub guard: crate::fetch::FetchGuard,
+}
+
+/// Verify a manifest, fetching a remote signature/key through the guard. Mirrors
+/// the offline `verify_manifest_text` but completes the deferred remote path.
+#[cfg(feature = "network")]
+pub async fn verify_manifest_text_net(text: &str, signing: Option<&Signing>, source: Option<&str>, opts: &VerifyOptions) -> SignatureResult {
+    let s = match signing {
+        None => return SignatureResult::new("unsigned", "manifest declares no signature", None),
+        Some(s) => s,
+    };
+    let mut key_id = s.key_id.clone();
+    let signature = match &s.signature {
+        None => {
+            return SignatureResult::new("unverifiable", "manifest declares a signing block but no signature location — treating as unverified", key_id);
+        }
+        Some(sig) => sig,
+    };
+    if let Some(scheme) = &s.scheme {
+        let low = scheme.to_lowercase();
+        if low != "ed25519" && low != "eddsa" {
+            return SignatureResult::new("unverifiable", format!("unsupported signing scheme '{}'", scheme), key_id);
+        }
+    }
+
+    // Signature material (inline, local, or remote through the guard).
+    let raw_sig = match load_material_net(signature, source, &opts.guard).await {
+        Ok(v) => v,
+        Err(e) => return SignatureResult::new("unverifiable", format!("cannot load signature: {}", e), None),
+    };
+    let mut embedded_key: Option<String> = None;
+    let signature_material: String = match serde_json::from_str::<serde_json::Value>(&raw_sig) {
+        Ok(serde_json::Value::Object(env)) => {
+            let sig_field = env.get("signature").map(val_to_string).unwrap_or_default();
+            embedded_key = env.get("public_key").map(val_to_string);
+            if let Some(kid) = env.get("key_id") {
+                key_id = Some(val_to_string(kid));
+            }
+            if let Some(alg) = env.get("algorithm") {
+                let low = val_to_string(alg).to_lowercase();
+                if low != "ed25519" && low != "eddsa" {
+                    return SignatureResult::new("unverifiable", format!("unsupported signature algorithm '{}'", val_to_string(alg)), key_id);
+                }
+            }
+            sig_field
+        }
+        _ => raw_sig,
+    };
+
+    // Public key: a pinned key wins, then the manifest's declared key, then the
+    // envelope-embedded key (self-attesting).
+    let (key_material, via) = if let Some(tk) = &opts.trusted_key {
+        match load_material_net(tk, None, &opts.guard).await {
+            Ok(m) => (m, "pinned key"),
+            Err(e) => return SignatureResult::new("unverifiable", format!("cannot load public key: {}", e), key_id),
+        }
+    } else if let Some(pk) = &s.public_key {
+        match load_material_net(pk, source, &opts.guard).await {
+            Ok(m) => (m, "declared key"),
+            Err(_) if embedded_key.is_some() => (embedded_key.clone().unwrap(), "envelope key"),
+            Err(e) => return SignatureResult::new("unverifiable", format!("cannot load public key: {}", e), key_id),
+        }
+    } else if let Some(ek) = &embedded_key {
+        (ek.clone(), "envelope key")
+    } else {
+        return SignatureResult::new("unverifiable", "no public key available", key_id);
+    };
+
+    crypto_verify(text, &signature_material, &key_material, via, key_id)
+}
+
+/// The pure crypto tail shared by the offline and network verify paths.
+#[cfg(feature = "verify-ed25519")]
+fn crypto_verify(text: &str, sig_material: &str, key_material: &str, via: &str, key_id: Option<String>) -> SignatureResult {
+    let sig_bytes = match decode_bytes(sig_material) {
+        Some(b) if b.len() == 64 => b,
+        _ => return SignatureResult::new("invalid", "signature is not 64 ed25519 signature bytes", key_id),
+    };
+    let verifying_key = match import_public_key(key_material) {
+        Ok(k) => k,
+        Err(e) => return SignatureResult::new("unverifiable", format!("cannot import public key: {}", e), key_id),
+    };
+    let sig = Signature::from_bytes(&sig_bytes.as_slice().try_into().expect("checked len 64"));
+    for candidate in [text.to_string(), normalize_trailing_newline(text)] {
+        if verifying_key.verify(candidate.as_bytes(), &sig).is_ok() {
+            return SignatureResult::new("verified", format!("ed25519 signature verified ({})", via), key_id);
+        }
+    }
+    SignatureResult::new("invalid", "ed25519 signature does not match manifest bytes", key_id)
+}
+
+/// Resolve inline / local / remote material to a string. Inline is returned as-is;
+/// a relative location is resolved against `source` (URL join or path join); a URL
+/// is fetched through the guard.
+#[cfg(feature = "network")]
+async fn load_material_net(value: &str, source: Option<&str>, guard: &crate::fetch::FetchGuard) -> Result<String, String> {
+    if looks_inline(value) {
+        return Ok(value.to_string());
+    }
+    let loc = resolve_location_net(source, value);
+    if crate::client::is_url(&loc) {
+        return crate::fetch::guarded_fetch_text(&loc, guard).await;
+    }
+    std::fs::read_to_string(&loc).map_err(|e| format!("{}: {}", loc, e))
+}
+
+/// Resolve a location against a base that may itself be a URL (mirrors TS
+/// `resolveLocation`): URL base → URL join; path base → dir join.
+#[cfg(feature = "network")]
+fn resolve_location_net(base: Option<&str>, loc: &str) -> String {
+    if crate::client::is_url(loc) {
+        return loc.to_string();
+    }
+    if let Some(b) = base {
+        if crate::client::is_url(b) {
+            if let Ok(u) = reqwest::Url::parse(b).and_then(|bu| bu.join(loc)) {
+                return u.to_string();
+            }
+        }
+    }
+    resolve_location(base, loc)
+}
