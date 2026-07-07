@@ -15,7 +15,8 @@
 
 import type { AgentPlan } from "./planner.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
-import { synthesize, loadAnthropicSdk, type SynthesisResult } from "./synthesize.js";
+import { synthesize, loadAnthropicSdk, type SynthesisResult, type SynthesisOptions } from "./synthesize.js";
+import { type SynthesisProvider, type Message, resolveProvider, type ResolveOptions } from "./provider.js";
 
 /** Metadata-only view of a plan set, safe to show a model: no unit content. */
 export interface PlanDigest {
@@ -133,7 +134,47 @@ const CRITIC_SYSTEM =
   "relevance scoring. Respond with strict JSON only: " +
   '{"terms": ["..."], "note": "one short sentence"} — an empty terms array if the plan already covers the task.';
 
-/** The default critic: a fast Claude model proposing terms from the plan digest. */
+/**
+ * A critic backed by the pluggable provider interface — works with any model.
+ * This is the preferred way to create a critic in the multi-model world.
+ */
+export function providerCritic(provider: SynthesisProvider): Critic {
+  return async ({ task, round, digest, maxTerms }) => {
+    const messages: Message[] = [
+      { role: "system", content: CRITIC_SYSTEM },
+      {
+        role: "user",
+        content:
+          `Task: ${task}\nCritique round: ${round}\nPropose at most ${maxTerms} terms.\n\n` +
+          `Plan digest (metadata only):\n${JSON.stringify(digest, null, 2)}`,
+      },
+    ];
+    const text = await provider.complete(messages, { maxTokens: 512 });
+    // Fail closed on anything that isn't the JSON we asked for: no terms, loop converges.
+    try {
+      const json = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
+      const terms = Array.isArray(json.terms) ? json.terms.map(String) : [];
+      return { terms, note: typeof json.note === "string" ? json.note : undefined };
+    } catch {
+      return { terms: [], note: "critic output was not valid JSON — treated as no proposals" };
+    }
+  };
+}
+
+/**
+ * Build a critic from a model spec string (e.g. "openai/gpt-4o-mini").
+ * Resolves the provider and wraps it as a Critic.
+ */
+export function makeCritic(model?: string, options?: ResolveOptions): Critic {
+  const provider = resolveProvider(model ?? DEFAULT_LOOP_MODEL, options);
+  return providerCritic(provider);
+}
+
+/**
+ * The default critic: a fast Claude model proposing terms from the plan digest.
+ * @deprecated Use `providerCritic(resolveProvider(model))` or `makeCritic(model)` instead.
+ * Kept for backward compatibility.
+ */
 export function claudeCritic(model: string): Critic {
   return async ({ task, round, digest, maxTerms }) => {
     const Anthropic = await loadAnthropicSdk();
@@ -223,11 +264,15 @@ export async function runLoop(location: string, task: string, options: LoopOptio
 export async function askLoop(
   location: string,
   task: string,
-  options: LoopOptions & { synthesisModel?: string } = {}
+  options: LoopOptions & { synthesisModel?: string; providerOptions?: ResolveOptions } = {}
 ): Promise<LoopResult & { synthesis: SynthesisResult }> {
   const loop = await runLoop(location, task, options);
   // Synthesis answers the ORIGINAL task; expansion terms only steered discovery.
   const synthPlans = loop.finalPlans.map((p, i) => (i === 0 ? { ...p, task } : p));
-  const synthesis = await synthesize(synthPlans, { model: options.synthesisModel, fetchGuard: options.followOptions?.fetchGuard });
+  const synthesis = await synthesize(synthPlans, {
+    model: options.synthesisModel,
+    fetchGuard: options.followOptions?.fetchGuard,
+    providerOptions: options.providerOptions,
+  });
   return { ...loop, synthesis };
 }

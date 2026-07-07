@@ -36,19 +36,6 @@ export {
   type GroundedReplayOptions,
 } from "./replayground.js";
 export {
-  groundAnswer,
-  splitClaims,
-  makeClaudeVerifier,
-  DEFAULT_MAX_GAPS,
-  type GroundUnit,
-  type GroundedAnswer,
-  type ClaimVerdict,
-  type Gap,
-  type GroundStatus,
-  type Verifier,
-  type GroundOptions,
-} from "./ground.js";
-export {
   groundingLoop,
   type GroundRoundFn,
   type GroundLoopStatus,
@@ -106,13 +93,39 @@ export {
   type ReasonChange,
 } from "./diff.js";
 export { outcomeOf, runVector, type VectorOutcome, type ConformanceVector } from "./vectors.js";
-export { synthesize, loadPlannedUnits, loadAnthropicSdk, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
+export {
+  resolveProvider,
+  AnthropicProvider,
+  OpenAICompatProvider,
+  type SynthesisProvider,
+  type Message,
+  type CompletionOptions,
+  type ResolveOptions,
+} from "./provider.js";
+export { synthesize, loadPlannedUnits, loadAnthropicSdk, buildSynthesisMessages, SYSTEM_PROMPT, type SynthesisOptions, type SynthesisResult, type LoadedUnit } from "./synthesize.js";
+export {
+  groundAnswer,
+  splitClaims,
+  makeClaudeVerifier,
+  makeProviderVerifier,
+  makeVerifier,
+  DEFAULT_MAX_GAPS,
+  type GroundUnit,
+  type GroundedAnswer,
+  type ClaimVerdict,
+  type Gap,
+  type GroundStatus,
+  type Verifier,
+  type GroundOptions,
+} from "./ground.js";
 export {
   runLoop,
   askLoop,
   gateTerms,
   digestPlans,
   claudeCritic,
+  providerCritic,
+  makeCritic,
   type LoopOptions,
   type LoopResult,
   type LoopRound,

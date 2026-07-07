@@ -34,7 +34,9 @@
 //   --trace               show the decision trace: per-unit gate cascade (plan only)
 //   --json                emit the result as JSON
 //   ask only:
-//   --model <id>          Claude model id (default: claude-opus-4-8)
+//   --model <id>          model id: provider/model (e.g. openai/gpt-4o, anthropic/claude-opus-4-8)
+//   --base-url <url>      base URL for OpenAI-compatible endpoints (overrides provider default)
+//   --api-key <key>       API key (alternative to env vars ANTHROPIC_API_KEY / OPENAI_API_KEY)
 //   --loop                audited critique loop: plan → LLM gap critique → re-plan → answer
 //   --max-rounds <n>      max critique rounds for --loop (default 3)
 //   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
@@ -53,7 +55,7 @@ import { planTree, plans, type FollowOptions } from "./follow.js";
 import { loadManifest } from "./client.js";
 import { formatPlan, formatPlanTree, formatValidation, formatReplay, formatGrounded, formatGroundedReplay, formatRecall, formatTrace, formatDiff } from "./format.js";
 import { synthesize, loadAnthropicSdk, loadPlannedUnits, type SynthesisResult } from "./synthesize.js";
-import { groundAnswer, makeClaudeVerifier } from "./ground.js";
+import { groundAnswer, makeClaudeVerifier, makeVerifier } from "./ground.js";
 import { replayGroundedAnswer } from "./replayground.js";
 import { groundingLoop, type GroundRoundFn } from "./groundloop.js";
 import { askLoop } from "./loop.js";
@@ -64,6 +66,7 @@ import { toEntry, fileStore, recall, type MemoryEntry, type RecallReplay } from 
 import { reuse } from "./reuse.js";
 import { trace as traceDecision } from "./trace.js";
 import { diffPlans } from "./diff.js";
+import { type ResolveOptions } from "./provider.js";
 
 interface Args {
   command: string;
@@ -100,6 +103,8 @@ interface Args {
   replay: boolean;
   limit?: number;
   trace: boolean;
+  baseUrl?: string;
+  apiKey?: string;
   positionals: string[];
 }
 
@@ -143,6 +148,8 @@ function parseArgs(argv: string[]): Args {
       case "--replay": a.replay = true; break;
       case "--limit": a.limit = Number(next()); break;
       case "--trace": a.trace = true; break;
+      case "--base-url": a.baseUrl = next(); break;
+      case "--api-key": a.apiKey = next(); break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
         positionals.push(t);
@@ -172,6 +179,11 @@ function buildPlanOptions(a: Args): PlanOptions {
 
 function buildFetchGuard(a: Args): FetchGuard {
   return { allowPrivate: a.allowPrivateHosts };
+}
+
+function buildProviderOptions(a: Args): ResolveOptions | undefined {
+  if (!a.baseUrl && !a.apiKey) return undefined;
+  return { baseUrl: a.baseUrl, apiKey: a.apiKey };
 }
 
 /** The `--check-gaps` reground seam: re-plan the artifact's manifest today and see which gap claims now ground. */
@@ -348,6 +360,7 @@ async function main() {
       loopModel: a.loopModel,
       synthesisModel: a.model,
       followOptions: buildFollowOptions(a),
+      providerOptions: buildProviderOptions(a),
     });
     if (a.json) { console.log(JSON.stringify(r, null, 2)); return; }
     console.log(formatPlan(r.basePlans[0]));
@@ -373,13 +386,13 @@ async function main() {
       const budgetBlocked = ps.some((p) => p.skipped.some((s) => /over budget/.test(s.reason)));
       // Synthesis answers the ORIGINAL task; expansion only steered discovery.
       const synthPlans = ps.map((p, i) => (i === 0 ? { ...p, task: a.task! } : p));
-      const syn = await synthesize(synthPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
+      const syn = await synthesize(synthPlans, { model: a.model, fetchGuard: buildFetchGuard(a), providerOptions: buildProviderOptions(a) });
       return { units: syn.unitsLoaded, answer: syn.answer, budgetBlocked };
     };
     const loop = await groundingLoop({
       task: a.task,
       navigate,
-      verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
+      verifier: makeVerifier(a.groundModel, buildProviderOptions(a)),
       maxRounds: a.groundRounds,
     });
     if (a.json) { console.log(JSON.stringify(loop, null, 2)); return; }
@@ -462,12 +475,12 @@ async function main() {
     if (!a.json && d.status === "drifted") console.log(`\n⚠ cached answer stale (${d.detail}) — re-answering.`);
   }
 
-  const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a) });
+  const result = await synthesize(allPlans, { model: a.model, fetchGuard: buildFetchGuard(a), providerOptions: buildProviderOptions(a) });
 
   // --ground: verify the answer against the loaded units and surface the gaps.
   const grounding = a.ground
     ? await groundAnswer(a.task, result.answer, result.unitsLoaded, {
-        verifier: makeClaudeVerifier(loadAnthropicSdk, a.groundModel),
+        verifier: makeVerifier(a.groundModel, buildProviderOptions(a)),
       })
     : undefined;
 
