@@ -1,0 +1,32 @@
+[package]
+name = "kcp-planner-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WebAssembly bindings for the deterministic KCP planner — the same Rust core that builds to the CLI binary, running in a browser tab."
+license = "Apache-2.0"
+repository = "https://github.com/Cantara/kcp-agent"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# No signature verification in the browser (no filesystem) — this drops the
+# curve25519/ed25519 dependencies from the WASM module.
+kcp-planner = { path = "../kcp-planner", default-features = false }
+# preserve_order keeps JSON field order identical to the CLI (and the TS reference).
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+# Pinned to the installed wasm-bindgen CLI — the crate and the glue generator
+# must match exactly.
+wasm-bindgen = "=0.2.126"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+
+# "Protocol, not library": the same core that compiles to a small static binary
+# also compiles to a small WASM module. Size-optimize aggressively.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

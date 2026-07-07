@@ -1,11 +1,11 @@
 // Build the gh-pages site artifacts:
-//   1. docs/js/kcp-agent.js — the real planner/gate/formatter bundled for the
-//      browser (ESM, from site/entry.ts). Node builtins are stubbed; the
-//      Claude SDK stays external (the site never synthesizes).
+//   1. docs/js/kcp-demos.js — the LLM-adjacent demos (term gate + grounding),
+//      bundled for the browser (ESM, from site/demos-entry.ts). The deterministic
+//      planner itself is NOT here — it runs as WebAssembly (docs/pkg, built by
+//      scripts/build-wasm.mjs), the same Rust core the CLI binary runs.
 //   2. docs/examples/ — a copy of the example manifests the arena plans over.
-//   3. docs/js/bundle-info.json — the bundle's sha256, surfaced on the site's
-//      Receipts section so anyone can reproduce the hash from source.
-// All outputs are gitignored and rebuilt by CI and the Pages deploy.
+// All outputs are gitignored and rebuilt by CI and the Pages deploy. The WASM
+// module's integrity hash (the shipping planner) is written by build-wasm.mjs.
 
 import { build } from "esbuild";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -17,8 +17,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stub = path.join(ROOT, "site", "node-stub.js");
 
 await build({
-  entryPoints: [path.join(ROOT, "site", "entry.ts")],
-  outfile: path.join(ROOT, "docs", "js", "kcp-agent.js"),
+  entryPoints: [path.join(ROOT, "site", "demos-entry.ts")],
+  outfile: path.join(ROOT, "docs", "js", "kcp-demos.js"),
   bundle: true,
   format: "esm",
   platform: "browser",
@@ -39,12 +39,9 @@ await build({
   logLevel: "info",
 });
 
-const bundlePath = path.join(ROOT, "docs", "js", "kcp-agent.js");
+const bundlePath = path.join(ROOT, "docs", "js", "kcp-demos.js");
 const sha256 = createHash("sha256").update(readFileSync(bundlePath)).digest("hex");
-writeFileSync(
-  path.join(ROOT, "docs", "js", "bundle-info.json"),
-  JSON.stringify({ file: "js/kcp-agent.js", sha256 }, null, 2) + "\n"
-);
+const kb = (readFileSync(bundlePath).length / 1024).toFixed(1);
 
 const dest = path.join(ROOT, "docs", "examples");
 rmSync(dest, { recursive: true, force: true });
@@ -52,4 +49,4 @@ mkdirSync(dest, { recursive: true });
 for (const ex of ["fjordwire", "vault", "incident", "summer"]) {
   cpSync(path.join(ROOT, "examples", ex), path.join(dest, ex), { recursive: true });
 }
-console.log(`site built: docs/js/kcp-agent.js (sha256 ${sha256.slice(0, 12)}…) + docs/examples/{fjordwire,vault,incident,summer}`);
+console.log(`site built: docs/js/kcp-demos.js (${kb} KB, sha256 ${sha256.slice(0, 12)}…) + docs/examples/{fjordwire,vault,incident,summer}`);

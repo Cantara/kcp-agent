@@ -1,0 +1,133 @@
+name: Rust Release
+
+# Build, checksum, and publish the kcp-planner binary across five platforms on a
+# `rust-vX.Y.Z` tag. The conformance vectors gate the release — a single vector
+# failure blocks shipping. (Tag prefix is `rust-v*` so it never collides with the
+# npm package's `v*` tags.)
+on:
+  push:
+    tags: ["rust-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CRATE_DIR: rust/kcp-planner
+  # The size budget for the stripped, LTO'd binary (issue #57). The size-optimized
+  # release profile keeps the full network build (reqwest/tokio, rustls) under this.
+  MAX_BYTES: 3145728 # 3 MiB
+
+jobs:
+  # The vectors gate the release: if the Rust core diverges from the reference on
+  # any vector, no binaries ship.
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo test --manifest-path ${{ env.CRATE_DIR }}/Cargo.toml --locked
+      - run: cargo clippy --manifest-path ${{ env.CRATE_DIR }}/Cargo.toml --all-targets -- -D warnings
+      - run: cargo publish --dry-run --manifest-path ${{ env.CRATE_DIR }}/Cargo.toml
+
+  build:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: kcp-planner-linux-x64
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            name: kcp-planner-linux-arm64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: kcp-planner-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: kcp-planner-macos-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: kcp-planner-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      # Cross linkers for the Linux musl targets (incl. aarch64). No-op elsewhere.
+      - if: runner.os == 'Linux'
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+      - name: Build (release, size-optimized)
+        run: cargo build --release --locked --manifest-path ${{ env.CRATE_DIR }}/Cargo.toml --target ${{ matrix.target }}
+      - name: Stage binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="${{ env.CRATE_DIR }}/target/${{ matrix.target }}/release/kcp-planner"
+          [ "${{ runner.os }}" = "Windows" ] && bin="${bin}.exe"
+          # strip is already applied by the release profile; strip again where available.
+          if command -v strip >/dev/null && [ "${{ runner.os }}" != "Windows" ]; then strip "$bin" || true; fi
+          mkdir -p dist
+          cp "$bin" "dist/${{ matrix.name }}"
+          size=$(wc -c < "dist/${{ matrix.name }}")
+          echo "${{ matrix.name }}: ${size} bytes"
+          if [ "$size" -gt "${{ env.MAX_BYTES }}" ]; then
+            echo "::error::${{ matrix.name }} is ${size} bytes, over the ${{ env.MAX_BYTES }} budget"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.name }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: staged
+      - name: Collect binaries + SHA256SUMS
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find staged -type f -exec cp {} dist/ \;
+          cd dist
+          sha256sum * > SHA256SUMS
+          echo "## Binaries" >> "$GITHUB_STEP_SUMMARY"
+          cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: kcp-planner ${{ github.ref_name }}
+          files: |
+            dist/kcp-planner-*
+            dist/SHA256SUMS
+          generate_release_notes: true
+
+  # Publish to crates.io when the CRATES_IO_TOKEN secret is configured; otherwise
+  # the dry-run in `gate` is the only verification (real publish is a no-op).
+  publish-crate:
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/rust-v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo publish
+        env:
+          TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          if [ -z "${TOKEN}" ]; then
+            echo "CRATES_IO_TOKEN not set — skipping crates.io publish (dry-run gated the build)."
+            exit 0
+          fi
+          cargo publish --manifest-path ${{ env.CRATE_DIR }}/Cargo.toml --token "${TOKEN}"

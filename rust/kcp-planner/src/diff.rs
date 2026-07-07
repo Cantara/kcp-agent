@@ -5,7 +5,19 @@
 //! a.skipped, b.selected, b.skipped) exactly like the TypeScript `Set` union.
 
 use crate::planner::AgentPlan;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
+
+/// Serialize an `Option<f64>` the way JS `JSON.stringify` renders numbers: a
+/// whole value as an integer (`3000`, not `3000.0`). Budget/context shift
+/// endpoints are f64 but are frequently whole (e.g. token ceilings), so this
+/// keeps `diff --json` byte-identical to the TS reference.
+fn ser_opt_num<S: Serializer>(v: &Option<f64>, s: S) -> Result<S::Ok, S::Error> {
+    match v {
+        None => s.serialize_none(),
+        Some(f) if f.fract() == 0.0 && f.abs() < 9.0e15 => s.serialize_i64(*f as i64),
+        Some(f) => s.serialize_f64(*f),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MoveSide {
@@ -40,9 +52,9 @@ pub struct UnitPresence {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BudgetShift {
     pub field: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", serialize_with = "ser_opt_num")]
     pub before: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", serialize_with = "ser_opt_num")]
     pub after: Option<f64>,
 }
 

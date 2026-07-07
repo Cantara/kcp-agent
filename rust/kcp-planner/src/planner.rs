@@ -241,9 +241,9 @@ pub fn temporal_status(unit: &Unit, as_of: &str) -> TemporalStatus {
     match &unit.temporal {
         None => TemporalStatus::Active,
         Some(t) => {
-            if t.valid_from.as_deref().map_or(false, |v| v > as_of) {
+            if t.valid_from.as_deref().is_some_and(|v| v > as_of) {
                 TemporalStatus::Future
-            } else if t.valid_until.as_deref().map_or(false, |v| v < as_of) {
+            } else if t.valid_until.as_deref().is_some_and(|v| v < as_of) {
                 TemporalStatus::Expired
             } else {
                 TemporalStatus::Active
@@ -582,5 +582,10 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
 /// Format an f64 the way JS `${n}` does for the clean decimals used in budgets
 /// (shortest round-trip, no trailing zeros): 0.0 → "0", 0.05 → "0.05".
 pub fn fmt_num(n: f64) -> String {
+    // JS `String(-0)` is "0"; Rust's `{}` prints "-0". Normalize so numbers
+    // interpolated into notes/labels match the TS reference byte-for-byte.
+    if n == 0.0 {
+        return "0".to_string();
+    }
     format!("{}", n)
 }

@@ -36,7 +36,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - run: cargo test --manifest-path rust/kcp-planner/Cargo.toml --locked
+      - run: cargo clippy --manifest-path rust/kcp-planner/Cargo.toml --all-targets -- -D warnings
+
+  # The browser WASM module must plan byte-identically to the native CLI — the
+  # same Rust core, whether it targets a 0.8 MB binary or a 445 KB WASM module.
+  # This builds the module, builds the native CLI, and diffs their JSON output.
+  wasm-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.126
+      - run: npm i -g binaryen # provides wasm-opt
+      - name: Build WASM module (enforces the size budget)
+        run: npm run build:wasm
+      - name: Build native CLI (the parity reference)
+        run: cargo build --manifest-path rust/kcp-planner/Cargo.toml --release
+      - name: WASM ↔ CLI byte-parity
+        run: npm run wasm:parity
 
   natives:
     needs: test
