@@ -53,6 +53,9 @@ pub struct PlanNode {
     pub ref_id: Option<String>,
     pub location: String,
     pub plan: Option<AgentPlan>,
+    /// kcp_version of the fetched manifest — kept so the node can be serialized
+    /// (the plan artifact echoes it) without retaining the whole manifest.
+    pub kcp_version: Option<String>,
     pub sha256: Option<String>,
     pub signature: Option<SignatureResult>,
     /// Fetch/parse/signature failure — the node is dead, fail-closed.
@@ -131,6 +134,7 @@ impl<'o> Walk<'o> {
                 self.committed = round6(self.committed + p.budget.projected_spend.unwrap_or(0.0));
             }
             node.sha256 = Some(format!("{:x}", Sha256::digest(text.as_bytes())));
+            node.kcp_version = manifest.kcp_version.clone();
 
             // Walk the eligible federation, fail-closed at every excluded ref.
             let federation = p.federation.clone();
@@ -178,6 +182,38 @@ pub async fn plan_tree(location: &str, task: &str, options: &FollowOptions) -> P
         base_budget: options.plan_options.budget.clone(),
     };
     walk.visit(location.to_string(), None, 0).await
+}
+
+/// Serialize a plan tree node to JSON (a port of the shape `kcp-agent plan
+/// --follow --json` / the MCP `kcp_plan` tool emit). The node's plan carries the
+/// loading layer's sha256 + signature.
+pub fn node_to_json(node: &PlanNode, options: &PlanOptions) -> serde_json::Value {
+    let mut m = serde_json::Map::new();
+    if let Some(rid) = &node.ref_id {
+        m.insert("refId".into(), serde_json::Value::from(rid.clone()));
+    }
+    m.insert("location".into(), serde_json::Value::from(node.location.clone()));
+    if let Some(p) = &node.plan {
+        m.insert(
+            "plan".into(),
+            crate::json::plan_to_value(p, node.kcp_version.as_deref(), options, &node.location, node.sha256.as_deref(), node.signature.as_ref()),
+        );
+    }
+    if let Some(sig) = &node.signature {
+        m.insert("signature".into(), crate::json::signature_to_value(sig));
+    }
+    if let Some(err) = &node.error {
+        m.insert("error".into(), serde_json::Value::from(err.clone()));
+    }
+    let not_followed: Vec<serde_json::Value> = node
+        .not_followed
+        .iter()
+        .map(|r| serde_json::json!({ "id": r.id, "url": r.url, "reason": r.reason }))
+        .collect();
+    m.insert("notFollowed".into(), serde_json::Value::Array(not_followed));
+    let children: Vec<serde_json::Value> = node.children.iter().map(|c| node_to_json(c, options)).collect();
+    m.insert("children".into(), serde_json::Value::Array(children));
+    serde_json::Value::Object(m)
 }
 
 /// All successfully planned nodes in the tree, root first, depth-first.

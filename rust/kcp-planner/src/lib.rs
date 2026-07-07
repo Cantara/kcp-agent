@@ -20,12 +20,18 @@ pub mod fetch;
 #[cfg(feature = "network")]
 pub mod follow;
 pub mod format;
+#[cfg(feature = "network")]
+pub mod mcp;
 pub mod json;
 pub mod model;
 pub mod plan_io;
 pub mod planner;
 #[cfg(feature = "network")]
 pub mod replay;
+#[cfg(feature = "network")]
+pub mod session;
+#[cfg(feature = "network")]
+pub mod synthesize;
 pub mod trace;
 pub mod validate;
 pub mod verify;
@@ -37,7 +43,13 @@ pub use client::load_manifest_text;
 #[cfg(feature = "network")]
 pub use fetch::{guarded_fetch_text, is_private_address, FetchGuard};
 #[cfg(feature = "network")]
-pub use follow::{plan_tree, plans, FollowOptions, PlanNode};
+pub use follow::{node_to_json, plan_tree, plans, FollowOptions, PlanNode};
+#[cfg(feature = "network")]
+pub use mcp::{handle_message, serve_mcp};
+#[cfg(feature = "network")]
+pub use session::dedupe_loaded;
+#[cfg(feature = "network")]
+pub use synthesize::{load_planned_units, LoadedUnit};
 #[cfg(feature = "network")]
 pub use replay::{replay_artifact, ReplayReport};
 pub use format::{format_diff, format_plan, format_trace, format_validation, Colors};

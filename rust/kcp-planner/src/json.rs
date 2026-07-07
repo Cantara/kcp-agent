@@ -43,18 +43,25 @@ fn signature_block(s: &SignatureResult) -> Value {
     obj(p)
 }
 
-/// Build the full plan artifact, matching the TypeScript CLI's `plan --json`.
-pub fn plan_to_json(p: &AgentPlan, manifest: &Manifest, options: &PlanOptions, source: &str, sha256: &str, signature: &SignatureResult) -> Value {
-    plan_to_value(p, manifest, options, source, Some(sha256), Some(signature))
+/// Serialize a `SignatureResult` as `{ status, detail, keyId? }` (for a plan tree
+/// node's top-level `signature` field).
+pub fn signature_to_value(s: &SignatureResult) -> Value {
+    signature_block(s)
 }
 
-/// Build a plan object matching the TS `AgentPlan` on the wire. `sha256` and
-/// `signature` are attached by the loading layer, so they're present in the
-/// `plan --json` artifact but absent from the raw plan embedded in a `--trace`
-/// (where the reference serializes `plan()` output directly).
+/// Build the full plan artifact, matching the TypeScript CLI's `plan --json`.
+pub fn plan_to_json(p: &AgentPlan, manifest: &Manifest, options: &PlanOptions, source: &str, sha256: &str, signature: &SignatureResult) -> Value {
+    plan_to_value(p, manifest.kcp_version.as_deref(), options, source, Some(sha256), Some(signature))
+}
+
+/// Build a plan object matching the TS `AgentPlan` on the wire. Takes `kcp_version`
+/// directly (project/version come from the plan) so a federation tree node can be
+/// serialized without keeping its whole manifest. `sha256` and `signature` are
+/// attached by the loading layer — present in the `plan --json` artifact, absent
+/// from the raw plan embedded in a `--trace`.
 pub fn plan_to_value(
     p: &AgentPlan,
-    manifest: &Manifest,
+    kcp_version: Option<&str>,
     options: &PlanOptions,
     source: &str,
     sha256: Option<&str>,
@@ -63,9 +70,9 @@ pub fn plan_to_value(
     let caps = options.caps();
 
     // manifest { project, version, kcpVersion?, source, sha256? }
-    let mut man = vec![("project", Value::from(manifest.project.clone())), ("version", Value::from(manifest.version.clone()))];
-    if let Some(kv) = &manifest.kcp_version {
-        man.push(("kcpVersion", Value::from(kv.clone())));
+    let mut man = vec![("project", Value::from(p.manifest_project.clone())), ("version", Value::from(p.manifest_version.clone()))];
+    if let Some(kv) = kcp_version {
+        man.push(("kcpVersion", Value::from(kv)));
     }
     man.push(("source", Value::from(source)));
     if let Some(sha) = sha256 {
@@ -226,7 +233,7 @@ pub fn trace_to_json(t: &DecisionTrace, manifest: &Manifest, options: &PlanOptio
         ("taskTerms", Value::from(t.task_terms.clone())),
         ("asOf", Value::from(t.as_of.clone())),
         ("capabilities", serde_json::to_value(&t.capabilities).unwrap_or(Value::Null)),
-        ("plan", plan_to_value(&t.plan, manifest, options, source, None, None)),
+        ("plan", plan_to_value(&t.plan, manifest.kcp_version.as_deref(), options, source, None, None)),
         ("units", serde_json::to_value(&t.units).unwrap_or(Value::Null)),
         ("gateSummary", serde_json::to_value(&t.gate_summary).unwrap_or(Value::Null)),
     ])

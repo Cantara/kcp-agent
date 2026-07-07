@@ -158,7 +158,7 @@ pub async fn replay_artifact(artifact_json: &Value, artifact_name: &str, guard: 
         let fresh = plan(&manifest, task, &options);
         let fresh_sig = SignatureResult { status: String::new(), detail: String::new(), key_id: None };
         // No sha256/signature — the pure, comparable projection.
-        let fresh_val = comparable(plan_to_value(&fresh, &manifest, &options, &resolved_source, None, Some(&fresh_sig)));
+        let fresh_val = comparable(plan_to_value(&fresh, manifest.kcp_version.as_deref(), &options, &resolved_source, None, Some(&fresh_sig)));
         let saved_val = comparable(s.clone());
 
         if saved_val == fresh_val {
