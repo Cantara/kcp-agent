@@ -24,6 +24,8 @@ pub mod json;
 pub mod model;
 pub mod plan_io;
 pub mod planner;
+#[cfg(feature = "network")]
+pub mod replay;
 pub mod trace;
 pub mod validate;
 pub mod verify;
@@ -36,6 +38,8 @@ pub use client::load_manifest_text;
 pub use fetch::{guarded_fetch_text, is_private_address, FetchGuard};
 #[cfg(feature = "network")]
 pub use follow::{plan_tree, plans, FollowOptions, PlanNode};
+#[cfg(feature = "network")]
+pub use replay::{replay_artifact, ReplayReport};
 pub use format::{format_diff, format_plan, format_trace, format_validation, Colors};
 pub use json::{plan_to_json, plan_to_value, trace_to_json};
 pub use model::{parse_manifest, Manifest, Unit};
