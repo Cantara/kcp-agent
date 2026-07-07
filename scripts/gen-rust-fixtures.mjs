@@ -19,9 +19,21 @@ const { trace } = await load('trace.js');
 const { diffPlans } = await load('diff.js');
 
 const VDIR = path.join(ROOT, 'vectors');
-const OUT = path.join(ROOT, 'rust', 'kcp-planner', 'fixtures');
-mkdirSync(path.join(OUT, 'trace'), { recursive: true });
-mkdirSync(path.join(OUT, 'diff'), { recursive: true });
+// The golden fixtures back the trace/diff conformance tests in BOTH ports; write
+// a copy into each so each module's tests stay self-contained (Rust reads from
+// its crate dir, Java from its classpath test resources).
+const OUT_DIRS = [
+  path.join(ROOT, 'rust', 'kcp-planner', 'fixtures'),
+  path.join(ROOT, 'java', 'kcp-planner', 'src', 'test', 'resources', 'fixtures'),
+];
+for (const out of OUT_DIRS) {
+  mkdirSync(path.join(out, 'trace'), { recursive: true });
+  mkdirSync(path.join(out, 'diff'), { recursive: true });
+}
+const writeFixture = (kind, file, data) => {
+  const body = JSON.stringify(data, null, 2) + '\n';
+  for (const out of OUT_DIRS) writeFileSync(path.join(out, kind, file), body);
+};
 
 // A trace fixture omits the embedded canonical `plan` (already conformance-
 // tested via vectors/) and keeps the trace-specific projection.
@@ -37,10 +49,7 @@ const vectors = readdirSync(VDIR).filter((f) => f.endsWith('.json')).sort();
 for (const f of vectors) {
   const v = JSON.parse(readFileSync(path.join(VDIR, f), 'utf8'));
   const t = trace(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
-  writeFileSync(
-    path.join(OUT, 'trace', f),
-    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: traceOutcome(t) }, null, 2) + '\n'
-  );
+  writeFixture('trace', f, { name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: traceOutcome(t) });
 }
 console.log(`wrote ${vectors.length} trace fixtures`);
 
@@ -83,9 +92,6 @@ for (const c of diffCases) {
   const m = parseManifest(c.manifest, c.name);
   const pa = plan(m, c.task, c.a);
   const pb = plan(m, c.task, c.b);
-  writeFileSync(
-    path.join(OUT, 'diff', `${c.name}.json`),
-    JSON.stringify({ name: c.name, manifest: c.manifest, task: c.task, a: c.a, b: c.b, expect: diffPlans(pa, pb) }, null, 2) + '\n'
-  );
+  writeFixture('diff', `${c.name}.json`, { name: c.name, manifest: c.manifest, task: c.task, a: c.a, b: c.b, expect: diffPlans(pa, pb) });
 }
 console.log(`wrote ${diffCases.length} diff fixtures`);

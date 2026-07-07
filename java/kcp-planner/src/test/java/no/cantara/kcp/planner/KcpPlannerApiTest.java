@@ -6,7 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import no.cantara.kcp.planner.diff.PlanDiff;
 import no.cantara.kcp.planner.model.Manifest;
+import no.cantara.kcp.planner.trace.DecisionTrace;
+import no.cantara.kcp.planner.trace.GateName;
+import no.cantara.kcp.planner.trace.UnitTrace;
 
 import org.junit.jupiter.api.Test;
 
@@ -67,5 +71,47 @@ class KcpPlannerApiTest {
         assertEquals(1200L, p.context().projectedTokens());
         assertEquals(2800L, p.context().remaining());
         assertFalse(p.context().approximate());
+    }
+
+    @Test
+    void traceAnnotatesEveryUnitWithGateVerdicts() {
+        Manifest m = ManifestParser.parse(MANIFEST, "test");
+        DecisionTrace t = KcpPlanner.trace(m, "how do I deploy to production?");
+
+        // One trace per manifest unit, in manifest order; the plan is the authority.
+        assertEquals(2, t.units().size());
+        assertEquals(2, t.plan().selected().size() + t.plan().skipped().size());
+
+        UnitTrace deploy = t.units().get(0);
+        assertEquals("deploy-guide", deploy.id());
+        assertEquals("selected", deploy.outcome());
+        // A selected unit walks the full cascade; the last gate is context_budget.
+        assertEquals(GateName.CONTEXT_BUDGET, deploy.gates().get(deploy.gates().size() - 1).gate());
+
+        UnitTrace hr = t.units().get(1);
+        assertEquals("skipped", hr.outcome());
+        assertEquals(GateName.AUDIENCE, hr.rejectedBy());
+        assertEquals(1, hr.gates().size()); // stops after the first rejection
+
+        // The gate summary spans all 13 gates.
+        assertEquals(13, t.gateSummary().size());
+    }
+
+    @Test
+    void diffDetectsAUnitFlippingSelectedToSkipped() {
+        Manifest m = ManifestParser.parse(MANIFEST, "test");
+        // As "agent", deploy-guide is selected; as "human" its audience excludes it,
+        // so it flips to skipped — a genuine selected_to_skipped move.
+        AgentPlan asAgent = KcpPlanner.plan(m, "deploy to production", PlanOptions.builder().role("agent").build());
+        AgentPlan asHuman = KcpPlanner.plan(m, "deploy to production", PlanOptions.builder().role("human").build());
+
+        PlanDiff diff = KcpPlanner.diffPlans(asAgent, asHuman);
+        assertFalse(diff.identical());
+        assertEquals(1, diff.moves().size());
+        assertEquals("deploy-guide", diff.moves().get(0).id());
+        assertEquals("selected_to_skipped", diff.moves().get(0).direction());
+        assertEquals(16, diff.moves().get(0).from().score().intValue());
+
+        assertTrue(KcpPlanner.diffPlans(asAgent, asAgent).identical());
     }
 }

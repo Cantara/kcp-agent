@@ -1,0 +1,74 @@
+{
+  "name": "context-budget-flip",
+  "manifest": "kcp_version: \"0.25\"\nproject: newsroom\nversion: 1.0.0\nunits:\n  - id: award-exclusive\n    path: stories/award.md\n    intent: \"Exclusive: the sovereign compute award decision and the winning bid\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, exclusive]\n    size_tokens: 2600\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.25\"}] }\n  - id: power-feed\n    path: feeds/power.md\n    intent: \"Live datacenter power-grid capacity feed for the compute award\"\n    audience: [agent]\n    triggers: [datacenter, power, capacity, compute]\n    size_tokens: 900\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.05\"}] }\n  - id: free-summary\n    path: stories/summary.md\n    intent: \"Free summary of the sovereign compute award\"\n    audience: [agent]\n    triggers: [sovereign, compute, award]\n    size_tokens: 300\n  - id: weather\n    path: misc/weather.md\n    intent: \"Local weather forecast\"\n    audience: [agent]\n    triggers: [weather, forecast]\n    size_tokens: 100\n",
+  "task": "sovereign compute award",
+  "a": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "b": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    },
+    "contextBudget": 3000
+  },
+  "expect": {
+    "a": {
+      "project": "newsroom",
+      "version": "1.0.0",
+      "task": "sovereign compute award",
+      "asOf": "2026-07-06"
+    },
+    "b": {
+      "project": "newsroom",
+      "version": "1.0.0",
+      "task": "sovereign compute award",
+      "asOf": "2026-07-06"
+    },
+    "identical": false,
+    "moves": [
+      {
+        "id": "power-feed",
+        "direction": "selected_to_skipped",
+        "from": {
+          "score": 10
+        },
+        "to": {
+          "reason": "over context budget: 900 tokens would exceed remaining 100 of 3,000"
+        }
+      }
+    ],
+    "scoreChanges": [],
+    "presence": [],
+    "budgetShifts": [
+      {
+        "field": "context.ceiling",
+        "after": 3000
+      },
+      {
+        "field": "context.projectedTokens",
+        "after": 2900
+      },
+      {
+        "field": "context.remaining",
+        "after": 100
+      }
+    ],
+    "reasonChanges": [],
+    "warningChanges": {
+      "added": [],
+      "removed": []
+    }
+  }
+}

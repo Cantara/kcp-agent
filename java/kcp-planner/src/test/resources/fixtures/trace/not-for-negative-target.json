@@ -1,0 +1,196 @@
+{
+  "name": "not-for-negative-target",
+  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n",
+  "task": "salary negotiation press",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "human",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "taskTerms": [
+      "salary",
+      "negotiation",
+      "press"
+    ],
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "human",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ],
+      "credentials": []
+    },
+    "units": [
+      {
+        "id": "salary-review",
+        "path": "hr/salary.md",
+        "intent": "Annual salary review for the merger integration team",
+        "outcome": "selected",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'human' in [\"human\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 9: intent matches 1 term(s); triggers match 1 term(s); id/path matches 1 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "no attestation required"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "free"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "public access"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 1 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": true,
+            "detail": "no context budget set"
+          }
+        ],
+        "score": 9,
+        "tokens": {
+          "source": "unmeasured"
+        }
+      },
+      {
+        "id": "press-kit",
+        "path": "comms/press.md",
+        "intent": "Press kit for the merger announcement",
+        "outcome": "skipped",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'human' in [\"agent\",\"human\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": false,
+            "detail": "not_for declares it does not serve 'salary negotiation'"
+          }
+        ],
+        "rejectedBy": "not_for"
+      }
+    ],
+    "gateSummary": [
+      {
+        "gate": "audience",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "not_for",
+        "passed": 1,
+        "failed": 1
+      },
+      {
+        "gate": "temporal",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "deprecated",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "supersession",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "relevance",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "attestation",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "payment",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "access",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "strict",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "max_units",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "money_budget",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "context_budget",
+        "passed": 1,
+        "failed": 0
+      }
+    ]
+  }
+}
