@@ -582,5 +582,10 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
 /// Format an f64 the way JS `${n}` does for the clean decimals used in budgets
 /// (shortest round-trip, no trailing zeros): 0.0 → "0", 0.05 → "0.05".
 pub fn fmt_num(n: f64) -> String {
+    // JS `String(-0)` is "0"; Rust's `{}` prints "-0". Normalize so numbers
+    // interpolated into notes/labels match the TS reference byte-for-byte.
+    if n == 0.0 {
+        return "0".to_string();
+    }
     format!("{}", n)
 }

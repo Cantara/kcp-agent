@@ -13,13 +13,21 @@
 
 pub mod budget;
 pub mod diff;
+pub mod format;
+pub mod json;
 pub mod model;
 pub mod planner;
 pub mod trace;
+pub mod validate;
+pub mod verify;
 pub mod vectors;
 
 pub use diff::{diff_plans, PlanDiff};
+pub use format::{format_plan, format_validation, Colors};
+pub use json::plan_to_json;
 pub use model::{parse_manifest, Manifest, Unit};
 pub use planner::{plan, score_unit, terms, AgentPlan, PlanOptions};
 pub use trace::{trace, trace_outcome, DecisionTrace, GateName, TraceOutcome, GATE_ORDER};
+pub use validate::{validate_location, validate_manifest, Finding, ValidationReport};
+pub use verify::{verify_manifest_text, SignatureResult};
 pub use vectors::{outcome_of, run_vector, ConformanceVector, VectorOutcome};

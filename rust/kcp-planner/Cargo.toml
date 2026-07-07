@@ -8,8 +8,26 @@ repository = "https://github.com/Cantara/kcp-agent"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml = "0.9"
+sha2 = "0.10"
+# Offline ed25519 manifest-signature verification (base64/hex/SPKI parsing is
+# hand-rolled to avoid extra deps). Remote fetch of signature/key files is
+# deferred to the network phase (#50).
+ed25519-dalek = { version = "2", default-features = false }
 
 [dev-dependencies]
 glob = "0.3"
+
+[[bin]]
+name = "kcp-planner"
+path = "src/bin/kcp-planner.rs"
+
+# A small, dependency-free static binary is the point (epic #42): strip symbols,
+# fat LTO, size-optimize, and abort on panic to drop the unwinding tables.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
