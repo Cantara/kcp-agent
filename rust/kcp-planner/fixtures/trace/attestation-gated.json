@@ -1,0 +1,178 @@
+{
+  "name": "attestation-gated",
+  "manifest": "kcp_version: \"0.25\"\nproject: cert\nversion: 1.0.0\ntrust:\n  agent_requirements:\n    require_attestation: true\n    trusted_providers: [soc.cert.example]\nunits:\n  - id: advisory\n    path: advisories/zero-day.md\n    intent: \"Zero-day advisory for the incident response team\"\n    audience: [agent]\n    triggers: [zero-day, advisory, incident]\n    access: restricted\n",
+  "task": "zero-day incident advisory",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "taskTerms": [
+      "zero",
+      "day",
+      "incident",
+      "advisory"
+    ],
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ],
+      "credentials": []
+    },
+    "units": [
+      {
+        "id": "advisory",
+        "path": "advisories/zero-day.md",
+        "intent": "Zero-day advisory for the incident response team",
+        "outcome": "selected",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 34: intent matches 4 term(s); triggers match 4 term(s); id/path matches 3 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "restricted: requires attestation the agent cannot present (loadEligible=false)"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "free"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "access 'restricted': agent holds no credentials (loadEligible=false)"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 1 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": true,
+            "detail": "no context budget set"
+          }
+        ],
+        "score": 34,
+        "tokens": {
+          "source": "unmeasured"
+        }
+      }
+    ],
+    "gateSummary": [
+      {
+        "gate": "audience",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "not_for",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "temporal",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "deprecated",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "supersession",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "relevance",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "attestation",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "payment",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "access",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "strict",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "max_units",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "money_budget",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "context_budget",
+        "passed": 1,
+        "failed": 0
+      }
+    ]
+  }
+}

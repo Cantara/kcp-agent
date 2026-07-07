@@ -1,0 +1,259 @@
+{
+  "name": "access-restricted-gated",
+  "manifest": "kcp_version: \"0.25\"\nproject: vault\nversion: 1.0.0\nunits:\n  - id: board-memo\n    path: memos/board.md\n    intent: \"Board memo on the merger deal terms\"\n    audience: [agent]\n    triggers: [merger, deal, board]\n    access: restricted\n    auth_scope: \"read:board\"\n    payment: { methods: [{type: x402, currency: USDC, price_per_request: \"0.30\"}] }\n  - id: public-brief\n    path: briefs/public.md\n    intent: \"Public brief on the merger deal\"\n    audience: [agent]\n    triggers: [merger, deal, brief]\n",
+  "task": "merger deal terms",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "taskTerms": [
+      "merger",
+      "deal",
+      "terms"
+    ],
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ],
+      "credentials": []
+    },
+    "units": [
+      {
+        "id": "board-memo",
+        "path": "memos/board.md",
+        "intent": "Board memo on the merger deal terms",
+        "outcome": "selected",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 17: intent matches 3 term(s); triggers match 2 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "no attestation required"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "x402: 0.30 USDC/request"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "access 'restricted': agent holds no credentials (loadEligible=false)"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 1 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": true,
+            "detail": "no context budget set"
+          }
+        ],
+        "score": 17,
+        "tokens": {
+          "source": "unmeasured"
+        },
+        "cost": {
+          "amount": 0.3,
+          "currency": "USDC",
+          "method": "x402"
+        }
+      },
+      {
+        "id": "public-brief",
+        "path": "briefs/public.md",
+        "intent": "Public brief on the merger deal",
+        "outcome": "selected",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 14: intent matches 2 term(s); triggers match 2 term(s)"
+          },
+          {
+            "gate": "attestation",
+            "passed": true,
+            "detail": "no attestation required"
+          },
+          {
+            "gate": "payment",
+            "passed": true,
+            "detail": "free"
+          },
+          {
+            "gate": "access",
+            "passed": true,
+            "detail": "public access"
+          },
+          {
+            "gate": "strict",
+            "passed": true,
+            "detail": "non-strict mode"
+          },
+          {
+            "gate": "max_units",
+            "passed": true,
+            "detail": "position 2 within cap of 5"
+          },
+          {
+            "gate": "money_budget",
+            "passed": true,
+            "detail": "no budget ceiling set"
+          },
+          {
+            "gate": "context_budget",
+            "passed": true,
+            "detail": "no context budget set"
+          }
+        ],
+        "score": 14,
+        "tokens": {
+          "source": "unmeasured"
+        }
+      }
+    ],
+    "gateSummary": [
+      {
+        "gate": "audience",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "not_for",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "temporal",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "deprecated",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "supersession",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "relevance",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "attestation",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "payment",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "access",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "strict",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "max_units",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "money_budget",
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "gate": "context_budget",
+        "passed": 2,
+        "failed": 0
+      }
+    ]
+  }
+}

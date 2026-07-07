@@ -12,10 +12,14 @@
 //! spec, not just the code.
 
 pub mod budget;
+pub mod diff;
 pub mod model;
 pub mod planner;
+pub mod trace;
 pub mod vectors;
 
+pub use diff::{diff_plans, PlanDiff};
 pub use model::{parse_manifest, Manifest, Unit};
 pub use planner::{plan, score_unit, terms, AgentPlan, PlanOptions};
+pub use trace::{trace, trace_outcome, DecisionTrace, GateName, TraceOutcome, GATE_ORDER};
 pub use vectors::{outcome_of, run_vector, ConformanceVector, VectorOutcome};

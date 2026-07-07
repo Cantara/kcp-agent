@@ -10,9 +10,9 @@ This is a *second implementation*. Its correctness is defined by the TypeScript 
 pinned by the shared conformance vectors: two independent planners that agree on every vector
 validate the **spec**, not just one codebase.
 
-> Status: **Phase 1 + Phase 2** of [epic #42](https://github.com/Cantara/kcp-agent/issues/42) —
-> the core planner and the conformance runner. CLI, WASM, network/MCP, and the release pipeline
-> are later phases.
+> Status: **Phases 1–4** of [epic #42](https://github.com/Cantara/kcp-agent/issues/42) — the
+> core planner, the conformance runner, the decision trace, and the plan diff. The CLI, WASM,
+> network/MCP, and the release pipeline are later phases.
 
 ## Use
 
@@ -46,6 +46,11 @@ cargo test        # runs the conformance harness against ../../vectors/*.json
 outcome against `expect`. All 11 vectors pass; a new vector added to the shared corpus fails here
 until this implementation handles it. Skip reasons, scores, budget arithmetic (6-decimal
 rounding to match `Number.toFixed(6)`), and federation decisions must all match exactly.
+
+The **decision trace** (`trace()`) and **plan diff** (`diff_plans()`) are validated the same way:
+`fixtures/trace/*.json` and `fixtures/diff/*.json` are golden outputs generated from the
+TypeScript reference (`npm run gen:rust-fixtures`), and `tests/{trace,diff}_conformance.rs`
+reproduce them byte-for-byte — including every per-gate detail string.
 
 ## Design notes
 
