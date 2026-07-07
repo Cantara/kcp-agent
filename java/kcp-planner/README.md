@@ -179,5 +179,7 @@ mvn clean test
 
 This is the deterministic core — `plan`, `trace`, `diff`, `validate`, a manifest client
 with SSRF guard and Ed25519 verification, unit-content loading, replay, and a five-tool
-MCP server. Remaining: a Spring Boot starter. There is no LLM synthesis, episodic memory,
-or `ask` command; those remain in the TypeScript agent.
+MCP server. A [Spring Boot starter](../kcp-planner-spring-boot-starter) auto-configures it
+as an injectable bean; the core here has zero Spring dependency and also runs in Quarkus,
+Micronaut, or plain Java. There is no LLM synthesis, episodic memory, or `ask` command;
+those remain in the TypeScript agent.

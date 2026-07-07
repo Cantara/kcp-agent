@@ -41,9 +41,11 @@ jobs:
       - run: cargo test --manifest-path rust/kcp-planner/Cargo.toml --locked
       - run: cargo clippy --manifest-path rust/kcp-planner/Cargo.toml --all-targets -- -D warnings
 
-  # The Java port (java/kcp-planner) must reproduce every conformance vector too —
-  # the same corpus, a third independent implementation. `mvn test` runs every
-  # vectors/*.json through KcpPlanner.plan and deep-equals the outcome against expect.
+  # The Java port (java/) must reproduce every conformance vector too — the same
+  # corpus, a third independent implementation. The reactor builds the core planner
+  # (kcp-planner) and the Spring Boot starter; `mvn test` runs every vectors/*.json
+  # through KcpPlanner.plan and deep-equals the outcome against expect, plus the
+  # trace/diff/JSON/verify fixtures and the starter's @SpringBootTest.
   java-conformance:
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +55,7 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: maven
-      - run: mvn -B -f java/kcp-planner/pom.xml clean test
+      - run: mvn -B -f java/pom.xml clean test
 
   # The browser WASM module must plan byte-identically to the native CLI — the
   # same Rust core, whether it targets a 0.8 MB binary or a 445 KB WASM module.

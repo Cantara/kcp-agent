@@ -1,0 +1,15 @@
+kcp_version: "0.25"
+project: docs
+version: 1.0.0
+units:
+  - id: deploy-guide
+    path: docs/deploy.md
+    intent: "How are releases deployed to production?"
+    audience: [agent]
+    triggers: [deploy, production, release]
+    size_tokens: 1200
+  - id: hr-handbook
+    path: hr/handbook.md
+    intent: "Employee handbook"
+    audience: [human]
+    triggers: [handbook, benefits]
