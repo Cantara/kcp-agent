@@ -12,12 +12,34 @@
 //   POST /validate  — convenience REST: {manifest} → validation report
 //   GET  /health    — {status, version, tools, uptime}
 //   OPTIONS *       — CORS preflight
+//   GET/DELETE /mcp — 405 (no SSE stream, no sessions — stateless streamable HTTP)
+//
+// With --manifest, the server injects that manifest into any tool call or REST
+// body that omits one, so remote MCP clients can call kcp_plan with just a task.
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { handleMessage, TOOLS, SERVER_INFO } from "./mcp.js";
 
 export interface ServeOptions {
   apiKey?: string;
+  /** Default manifest location injected into tool calls and REST bodies that omit one. */
+  defaultManifest?: string;
+}
+
+/** The tools whose input schema takes a `manifest` argument. */
+const MANIFEST_TOOLS = new Set(["kcp_plan", "kcp_load", "kcp_validate", "kcp_trace"]);
+
+/**
+ * Inject the server's default manifest into a tools/call message that omits one.
+ * An explicit caller-provided manifest always wins.
+ */
+function withDefaultManifest(msg: unknown, defaultManifest: string | undefined): unknown {
+  if (!defaultManifest || typeof msg !== "object" || msg === null) return msg;
+  const m = msg as { method?: string; params?: { name?: string; arguments?: Record<string, unknown> } };
+  if (m.method !== "tools/call" || !m.params || !MANIFEST_TOOLS.has(m.params.name ?? "")) return msg;
+  const args = m.params.arguments;
+  if (args?.["manifest"] !== undefined) return msg;
+  return { ...m, params: { ...m.params, arguments: { ...(args ?? {}), manifest: defaultManifest } } };
 }
 
 const startTime = Date.now();
@@ -123,6 +145,7 @@ function unwrapToolResult(rpc: object | null): unknown {
 
 function makeHandler(options: ServeOptions) {
   const apiKey = options.apiKey;
+  const defaultManifest = options.defaultManifest;
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     setCorsHeaders(res);
@@ -174,14 +197,23 @@ function makeHandler(options: ServeOptions) {
         });
         return;
       }
+      msg = withDefaultManifest(msg, defaultManifest);
       const response = await handleMessage(msg as Parameters<typeof handleMessage>[0]);
       if (response) {
         sendJson(res, 200, response);
       } else {
-        // Notification acknowledged silently — return 204
-        res.writeHead(204);
+        // Notification acknowledged — the MCP streamable-HTTP spec requires 202 Accepted.
+        res.writeHead(202);
         res.end();
       }
+      return;
+    }
+
+    // Streamable HTTP: we do not offer a server-initiated SSE stream or sessions,
+    // so GET/DELETE on the MCP endpoint answer 405 per the spec.
+    if (pathname === "/mcp" && (req.method === "GET" || req.method === "DELETE")) {
+      res.writeHead(405, { Allow: "POST, OPTIONS" });
+      res.end();
       return;
     }
 
@@ -193,6 +225,11 @@ function makeHandler(options: ServeOptions) {
       } catch {
         sendJson(res, 400, { error: "invalid JSON body" });
         return;
+      }
+
+      // /plan, /trace and /validate take a manifest; fall back to the server default.
+      if (defaultManifest && pathname !== "/diff" && body["manifest"] === undefined) {
+        body["manifest"] = defaultManifest;
       }
 
       try {

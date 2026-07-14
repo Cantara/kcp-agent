@@ -101,12 +101,23 @@ describe("HTTP serve (no auth)", () => {
     expect(rpc.result.serverInfo.name).toBe("kcp-agent");
   });
 
-  it("POST /mcp — notification returns 204", async () => {
+  it("POST /mcp — notification returns 202 Accepted (streamable HTTP spec)", async () => {
     const r = await request(PORT, "POST", "/mcp", {
       jsonrpc: "2.0",
       method: "notifications/initialized",
     });
-    expect(r.status).toBe(204);
+    expect(r.status).toBe(202);
+  });
+
+  it("GET /mcp returns 405 with Allow header (no SSE stream)", async () => {
+    const r = await request(PORT, "GET", "/mcp");
+    expect(r.status).toBe(405);
+    expect(r.headers["allow"]).toContain("POST");
+  });
+
+  it("DELETE /mcp returns 405 (stateless — no sessions to delete)", async () => {
+    const r = await request(PORT, "DELETE", "/mcp");
+    expect(r.status).toBe(405);
   });
 
   it("POST /plan — convenience REST returns a plan", async () => {
@@ -184,6 +195,78 @@ describe("HTTP serve (no auth)", () => {
     expect(r.status).toBe(500);
     const body = JSON.parse(r.body);
     expect(body.error).toMatch(/requires/);
+  });
+});
+
+// ── Tests with a default manifest ───────────────────────────────────────
+
+describe("HTTP serve (with default manifest)", () => {
+  let server: http.Server;
+  const PORT = 19878;
+
+  beforeAll(async () => {
+    server = startServer(PORT, { defaultManifest: "examples/demo-hub" });
+    await new Promise<void>((resolve) => {
+      if (server.listening) return resolve();
+      server.on("listening", resolve);
+    });
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  });
+
+  it("POST /mcp — tools/call kcp_plan without manifest uses the default", async () => {
+    const r = await request(PORT, "POST", "/mcp", {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "kcp_plan", arguments: { task: "how do I deploy?" } },
+    });
+    expect(r.status).toBe(200);
+    const rpc = JSON.parse(r.body);
+    expect(rpc.result.isError).toBeFalsy();
+    const plan = JSON.parse(rpc.result.content[0].text);
+    expect(plan.plan.manifest.project).toBe("acme-knowledge-hub");
+  });
+
+  it("POST /mcp — an explicit manifest wins over the default", async () => {
+    const r = await request(PORT, "POST", "/mcp", {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "kcp_plan", arguments: { task: "x", manifest: "does/not/exist" } },
+    });
+    expect(r.status).toBe(200);
+    const rpc = JSON.parse(r.body);
+    expect(rpc.result.isError).toBe(true);
+  });
+
+  it("POST /mcp — kcp_replay is not given a manifest (schema has none)", async () => {
+    const r = await request(PORT, "POST", "/mcp", {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "kcp_replay", arguments: {} },
+    });
+    expect(r.status).toBe(200);
+    const rpc = JSON.parse(r.body);
+    // Missing artifact should still be the failure — not a manifest injection surprise.
+    expect(rpc.result.isError).toBe(true);
+  });
+
+  it("POST /plan without manifest uses the default", async () => {
+    const r = await request(PORT, "POST", "/plan", { task: "how do I deploy?", env: "prod" });
+    expect(r.status).toBe(200);
+    const plan = JSON.parse(r.body);
+    expect(plan.plan.manifest.project).toBe("acme-knowledge-hub");
+  });
+
+  it("POST /validate without manifest uses the default", async () => {
+    const r = await request(PORT, "POST", "/validate", {});
+    expect(r.status).toBe(200);
+    const report = JSON.parse(r.body);
+    expect(report.ok).toBe(true);
   });
 });
 
