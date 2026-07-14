@@ -266,7 +266,7 @@ const USAGE =
   '  kcp-agent recall   "<task>" --memory <dir> [--replay] [--limit <n>]\n' +
   '  kcp-agent diff     <a.json> <b.json> [--json]\n' +
   '  kcp-agent mcp\n' +
-  '  kcp-agent serve    [--port <n>] [--api-key <key>]\n' +
+  '  kcp-agent serve    [<port>] [--api-key <key>] [--manifest <path|dir|url>]\n' +
   '  kcp-agent watch    <path|dir> [--task "<task>"] [--diff] [--once] [--json]\n' +
   '  kcp-agent init     [dir] [--publisher <name>] [--dry-run] [--force]\n' +
   '  kcp-agent discover <url>\n' +
@@ -289,7 +289,7 @@ async function main() {
     const { startServer } = await import("./serve.js");
     const port = a.maxUnits ?? 3100; // reuse --max-units slot for port, or check positionals
     const portNum = a.positionals.length ? Number(a.positionals[0]) : port;
-    const server = startServer(isNaN(portNum) || portNum === 0 ? 3100 : portNum, { apiKey: a.apiKey });
+    const server = startServer(isNaN(portNum) || portNum === 0 ? 3100 : portNum, { apiKey: a.apiKey, defaultManifest: a.manifest });
     const addr = server.address();
     const p = typeof addr === "object" && addr ? addr.port : portNum;
     console.log(`kcp-agent HTTP server listening on port ${p}`);
