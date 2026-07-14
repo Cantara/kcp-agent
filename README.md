@@ -81,6 +81,22 @@ lower-scored unit still gets its chance. Since the planner works on metadata *be
 projection is a lower bound) — unless `--strict`, which excludes it fail-closed. `--context-budget`
 composes with `--budget`: a unit must fit both ceilings.
 
+### Machine-readable plans
+
+Use `--json` when another agent or integration consumes a plan. The output preserves the plan fields
+at the top level and adds:
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "plan"
+}
+```
+
+`kind` is `plan`, `tree` (when `--follow` is used), or `trace` (when `--trace` is used). Human-readable
+output is not a compatibility surface. Successful JSON commands exit 0; planner or manifest errors
+write diagnostics to stderr and exit non-zero.
+
 ### `ask` — plan, then answer via Claude
 
 ```bash

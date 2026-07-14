@@ -69,6 +69,7 @@ import { reuse } from "./reuse.js";
 import { trace as traceDecision } from "./trace.js";
 import { diffPlans } from "./diff.js";
 import { type ResolveOptions } from "./provider.js";
+import { encodePlanJson } from "./plan-json.js";
 
 interface Args {
   command: string;
@@ -487,12 +488,12 @@ async function main() {
     if (a.trace) {
       const manifest = await loadManifest(a.manifest!, buildFetchGuard(a));
       const t = traceDecision(manifest, a.task!, buildPlanOptions(a));
-      if (a.json) { console.log(JSON.stringify(t, null, 2)); return; }
+      if (a.json) { console.log(encodePlanJson(t, "trace")); return; }
       console.log(formatPlan(t.plan));
       console.log(formatTrace(t));
       return;
     }
-    if (a.json) console.log(JSON.stringify(a.follow ? tree : allPlans[0], null, 2));
+    if (a.json) console.log(encodePlanJson(a.follow ? tree : allPlans[0], a.follow ? "tree" : "plan"));
     else console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
     // --memory: report determinism against a prior episode (fail-closed on sha drift), then record.
     if (a.memory) {
