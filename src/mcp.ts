@@ -35,7 +35,7 @@ import { trace as traceDecision } from "./trace.js";
 export const PROTOCOL_VERSION = "2025-06-18";
 // Version must match package.json — test/mcp.test.ts pins them together
 // (a runtime read wouldn't survive `deno compile`, which embeds only the module graph).
-export const SERVER_INFO = { name: "kcp-agent", version: "0.12.0" };
+export const SERVER_INFO = { name: "kcp-agent", version: "0.13.0" };
 
 interface JsonRpcRequest {
   jsonrpc?: string;
