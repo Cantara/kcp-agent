@@ -234,7 +234,7 @@ describe("generateWebManifest", () => {
       robotsDisallowed: [],
     };
     const yaml = generateWebManifest(crawl);
-    expect(yaml).toContain('kcp_version: "0.25"');
+    expect(yaml).toContain('kcp_version: "0.26"');
     expect(yaml).toContain("project:");
     expect(yaml).toContain("units:");
     expect(yaml).toContain("id: index");

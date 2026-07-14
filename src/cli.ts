@@ -37,6 +37,8 @@
 //   --model <id>          model id: provider/model (e.g. openai/gpt-4o, anthropic/claude-opus-4-8)
 //   --base-url <url>      base URL for OpenAI-compatible endpoints (overrides provider default)
 //   --api-key <key>       API key (alternative to env vars ANTHROPIC_API_KEY / OPENAI_API_KEY)
+//   serve only:
+//   --public-url <url>    the public URL this server is reachable at — self-checked against the manifest's serving.mcp (§3.12)
 //   --loop                audited critique loop: plan → LLM gap critique → re-plan → answer
 //   --max-rounds <n>      max critique rounds for --loop (default 3)
 //   --loop-model <id>     critic model for --loop (default: claude-haiku-4-5)
@@ -105,6 +107,7 @@ interface Args {
   trace: boolean;
   baseUrl?: string;
   apiKey?: string;
+  publicUrl?: string;
   positionals: string[];
 }
 
@@ -150,6 +153,7 @@ function parseArgs(argv: string[]): Args {
       case "--trace": a.trace = true; break;
       case "--base-url": a.baseUrl = next(); break;
       case "--api-key": a.apiKey = next(); break;
+      case "--public-url": a.publicUrl = next(); break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
         positionals.push(t);
@@ -266,7 +270,7 @@ const USAGE =
   '  kcp-agent recall   "<task>" --memory <dir> [--replay] [--limit <n>]\n' +
   '  kcp-agent diff     <a.json> <b.json> [--json]\n' +
   '  kcp-agent mcp\n' +
-  '  kcp-agent serve    [<port>] [--api-key <key>] [--manifest <path|dir|url>]\n' +
+  '  kcp-agent serve    [<port>] [--api-key <key>] [--manifest <path|dir|url>] [--public-url <url>]\n' +
   '  kcp-agent watch    <path|dir> [--task "<task>"] [--diff] [--once] [--json]\n' +
   '  kcp-agent init     [dir] [--publisher <name>] [--dry-run] [--force]\n' +
   '  kcp-agent discover <url>\n' +
@@ -289,7 +293,12 @@ async function main() {
     const { startServer } = await import("./serve.js");
     const port = a.maxUnits ?? 3100; // reuse --max-units slot for port, or check positionals
     const portNum = a.positionals.length ? Number(a.positionals[0]) : port;
-    const server = startServer(isNaN(portNum) || portNum === 0 ? 3100 : portNum, { apiKey: a.apiKey, defaultManifest: a.manifest });
+    const server = startServer(isNaN(portNum) || portNum === 0 ? 3100 : portNum, {
+      apiKey: a.apiKey,
+      defaultManifest: a.manifest,
+      publicUrl: a.publicUrl,
+      fetchGuard: buildFetchGuard(a),
+    });
     const addr = server.address();
     const p = typeof addr === "object" && addr ? addr.port : portNum;
     console.log(`kcp-agent HTTP server listening on port ${p}`);

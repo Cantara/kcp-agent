@@ -88,6 +88,14 @@ export interface Signing {
   key_id?: string;
 }
 
+/** Serving Endpoint Binding (§3.12, KCP 0.26) — where this manifest is authoritatively served. */
+export interface Serving {
+  /** Exhaustive list of HTTPS URLs the manifest is authoritatively served from. */
+  manifest?: string[];
+  /** Exhaustive list of HTTPS MCP endpoints authorized to represent this manifest. */
+  mcp?: string[];
+}
+
 export interface TrustAgentRequirements {
   require_attestation?: boolean;
   trusted_providers?: string[];
@@ -104,6 +112,7 @@ export interface Manifest {
   rate_limits?: RateLimits;
   trust?: { agent_requirements?: TrustAgentRequirements };
   signing?: Signing;
-  /** Where the manifest was loaded from (path or URL) — set by the client. */
+  serving?: Serving;
+  /** Where the manifest was loaded from (path, or final post-redirect URL) — set by the client. */
   source?: string;
 }

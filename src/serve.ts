@@ -19,11 +19,17 @@
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { handleMessage, TOOLS, SERVER_INFO } from "./mcp.js";
+import { buildServingLinks, type ServingLinks } from "./serving.js";
+import type { FetchGuard } from "./fetch.js";
 
 export interface ServeOptions {
   apiKey?: string;
   /** Default manifest location injected into tool calls and REST bodies that omit one. */
   defaultManifest?: string;
+  /** Public base URL this server is reachable at — self-checked against the manifest's serving.mcp (§3.12). */
+  publicUrl?: string;
+  /** Guard applied when loading the default manifest for Link headers / self-check. */
+  fetchGuard?: FetchGuard;
 }
 
 /** The tools whose input schema takes a `manifest` argument. */
@@ -50,7 +56,57 @@ function setCorsHeaders(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  // Link carries the RFC 8288 knowledge-manifest relations — browsers only
+  // expose it to cross-origin JS when it is explicitly listed here.
+  res.setHeader("Access-Control-Expose-Headers", "Link");
   res.setHeader("Access-Control-Max-Age", "86400");
+}
+
+// ── Serving discovery (RFC 8288 Link headers + §3.12 self-check) ────────
+//
+// A serving MCP endpoint should tell agents where the manifest that governs
+// it lives: `Link: <url>; rel="knowledge-manifest"` (plus its signature and
+// signing key when they are URL-addressable). And when that manifest declares
+// `serving.mcp`, the server self-checks its own public URL against the list —
+// a Level-2 SHOULD in KCP 0.26 that catches a misdeployed representative at
+// startup instead of at the first refused plan.
+
+/** Does this signing-block value look like something we can link to (URL or relative file), not inline material? */
+function linkable(value: string | undefined): boolean {
+  if (!value) return false;
+  if (/^https?:\/\//.test(value)) return true;
+  // Relative file convention (knowledge.yaml.sig, keys/kcp.pub, …) — short,
+  // path-shaped, with an extension. Inline base64/PEM material is neither.
+  return value.length <= 128 && /^[\w./-]+\.[A-Za-z0-9]+$/.test(value) && !value.includes("-----");
+}
+
+/** Load the default manifest (if any) and derive the Link header values + serving.mcp self-check. */
+async function resolveServingLinks(options: ServeOptions): Promise<ServingLinks> {
+  if (!options.defaultManifest) return { links: [] };
+  try {
+    const { loadManifest } = await import("./client.js");
+    const { resolveLocation } = await import("./verify.js");
+    const manifest = await loadManifest(options.defaultManifest, options.fetchGuard ?? {});
+    // The manifest's public URL: where it was served from, or its first declared serving.manifest entry.
+    const manifestUrl = /^https?:\/\//.test(manifest.source ?? "")
+      ? manifest.source
+      : manifest.serving?.manifest?.[0];
+    const asUrl = (loc: string | undefined): string | undefined => {
+      if (!linkable(loc)) return undefined;
+      if (/^https?:\/\//.test(loc!)) return loc;
+      if (!manifestUrl) return undefined; // relative with no public base — nothing to link
+      return resolveLocation(manifestUrl, loc!);
+    };
+    return buildServingLinks({
+      manifestUrl,
+      signatureUrl: asUrl(manifest.signing?.signature),
+      keyUrl: asUrl(manifest.signing?.public_key),
+      servingMcp: manifest.serving?.mcp,
+      publicUrl: options.publicUrl,
+    });
+  } catch (e) {
+    return { links: [], warning: `could not load manifest for Link headers: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────
@@ -143,12 +199,21 @@ function unwrapToolResult(rpc: object | null): unknown {
 
 // ── Request handler ─────────────────────────────────────────────────────
 
-function makeHandler(options: ServeOptions) {
+function makeHandler(options: ServeOptions, servingLinks: Promise<ServingLinks>) {
   const apiKey = options.apiKey;
   const defaultManifest = options.defaultManifest;
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     setCorsHeaders(res);
+
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    const pathname = url.pathname;
+
+    // RFC 8288 discovery: /mcp and /health carry the knowledge-manifest links.
+    if (pathname === "/mcp" || pathname === "/health") {
+      const { links } = await servingLinks;
+      if (links.length) res.setHeader("Link", links);
+    }
 
     // CORS preflight
     if (req.method === "OPTIONS") {
@@ -156,9 +221,6 @@ function makeHandler(options: ServeOptions) {
       res.end();
       return;
     }
-
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    const pathname = url.pathname;
 
     // Health check — unauthenticated
     if (pathname === "/health" && req.method === "GET") {
@@ -261,7 +323,15 @@ function makeHandler(options: ServeOptions) {
  * `handleMessage` used by the stdio MCP server.
  */
 export function startServer(port: number, options: ServeOptions = {}): Server {
-  const handler = makeHandler(options);
+  // Resolved once, lazily awaited per request; the self-check warning is
+  // logged as soon as the manifest loads — a misdeployed representative
+  // (public URL not in serving.mcp) should be loud at startup.
+  const servingLinks = resolveServingLinks(options);
+  servingLinks.then(({ links, warning }) => {
+    if (links.length) console.log(`  serving ${links.length} Link header(s) on /mcp and /health`);
+    if (warning) console.warn(`  ⚠ serving: ${warning}`);
+  });
+  const handler = makeHandler(options, servingLinks);
   const server = createServer((req, res) => {
     handler(req, res).catch((err) => {
       console.error("kcp-agent serve: unhandled error:", err);
