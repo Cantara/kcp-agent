@@ -1,6 +1,6 @@
 [package]
 name = "kcp-planner"
-version = "0.1.0"
+version = "0.11.0"
 edition = "2021"
 description = "The deterministic KCP planner — a Rust port of the kcp-agent reference core, validated against the shared conformance vectors."
 license = "Apache-2.0"
