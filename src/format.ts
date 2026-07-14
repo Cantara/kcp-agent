@@ -54,6 +54,16 @@ export function formatPlan(p: AgentPlan): string {
             : c.dim(`· ${s.detail}`);
     out.push(c.bold("Signature: ") + line);
   }
+  if (p.serving) {
+    const s = p.serving;
+    const line =
+      s.status === "bound"
+        ? c.green(`✓ ${s.detail}`)
+        : s.status === "unbound"
+          ? c.yellow(`⚠ ${s.detail}`)
+          : c.dim(`· ${s.detail}`);
+    out.push(c.bold("Serving: ") + line);
+  }
   out.push("");
 
   // selected

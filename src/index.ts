@@ -7,11 +7,20 @@ export * from "./model.js";
 export { parseManifest, loadManifest, loadManifestText } from "./client.js";
 export {
   guardedFetchText,
+  guardedFetchTextFinal,
   isPrivateAddress,
   DEFAULT_MAX_BYTES,
   DEFAULT_TIMEOUT_MS,
   type FetchGuard,
 } from "./fetch.js";
+export {
+  checkServing,
+  normalizeServingUrl,
+  buildServingLinks,
+  type ServingCheck,
+  type ServingStatus,
+  type ServingLinks,
+} from "./serving.js";
 export {
   plan,
   scoreUnit,

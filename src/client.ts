@@ -7,8 +7,8 @@
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import { guardedFetchText, type FetchGuard } from "./fetch.js";
-import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier, Signing } from "./model.js";
+import { guardedFetchTextFinal, type FetchGuard } from "./fetch.js";
+import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier, Signing, Serving } from "./model.js";
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => !!v && typeof v === "object" && !Array.isArray(v);
@@ -146,6 +146,15 @@ export function parseManifest(text: string, source?: string): Manifest {
     };
   }
   const ar = trustRaw && isObj(trustRaw["agent_requirements"]) ? trustRaw["agent_requirements"] : undefined;
+  // Serving Endpoint Binding (§3.12, KCP 0.26) — exhaustive lists of where the
+  // manifest is authoritatively served and which MCP endpoints represent it.
+  const servingRaw = isObj(raw["serving"]) ? raw["serving"] : undefined;
+  const serving: Serving | undefined = servingRaw
+    ? {
+        manifest: Array.isArray(servingRaw["manifest"]) ? servingRaw["manifest"].map(String) : undefined,
+        mcp: Array.isArray(servingRaw["mcp"]) ? servingRaw["mcp"].map(String) : undefined,
+      }
+    : undefined;
   return {
     project: String(raw["project"] ?? "(unnamed)"),
     version: String(raw["version"] ?? "0.0.0"),
@@ -164,6 +173,7 @@ export function parseManifest(text: string, source?: string): Manifest {
         }
       : undefined,
     signing,
+    serving,
     source,
   };
 }
@@ -171,8 +181,11 @@ export function parseManifest(text: string, source?: string): Manifest {
 /** Resolve a location (file, directory, or HTTPS URL) to manifest text + source label. */
 export async function loadManifestText(location: string, fetchGuard: FetchGuard = {}): Promise<{ text: string; source: string }> {
   if (/^https?:\/\//.test(location)) {
-    const text = await guardedFetchText(location, fetchGuard);
-    return { text, source: location };
+    // Source is the FINAL post-redirect URL: it anchors relative signature/key
+    // resolution to where the bytes actually came from, and it is the URL the
+    // serving binding (§3.12 / C22) compares against serving.manifest.
+    const { text, finalUrl } = await guardedFetchTextFinal(location, fetchGuard);
+    return { text, source: finalUrl };
   }
   let path = location;
   if (existsSync(path) && statSync(path).isDirectory()) {

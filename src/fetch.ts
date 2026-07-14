@@ -131,6 +131,18 @@ export async function assertPublicUrl(rawUrl: string, guard: FetchGuard): Promis
 
 /** Fetch text from a URL through the guard: scheme + host + redirect + size + time. */
 export async function guardedFetchText(rawUrl: string, guard: FetchGuard = {}): Promise<string> {
+  return (await guardedFetchTextFinal(rawUrl, guard)).text;
+}
+
+/**
+ * Like guardedFetchText, but also returns the final post-redirect URL the body
+ * was actually read from. The serving binding (§3.12 / C22) compares that URL —
+ * not the one dialed — against the manifest's declared serving.manifest list.
+ */
+export async function guardedFetchTextFinal(
+  rawUrl: string,
+  guard: FetchGuard = {}
+): Promise<{ text: string; finalUrl: string }> {
   const maxBytes = guard.maxBytes ?? DEFAULT_MAX_BYTES;
   const timeoutMs = guard.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -155,7 +167,7 @@ export async function guardedFetchText(rawUrl: string, guard: FetchGuard = {}): 
       throw new Error(`response too large: ${declared} bytes exceeds cap ${maxBytes}`);
     }
     // ...and enforce the ceiling while streaming, for servers that don't (or lie).
-    return await readCapped(res, maxBytes, url.href);
+    return { text: await readCapped(res, maxBytes, url.href), finalUrl: url.href };
   }
   throw new Error(`too many redirects (>${MAX_REDIRECTS}) starting at ${rawUrl}`);
 }

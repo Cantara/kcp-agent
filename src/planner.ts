@@ -9,6 +9,7 @@
 
 import type { Manifest, Unit, PaymentMethod } from "./model.js";
 import type { SignatureResult } from "./verify.js";
+import { checkServing, type ServingCheck } from "./serving.js";
 
 export interface AgentCapabilities {
   /** Role the agent presents (default "agent"). Units target audiences. */
@@ -140,6 +141,8 @@ export interface AgentPlan {
   warnings: string[];
   /** Signature verification result — attached by the loading layer, never by the pure planner. */
   signature?: SignatureResult;
+  /** Serving Endpoint Binding check (§3.12 / C22) — present when the manifest declares a serving block. */
+  serving?: ServingCheck;
 }
 
 const STOPWORDS = new Set([
@@ -338,6 +341,14 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
   const taskTerms = terms(task);
   if (taskTerms.length === 0) warnings.push("task produced no search terms after stopword removal");
 
+  // Serving Endpoint Binding (§16.5 C22): the manifest's source is the final
+  // post-redirect retrieval URL (set by the loading layer). If it is not in
+  // the declared serving.manifest list, the plan must not tier above `known`
+  // and must warn naming both the retrieval URL and the declared list. Pure —
+  // both inputs are already on the manifest.
+  const serving = checkServing(manifest.serving, manifest.source);
+  if (serving?.status === "unbound") warnings.push(`serving binding: ${serving.detail}`);
+
   const ar = manifest.trust?.agent_requirements;
   const requiresAttestation = !!ar?.require_attestation;
   const agentCanAttest =
@@ -526,5 +537,6 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     budget: budgetPlan,
     context: contextPlan,
     warnings,
+    ...(serving ? { serving } : {}),
   };
 }

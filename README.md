@@ -246,6 +246,7 @@ planning sensibly.
 | `--memory <dir>` | (`remember`/`recall`) episodic-memory directory — one hash-addressed entry per artifact |
 | `--replay` | (`recall`) re-verify each recalled episode against today's manifests (a drifted hit exits 1) |
 | `--limit <n>` | (`recall`) cap the number of episodes returned |
+| `--public-url <url>` | (`serve`) public URL this server is reachable at — self-checked against the manifest's declared `serving.mcp` (§3.12); a mismatch warns at startup |
 
 `test/docs.test.ts` keeps this table honest: every flag `parseArgs` accepts must appear here
 and in the `cli.ts` header, and vice versa.

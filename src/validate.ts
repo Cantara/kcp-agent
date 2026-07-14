@@ -106,6 +106,31 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
     warn("manifest", `signing scheme '${manifest.signing.scheme}' is not one this agent can verify (ed25519)`);
   }
 
+  // Serving Endpoint Binding (§3.12): every entry MUST be an absolute https://
+  // URL — an http:// entry is a §7 validation error, not a warning.
+  if (manifest.serving) {
+    const lists: [string, string[] | undefined][] = [
+      ["serving.manifest", manifest.serving.manifest],
+      ["serving.mcp", manifest.serving.mcp],
+    ];
+    for (const [field, list] of lists) {
+      for (const entry of list ?? []) {
+        if (!/^https:\/\//.test(entry)) {
+          err("manifest", `${field} entry '${entry}' must be an absolute https:// URL (§3.12)`);
+        } else {
+          try {
+            new URL(entry);
+          } catch {
+            err("manifest", `${field} entry '${entry}' is not a valid URL (§3.12)`);
+          }
+        }
+      }
+    }
+    if (!manifest.signing) {
+      warn("manifest", "serving block declared without a signing block — an unsigned binding can be stripped or altered by a re-hoster (§3.12 recommends signing)");
+    }
+  }
+
   return findings;
 }
 
