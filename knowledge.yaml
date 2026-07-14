@@ -6,7 +6,7 @@
 # test/manifest.test.ts keeps this file honest: it parses the manifest, checks
 # every unit path exists on disk, and runs a plan against it.
 
-kcp_version: "0.25"
+kcp_version: "0.26"
 project: kcp-agent
 version: 0.11.0
 updated: "2026-07-07"
@@ -280,3 +280,17 @@ manifests:
     url: "https://raw.githubusercontent.com/Cantara/knowledge-context-protocol/main/knowledge.yaml"
     label: "Knowledge Context Protocol — the spec this agent implements"
     relationship: foundation
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  public_key: "MCowBQYDK2VwAyEAuipgusnqU9vjf3p2yPVLD/DmERT6tBbLOqEETdxAhMU="
+  signature: "https://raw.githubusercontent.com/Cantara/kcp-agent/main/knowledge.yaml.sig"
+
+# Serving Endpoint Binding (KCP SPEC v0.26 §3.12): authoritative manifest URL
+# and authorized MCP representative. Ignored by pre-0.26 verifiers.
+serving:
+  manifest:
+    - https://raw.githubusercontent.com/Cantara/kcp-agent/main/knowledge.yaml
+  mcp:
+    - https://mcp.cantara.no/mcp
