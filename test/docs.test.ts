@@ -90,4 +90,12 @@ describe("CLI reference", () => {
   it("the header documents no flag that parseArgs does not accept", () => {
     for (const f of headerFlags) expect(switchFlags, `header documents unknown flag ${f}`).toContain(f);
   });
+
+  it("the usage footer's promise holds: `plan --help` exits 0 with the option reference", () => {
+    const out = execFileSync("node", [path.join(ROOT, "dist", "cli.js"), "plan", "--help"], {
+      cwd: ROOT, encoding: "utf8",
+    });
+    expect(out).toContain("Options:");
+    expect(out).toContain("--json");
+  });
 });

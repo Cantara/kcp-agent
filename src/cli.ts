@@ -33,6 +33,7 @@
 //   --trust-key <loc>     pinned ed25519 public key (path, URL, or inline) for verification
 //   --trace               show the decision trace: per-unit gate cascade (plan only)
 //   --json                emit the result as JSON
+//   --help, -h            print usage and this option reference
 //   ask only:
 //   --model <id>          model id: provider/model (e.g. openai/gpt-4o, anthropic/claude-opus-4-8)
 //   --base-url <url>      base URL for OpenAI-compatible endpoints (overrides provider default)
@@ -109,11 +110,12 @@ interface Args {
   baseUrl?: string;
   apiKey?: string;
   publicUrl?: string;
+  help: boolean;
   positionals: string[];
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false, replay: false, trace: false, positionals: [] };
+  const a: Args = { command: argv[0] ?? "", strict: false, json: false, follow: false, allowPrivateHosts: false, noVerify: false, requireSignature: false, loop: false, ground: false, checkGaps: false, replay: false, trace: false, help: false, positionals: [] };
   const rest = argv.slice(1);
   const positionals: string[] = [];
   for (let i = 0; i < rest.length; i++) {
@@ -155,6 +157,7 @@ function parseArgs(argv: string[]): Args {
       case "--base-url": a.baseUrl = next(); break;
       case "--api-key": a.apiKey = next(); break;
       case "--public-url": a.publicUrl = next(); break;
+      case "--help": case "-h": a.help = true; break;
       default:
         if (t.startsWith("--")) { console.error(`Unknown option: ${t}`); process.exit(2); }
         positionals.push(t);
@@ -277,12 +280,56 @@ const USAGE =
   '  kcp-agent discover <url>\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
+const OPTIONS =
+  'Options:\n' +
+  '  --manifest <loc>        manifest path, directory, or URL\n' +
+  '  --env <env>             environment for scope filtering\n' +
+  '  --as-of <date>          plan as of a pinned date (default: today)\n' +
+  '  --max-units <n>         cap on selected units (default 5)\n' +
+  '  --strict                fail-closed: drop non-eligible units instead of listing them\n' +
+  '  --role <role>           audience role the agent presents (default: agent)\n' +
+  '  --methods <list>        payment methods the agent can settle, e.g. free,x402\n' +
+  '  --credentials <list>    credential kinds the agent holds, e.g. api_key,oauth2\n' +
+  '  --attest <provider>     attestation provider the agent can present\n' +
+  '  --budget <amount>       spend ceiling for pay-per-request units (whole federated walk)\n' +
+  '  --currency <code>       budget currency (default USDC)\n' +
+  '  --context-budget <n>    token ceiling for loaded context (composes with --budget)\n' +
+  '  --follow                fetch and plan eligible federation refs too\n' +
+  '  --max-depth <n>         federation hops to follow (default 1; implies --follow)\n' +
+  '  --max-nodes <n>         cap on total manifests fetched across the walk (default 64)\n' +
+  '  --allow-private-hosts   permit loopback/private hosts and http:// (off by default)\n' +
+  '  --no-verify             skip manifest signature verification\n' +
+  '  --require-signature     fail unless every manifest has a verified signature\n' +
+  '  --trust-key <loc>       pinned ed25519 public key for verification\n' +
+  '  --trace                 (plan) show the per-unit gate-cascade decision trace\n' +
+  '  --json                  emit the result as JSON (stable, versioned: schemaVersion + kind)\n' +
+  '  --model <id>            (ask) synthesis model id, e.g. anthropic/claude-opus-4-8\n' +
+  '  --base-url <url>        (ask) base URL for OpenAI-compatible endpoints\n' +
+  '  --api-key <key>         (ask) API key — alternative to ANTHROPIC_API_KEY / OPENAI_API_KEY\n' +
+  '  --loop                  (ask) audited critique loop: plan → critique → term gate → re-plan\n' +
+  '  --max-rounds <n>        (ask --loop) max critique rounds (default 3)\n' +
+  '  --loop-model <id>       (ask --loop) critic model\n' +
+  '  --ground                (ask) verify each answer claim against a loaded unit\n' +
+  '  --ground-model <id>     (ask --ground) verifier model\n' +
+  '  --ground-rounds <n>     (ask) closed-loop grounding rounds (default 0)\n' +
+  '  --check-gaps            (replay) re-navigate to see if a surfaced gap now closes\n' +
+  '  --memory <dir>          (remember/recall/plan) episodic-memory directory\n' +
+  '  --replay                (recall) re-verify each hit against the live world\n' +
+  '  --limit <n>             (recall) max hits returned\n' +
+  '  --public-url <url>      (serve) advertised public base URL';
+
 async function main() {
   const a = parseArgs(process.argv.slice(2));
 
   if (a.command === "" || a.command === "--help" || a.command === "-h" || a.command === "help") {
     console.log(USAGE);
     process.exit(a.command === "" ? 2 : 0);
+  }
+
+  // `kcp-agent <command> --help` — the usage footer promises this works.
+  if (a.help) {
+    console.log(`${USAGE}\n\n${OPTIONS}`);
+    process.exit(0);
   }
 
   if (a.command === "mcp") {
