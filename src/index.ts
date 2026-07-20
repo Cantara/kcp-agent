@@ -128,6 +128,16 @@ export {
   type GroundOptions,
 } from "./ground.js";
 export {
+  assess,
+  extractSelfReport,
+  makeProviderEvaluator,
+  makeEvaluator,
+  type ConfidenceSignal,
+  type ConfidenceVerdict,
+  type ConfidenceEvaluator,
+  type AssessOptions,
+} from "./assess.js";
+export {
   runLoop,
   askLoop,
   gateTerms,
