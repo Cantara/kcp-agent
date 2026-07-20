@@ -178,11 +178,41 @@ isn't `grounded` (`partial-unsupported`, `partial-budget`, `partial-rounds`) sti
 remaining gaps. A compromised verifier can, at worst, widen navigation within the eligible set — it
 can never cross a gate, name a URL, or spend past the budget.
 
-### Demos — seventeen scenarios, no mocks
+### `assess` — gate what may be *acted on*
+
+The plan's gates decide what may be *loaded*; grounding decides what may be *asserted*;
+`assess()` decides whether a conclusion clears a confidence threshold before it is **acted on**.
+It runs downstream of synthesis — confidence is a property of the output, which is exactly why it
+structurally cannot be gate #14 in the pre-selection cascade.
+
+```ts
+import { assess } from "kcp-agent";
+
+const verdict = await assess(task, answer, loadedUnits, {
+  threshold: 0.7,            // org policy — caller-supplied, never manifest data
+  severity: "critical",
+  evaluator,                 // optional: makeProviderEvaluator(provider) — a separate judge
+});
+// { gate: "confidence", passed, score, threshold, signals[], detail, asOf }
+```
+
+Same trust posture as grounding: confidence is a **proposal** (the answer's own
+`Confidence: 0.82`-style self-report via `extractSelfReport`, and/or an injected evaluator's
+judgment); the gate **adjudicates** deterministically — `min`-aggregated by default, fail-closed
+on anything unmeasurable. Raw `signals[]` are preserved verbatim on every verdict so thresholds
+can be calibrated against real outcomes over time. The verdict reuses the gates'
+binary-plus-written-reason contract but is a separate downstream artifact — `DecisionTrace` and
+the conformance vectors are untouched.
+
+The enforcement side lives in [kcp-harness](https://github.com/Cantara/kcp-harness): its
+`harness_assess` MCP tool runs this gate and routes failed verdicts on critical tasks to a
+**named human** via its approval tickets, with the verdict embedded as evidence.
+
+### Demos — nineteen scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all seventeen, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · context-window · dogfood
+node examples/demos.js            # all nineteen, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · trace · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · context-window · dogfood · second-opinion
 node examples/demos.js vault      # one at a time
 ```
 
@@ -205,9 +235,10 @@ node examples/demos.js vault      # one at a time
 | **The Borrowed Memory** | MCP session dedup: `kcp_load` withholds the bytes a caller already holds (sha-confirmed stubs), and re-serves any unit that drifted | — |
 | **The Context Window** | `--context-budget`: a token ceiling, greedy by score, over-budget units skipped with the arithmetic; size from declared `size_tokens` or `bytes/4` | — |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
+| **The Second Opinion** | assess() gates a low-confidence conclusion before it is acted on | — |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all seventeen in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all nineteen in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself
@@ -437,6 +468,9 @@ const manifest = await loadManifest("./knowledge.yaml");
 const p = plan(manifest, "how do I deploy?", { env: "prod", capabilities: { paymentMethods: ["free", "x402"] } });
 // p.selected / p.skipped / p.federation / p.budget / p.trust — a pure, inspectable artifact
 const { answer } = await synthesize(p);   // optional LLM step
+
+import { assess } from "kcp-agent";       // post-synthesis confidence gate
+const verdict = await assess("how do I deploy?", answer, [], { threshold: 0.7 });
 ```
 
 ## Design
@@ -450,6 +484,8 @@ const { answer } = await synthesize(p);   // optional LLM step
 - **Signature verification** (`src/verify.ts`) — ed25519 over exact manifest bytes via WebCrypto.
 - **Synthesis layer** (`src/synthesize.ts`) — the only part that calls a model; loads only the
   planned units and answers the task.
+- **Confidence gate** (`src/assess.ts`) — post-synthesis: adjudicates self-reported and/or
+  evaluator confidence against a caller-supplied threshold, deterministically, fail-closed.
 - **MCP server** (`src/mcp.ts`) — dependency-free JSON-RPC over stdio.
 
 ## Spec conformance

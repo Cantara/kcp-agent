@@ -239,4 +239,14 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toMatch(/1\. planner .*src\/planner\.ts/);
     expect(out).toContain("kcp-spec");
   });
+
+  it("second-opinion: the confidence gate adjudicates deterministically, fail-closed", () => {
+    const out = demo("second-opinion");
+    expect(out).toContain("✓ act    confidence 0.92 >= threshold 0.7");
+    expect(out).toContain("✗ hold   confidence 0.41 < threshold 0.7 on critical task");
+    expect(out).toContain("no confidence signal obtainable");
+    // min aggregation: the 0.35 skeptic outvotes the 0.92 self-report
+    expect(out).toContain("✗ hold   confidence 0.35 < threshold 0.7");
+    expect(out).toContain("the loaded units never name a winner");
+  });
 });

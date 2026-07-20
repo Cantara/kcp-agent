@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — eighteen narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — nineteen narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all eighteen in CI as regression tests.
+// all nineteen in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -992,6 +992,43 @@ const SCENARIOS = [
       'The repo is its own example: the planner routes "how does the planner score units?" to ' +
       'src/planner.ts, and the federation block points onward to the KCP spec itself. If the ' +
       'manifest rots, CI fails — the dogfood is load-bearing.',
+  },
+  {
+    id: 'second-opinion',
+    title: 'The Second Opinion — confidence gates what may be acted on',
+    useCase:
+      'A Fjordwire editor drafts a market note from loaded units. Newsroom policy: anything ' +
+      'under 70% confidence on a critical task stops and routes to a human before it is used. ' +
+      'The planner gated loading; grounding gated asserting; assess() gates acting.',
+    async run() {
+      const { assess } = await import(pathToFileURL(path.join(ROOT, 'dist', 'assess.js')).href);
+      const task = 'draft the chip-fab market note';
+      const opts = { threshold: 0.7, severity: 'critical', asOf: '2026-07-05' };
+
+      const confident = await assess(task, 'The award went to the Nordic bid. Confidence: 0.92', [], opts);
+      const shaky = await assess(task, 'Perhaps the Nordic bid won? Confidence: 0.41', [], opts);
+      const mute = await assess(task, 'The award went to the Nordic bid.', [], opts);
+      // A separate judge — deterministic here, an LLM via makeProviderEvaluator in production.
+      const skeptic = async () => ({ source: 'evaluator', score: 0.35, reasoning: 'the loaded units never name a winner' });
+      const overruled = await assess(task, 'The award went to the Nordic bid. Confidence: 0.92', [], { ...opts, evaluator: skeptic });
+
+      const mark = (v) => (v.passed ? c.green('✓ act    ') : c.yellow('✗ hold   ')) + v.detail;
+      return { blocks: [
+        { command: "assess(task, draft, units, { threshold: 0.7, severity: 'critical' })", lines: [
+          '  ' + mark(confident),
+          '  ' + mark(shaky),
+          '  ' + mark(mute),
+        ] },
+        { command: "assess(task, draft, units, { ...same, evaluator: skeptic })", lines: [
+          '  ' + mark(overruled),
+        ] },
+      ] };
+    },
+    verdict:
+      'Confidence is a proposal; the gate adjudicates. Self-report and evaluator both just ' +
+      'propose scores — the deterministic layer min-aggregates them, so a cocky 0.92 self-report ' +
+      'cannot outvote a 0.35 skeptic, and a draft with no signal at all fails closed. The held ' +
+      'verdicts are exactly what kcp-harness routes to a named human as approval-ticket evidence.',
   },
 ];
 
