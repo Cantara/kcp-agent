@@ -249,4 +249,14 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("✗ hold   confidence 0.35 < threshold 0.7");
     expect(out).toContain("the loaded units never name a winner");
   });
+
+  it("governed-skill: a procedure fails closed until someone grants it", () => {
+    const out = demo("governed-skill");
+    expect(out).toContain("● 1. restart-web-service");
+    expect(out).toContain("○ 2. rotate-signing-keys");
+    expect(out).toContain("not load-eligible");
+    // under --strict, the ungranted skill is dropped, and attributed to its own gate
+    expect(out).toContain("Load plan (1 unit)");
+    expect(out).toContain("kind: skill not invoke-eligible: no explicit eligibility grant");
+  });
 });

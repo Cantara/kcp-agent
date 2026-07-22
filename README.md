@@ -208,11 +208,39 @@ The enforcement side lives in [kcp-harness](https://github.com/Cantara/kcp-harne
 `harness_assess` MCP tool runs this gate and routes failed verdicts on critical tasks to a
 **named human** via its approval tickets, with the verdict embedded as evidence.
 
-### Demos — nineteen scenarios, no mocks
+### `kind: skill` — governed procedures, gated separately from knowledge
+
+Spec §4.3a (v0.26.1) adds a second class of unit alongside plain knowledge: `kind: skill` marks
+something an agent could *do* — a runbook, a script, a procedure — not just read. Skills fail
+closed by default: a `kind: skill` unit is **not invoke-eligible** unless the manifest carries an
+explicit `load_eligible: true` grant, bounded by an `action_scope` (`tools`, `paths`,
+`capabilities` it may touch). This runs as its own gate, `skill_eligibility`, inserted into the
+pre-selection cascade right after relevance — the cascade is **fourteen** gates, not thirteen.
+
+```yaml
+units:
+  - id: restart-web-service
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: ["shell.exec"]
+      paths: ["/opt/web-service"]
+      capabilities: ["service.restart"]
+```
+
+An ungranted skill is still **planned** — the agent can see it exists and why it matched a task,
+same audit-before-action posture as every other gate — it is simply withheld (`loadEligible:
+false`), or dropped entirely under `--strict`, attributed to `skill_eligibility` specifically
+rather than the generic strict cutoff. Planning a skill is always safe; invoking one is a
+separate, explicitly-granted decision. See [The Governed Skill](#demos--twenty-scenarios-no-mocks)
+demo below, and the [conformant-implementation guide](guides/build-a-conformant-implementation.md)
+for the exact gate contract a port must reproduce.
+
+### Demos — twenty scenarios, no mocks
 
 ```bash
-node examples/demos.js            # all nineteen, narrated
-node examples/demos.js --list     # newsstand · transition · vault · org · audit · trace · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · context-window · dogfood · second-opinion
+node examples/demos.js            # all twenty, narrated
+node examples/demos.js --list     # newsstand · transition · vault · org · audit · trace · loop · grounding · seal · incident · leash · summer · milky-way · moved-world · deja-vu · borrowed-memory · context-window · dogfood · second-opinion · governed-skill
 node examples/demos.js vault      # one at a time
 ```
 
@@ -236,9 +264,10 @@ node examples/demos.js vault      # one at a time
 | **The Context Window** | `--context-budget`: a token ceiling, greedy by score, over-budget units skipped with the arithmetic; size from declared `size_tokens` or `bytes/4` | — |
 | **The Dogfood** | the agent validates and navigates its own repository | §2 |
 | **The Second Opinion** | assess() gates a low-confidence conclusion before it is acted on | — |
+| **The Governed Skill** | a `kind: skill` procedure fails closed until an explicit `action_scope` grant makes it invoke-eligible | §4.3a |
 
 Every fact each demo narrates is parsed or computed from the shipping CLI's and library's real
-output — nothing is hardcoded — and `test/demos.test.ts` runs all nineteen in CI, so the narration is
+output — nothing is hardcoded — and `test/demos.test.ts` runs all twenty in CI, so the narration is
 itself a regression suite. Everything is offline; no API key needed.
 
 ### This repo describes itself

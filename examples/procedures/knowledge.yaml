@@ -1,0 +1,46 @@
+# The Procedures example — governed skills, fail-closed by default (spec §4.3a, v0.26.1).
+#
+#   rotate-signing-keys   kind: skill, no load_eligible: fails closed exactly like
+#                         an unaffordable or unauthenticated unit — listed in the
+#                         plan, but not load-eligible until someone grants it.
+#   restart-web-service   kind: skill, load_eligible: true + an explicit, bounded
+#                         action_scope: eligible to invoke.
+
+kcp_version: "0.26"
+project: procedures
+version: 1.0.0
+updated: "2026-07-22"
+language: en
+
+trust:
+  provenance:
+    publisher: "Procedures Example AS"
+
+payment:
+  default_tier: free
+  methods:
+    - type: free
+
+units:
+  - id: rotate-signing-keys
+    path: runbooks/rotate-signing-keys.md
+    kind: skill
+    intent: "Rotate the production signing keys after a suspected compromise"
+    scope: global
+    audience: [agent]
+    triggers: [rotate, signing, keys, compromise]
+    execute: "scripts/rotate-signing-keys.sh"
+
+  - id: restart-web-service
+    path: runbooks/restart-web-service.md
+    kind: skill
+    intent: "Restart the web service after a bad deploy"
+    scope: global
+    audience: [agent]
+    triggers: [restart, web, service, deploy]
+    execute: "scripts/restart-web-service.sh"
+    load_eligible: true
+    action_scope:
+      tools: ["shell.exec"]
+      paths: ["/opt/web-service"]
+      capabilities: ["service.restart"]

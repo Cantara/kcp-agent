@@ -48,12 +48,19 @@ A unit that survives all five is **selected**, then evaluated for **load-eligibi
 the plan either way, so the caller sees the gate; `--strict` drops non-eligible units instead).
 Eligibility is reduced by, in order, appending a reason each time:
 
-6. **Attestation** — if the manifest requires attestation and the unit is `access: restricted` and
+6. **Skill eligibility** (v0.16.0, spec §4.3a `kind: skill`) — a governed procedure/skill fails
+   closed by default: not eligible unless the unit carries an explicit `load_eligible: true` grant,
+   `kind: skill not invoke-eligible: no explicit eligibility grant`. This is a **soft gate outside
+   `--strict`** — the plan still lists the unit with `loadEligible: false` so the caller can see it
+   was evaluated — but under `--strict` it fail-closes at this gate specifically, so the skip is
+   attributed to `skill_eligibility` rather than the generic strict gate. Units that are not
+   `kind: skill` pass through untouched (`not a skill`).
+7. **Attestation** — if the manifest requires attestation and the unit is `access: restricted` and
    the agent cannot present a trusted provider: not eligible, `restricted: requires attestation the
    agent cannot present`.
-7. **Payment affordability** — if the unit's payment method is not one the agent can settle: not
+8. **Payment affordability** — if the unit's payment method is not one the agent can settle: not
    eligible, `unaffordable: <method>`.
-8. **Access is the auth axis** — `authenticated`/`restricted` with **no credentials**: append
+9. **Access is the auth axis** — `authenticated`/`restricted` with **no credentials**: append
    `access '<level>': agent holds no credentials`; `restricted` → not eligible. Payment **never**
    substitutes for identity: a `restricted` + `x402` unit also emits the §4.11 mis-authoring hint.
    (An anonymous-paid unit is declared `access: public` with a payment block, so it never reaches
