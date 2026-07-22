@@ -1,0 +1,45 @@
+{
+  "name": "skill-eligibility-granted",
+  "spec": "§4.3a",
+  "description": "a kind: skill unit with an explicit load_eligible: true grant is invoke-eligible; one without a grant is soft-gated",
+  "manifest": "kcp_version: \"0.25\"\nproject: skills-kb\nversion: 1.0.0\nunits:\n  - id: deploy-skill\n    path: skills/deploy.md\n    intent: \"How to deploy a release to production\"\n    kind: skill\n    load_eligible: true\n    audience: [agent]\n    triggers: [deploy, release, production]\n    action_scope:\n      tools: [Bash]\n      paths: [\"scripts/**\"]\n      capabilities: [shell]\n  - id: rollback-skill\n    path: skills/rollback.md\n    intent: \"How to roll back a production deploy\"\n    kind: skill\n    audience: [agent]\n    triggers: [deploy, rollback, production]\n",
+  "task": "how do I deploy a release to production?",
+  "options": {
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": {
+    "selected": [
+      {
+        "id": "deploy-skill",
+        "loadEligible": true,
+        "score": 23
+      },
+      {
+        "id": "rollback-skill",
+        "loadEligible": false,
+        "score": 14
+      }
+    ],
+    "skipped": [],
+    "federation": [],
+    "trust": {
+      "requiresAttestation": false,
+      "agentCanAttest": true
+    },
+    "budget": {
+      "rateTier": "default"
+    },
+    "context": {
+      "approximate": false,
+      "unmeasured": 1
+    },
+    "warnings": []
+  }
+}

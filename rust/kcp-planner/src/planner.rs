@@ -362,20 +362,26 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
             skipped.push(SkippedUnit { id: unit.id.clone(), reason: "no task-relevance match".to_string() });
             continue;
         }
-        // 7. attestation
-        let unit_requires_attestation = requires_attestation && unit.access.as_deref() == Some("restricted");
+        // 7. skill_eligibility — a governed procedure/skill (kind: skill) fails
+        // closed: load/invoke-eligible only with an explicit load_eligible grant.
         let mut load_eligible = true;
+        if unit.kind.as_deref() == Some("skill") && unit.load_eligible != Some(true) {
+            load_eligible = false;
+            reasons.push("kind: skill not invoke-eligible: no explicit eligibility grant".to_string());
+        }
+        // 8. attestation
+        let unit_requires_attestation = requires_attestation && unit.access.as_deref() == Some("restricted");
         if unit_requires_attestation && !agent_can_attest {
             load_eligible = false;
             reasons.push("restricted: requires attestation the agent cannot present".to_string());
         }
-        // 8. payment
+        // 9. payment
         let payment = plan_payment(unit.payment.as_ref().or(manifest.payment.as_ref()), &caps);
         if !payment.affordable {
             load_eligible = false;
             reasons.push(format!("unaffordable: {}", payment.method));
         }
-        // 9. access is the auth axis
+        // 10. access is the auth axis
         let access = unit.access.as_deref();
         if (access == Some("authenticated") || access == Some("restricted")) && caps.credentials.is_empty() {
             reasons.push(format!("access '{}': agent holds no credentials", access.unwrap()));
@@ -389,7 +395,7 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
                 ));
             }
         }
-        // 10. strict
+        // 11. strict
         if options.strict == Some(true) && !load_eligible {
             let reason = reasons.last().cloned().unwrap_or_else(|| "not load-eligible".to_string());
             skipped.push(SkippedUnit { id: unit.id.clone(), reason });

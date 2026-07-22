@@ -1,0 +1,17 @@
+{
+  "name": "skill-eligibility-strict-reject",
+  "manifest": "kcp_version: \"0.25\"\nproject: skills-kb\nversion: 1.0.0\nunits:\n  - id: deploy-skill\n    path: skills/deploy.md\n    intent: \"How to deploy a release to production\"\n    kind: skill\n    load_eligible: true\n    audience: [agent]\n    triggers: [deploy, release, production]\n    action_scope:\n      tools: [Bash]\n      paths: [\"scripts/**\"]\n      capabilities: [shell]\n  - id: rollback-skill\n    path: skills/rollback.md\n    intent: \"How to roll back a production deploy\"\n    kind: skill\n    audience: [agent]\n    triggers: [deploy, rollback, production]\n",
+  "task": "how do I deploy a release to production?",
+  "options": {
+    "strict": true,
+    "asOf": "2026-07-06",
+    "capabilities": {
+      "role": "agent",
+      "paymentMethods": [
+        "free",
+        "x402"
+      ]
+    }
+  },
+  "expect": "{\n  \"task\": \"how do I deploy a release to production?\",\n  \"manifest\": {\n    \"project\": \"skills-kb\",\n    \"version\": \"1.0.0\",\n    \"kcpVersion\": \"0.25\",\n    \"source\": \"skill-eligibility-strict-reject\"\n  },\n  \"trust\": {\n    \"requiresAttestation\": false,\n    \"agentCanAttest\": true,\n    \"note\": \"no manifest-level attestation requirement\"\n  },\n  \"asOf\": \"2026-07-06\",\n  \"options\": {\n    \"capabilities\": {\n      \"role\": \"agent\",\n      \"paymentMethods\": [\n        \"free\",\n        \"x402\"\n      ],\n      \"credentials\": []\n    },\n    \"maxUnits\": 5,\n    \"strict\": true\n  },\n  \"selected\": [\n    {\n      \"id\": \"deploy-skill\",\n      \"path\": \"skills/deploy.md\",\n      \"intent\": \"How to deploy a release to production\",\n      \"score\": 23,\n      \"reasons\": [\n        \"intent matches 3 term(s)\",\n        \"triggers match 3 term(s)\",\n        \"id/path matches 1 term(s)\"\n      ],\n      \"payment\": {\n        \"method\": \"free\",\n        \"affordable\": true\n      },\n      \"requiresAttestation\": false,\n      \"loadEligible\": true\n    }\n  ],\n  \"skipped\": [\n    {\n      \"id\": \"rollback-skill\",\n      \"reason\": \"kind: skill not invoke-eligible: no explicit eligibility grant\"\n    }\n  ],\n  \"federation\": [],\n  \"budget\": {\n    \"rateTier\": \"default\",\n    \"perRequestCosts\": [],\n    \"note\": \"all selected units are free to load at the resolved tier.\"\n  },\n  \"context\": {\n    \"approximate\": false,\n    \"unmeasured\": 1,\n    \"note\": \"no context budget set.\"\n  },\n  \"warnings\": []\n}"
+}

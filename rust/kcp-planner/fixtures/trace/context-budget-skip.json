@@ -66,6 +66,11 @@
             "detail": "score 23: intent matches 3 term(s); triggers match 3 term(s); id/path matches 1 term(s)"
           },
           {
+            "gate": "skill_eligibility",
+            "passed": true,
+            "detail": "not a skill"
+          },
+          {
             "gate": "attestation",
             "passed": true,
             "detail": "no attestation required"
@@ -149,6 +154,11 @@
             "detail": "score 10: intent matches 2 term(s); triggers match 1 term(s)"
           },
           {
+            "gate": "skill_eligibility",
+            "passed": true,
+            "detail": "not a skill"
+          },
+          {
             "gate": "attestation",
             "passed": true,
             "detail": "no attestation required"
@@ -222,6 +232,11 @@
             "gate": "relevance",
             "passed": true,
             "detail": "score 21: intent matches 3 term(s); triggers match 3 term(s)"
+          },
+          {
+            "gate": "skill_eligibility",
+            "passed": true,
+            "detail": "not a skill"
           },
           {
             "gate": "attestation",
@@ -335,6 +350,11 @@
         "gate": "relevance",
         "passed": 3,
         "failed": 1
+      },
+      {
+        "gate": "skill_eligibility",
+        "passed": 3,
+        "failed": 0
       },
       {
         "gate": "attestation",

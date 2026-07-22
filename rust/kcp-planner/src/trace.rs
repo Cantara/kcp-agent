@@ -20,6 +20,7 @@ pub enum GateName {
     Deprecated,
     Supersession,
     Relevance,
+    SkillEligibility,
     Attestation,
     Payment,
     Access,
@@ -29,13 +30,14 @@ pub enum GateName {
     ContextBudget,
 }
 
-pub const GATE_ORDER: [GateName; 13] = [
+pub const GATE_ORDER: [GateName; 14] = [
     GateName::Audience,
     GateName::NotFor,
     GateName::Temporal,
     GateName::Deprecated,
     GateName::Supersession,
     GateName::Relevance,
+    GateName::SkillEligibility,
     GateName::Attestation,
     GateName::Payment,
     GateName::Access,
@@ -261,7 +263,28 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
             continue;
         }
 
-        // 7. attestation
+        // 7. skill_eligibility — a governed procedure/skill (kind: skill) fails closed:
+        // load/invoke-eligible only with an explicit load_eligible grant. Soft-gate in
+        // non-strict mode (mirrors attestation/payment: pass with loadEligible=false so
+        // the plan still lists it); under strict it fail-closes at its own gate, which
+        // keeps the trace outcome equal to the canonical plan and attributes the skip
+        // precisely to skill_eligibility rather than the generic strict gate.
+        if unit.kind.as_deref() == Some("skill") && unit.load_eligible != Some(true) {
+            load_eligible = false;
+            if options.strict == Some(true) {
+                reject!(GateName::SkillEligibility, "kind: skill not invoke-eligible: no explicit eligibility grant".to_string());
+            } else {
+                pass!(GateName::SkillEligibility, "kind: skill not invoke-eligible: no explicit eligibility grant (loadEligible=false)".to_string());
+            }
+        } else {
+            pass!(GateName::SkillEligibility, if unit.kind.as_deref() == Some("skill") { "kind: skill with explicit eligibility grant".to_string() } else { "not a skill".to_string() });
+        }
+        if rejected {
+            candidates.push(Candidate { unit, gates, rejected, rejected_by, score, load_eligible, payment });
+            continue;
+        }
+
+        // 8. attestation
         let unit_requires_attestation = requires_attestation && unit.access.as_deref() == Some("restricted");
         if unit_requires_attestation && !agent_can_attest {
             load_eligible = false;
@@ -270,7 +293,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
             pass!(GateName::Attestation, if unit_requires_attestation { "agent can present required attestation".to_string() } else { "no attestation required".to_string() });
         }
 
-        // 8. payment
+        // 9. payment
         if !payment.affordable {
             load_eligible = false;
             pass!(GateName::Payment, format!("unaffordable: {} (loadEligible=false)", payment.method));
@@ -278,7 +301,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
             pass!(GateName::Payment, if payment.method == "free" { "free".to_string() } else { format!("{}: {}", payment.method, payment.cost.clone().unwrap_or_default()) });
         }
 
-        // 9. access
+        // 10. access
         let access = unit.access.as_deref();
         if (access == Some("authenticated") || access == Some("restricted")) && caps.credentials.is_empty() {
             if access == Some("restricted") {
@@ -292,7 +315,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
             });
         }
 
-        // 10. strict
+        // 11. strict
         if options.strict == Some(true) && !load_eligible {
             reject!(GateName::Strict, "not load-eligible under strict mode".to_string());
         } else {
@@ -311,7 +334,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
     let mut used_tokens = 0i64;
 
     for &i in &order {
-        // 11. max_units
+        // 12. max_units
         if accepted >= max_units {
             candidates[i].rejected = true;
             candidates[i].rejected_by = Some(GateName::MaxUnits);
@@ -320,7 +343,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
         }
         candidates[i].gates.push(GateVerdict { gate: GateName::MaxUnits, passed: true, detail: format!("position {} within cap of {}", accepted + 1, max_units) });
 
-        // 12. money_budget
+        // 13. money_budget
         let price = candidates[i].payment.price_per_request;
         let mut money_rejected = false;
         if let Some(b) = budget {
@@ -360,7 +383,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
             continue;
         }
 
-        // 13. context_budget
+        // 14. context_budget
         if let Some(cb) = context_budget {
             if candidates[i].load_eligible {
                 let ti = unit_tokens(candidates[i].unit);

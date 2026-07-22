@@ -11,6 +11,7 @@
 //! integration test. Two implementations that agree on every vector validate the
 //! spec, not just the code.
 
+pub mod assess;
 pub mod budget;
 #[cfg(feature = "network")]
 pub mod client;
@@ -37,6 +38,10 @@ pub mod validate;
 pub mod verify;
 pub mod vectors;
 
+pub use assess::{
+    assess, extract_self_report, Aggregate, AssessInput, AssessOptions, ConfidenceEvaluator, ConfidenceSignal,
+    ConfidenceVerdict, GroundUnit, SignalSource,
+};
 pub use diff::{diff_plans, PlanDiff};
 #[cfg(feature = "network")]
 pub use client::load_manifest_text;

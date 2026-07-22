@@ -1,9 +1,10 @@
 {
-  "name": "temporal-supersession-overlap",
-  "manifest": "kcp_version: \"0.25\"\nproject: newsroom\nversion: 1.0.0\nunits:\n  - id: award-rumour\n    path: stories/rumour.md\n    intent: \"Rumour round-up: who is favourite for the sovereign compute award?\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, rumour]\n    temporal:\n      valid_from: \"2026-06-28\"\n      valid_until: \"2026-07-05\"\n      superseded_by: award-exclusive\n  - id: award-exclusive\n    path: stories/award.md\n    intent: \"Exclusive: the sovereign compute award decision\"\n    audience: [agent]\n    triggers: [sovereign, compute, award, exclusive]\n    temporal:\n      valid_from: \"2026-07-05\"\n",
-  "task": "sovereign compute award",
+  "name": "skill-eligibility-strict-reject",
+  "manifest": "kcp_version: \"0.25\"\nproject: skills-kb\nversion: 1.0.0\nunits:\n  - id: deploy-skill\n    path: skills/deploy.md\n    intent: \"How to deploy a release to production\"\n    kind: skill\n    load_eligible: true\n    audience: [agent]\n    triggers: [deploy, release, production]\n    action_scope:\n      tools: [Bash]\n      paths: [\"scripts/**\"]\n      capabilities: [shell]\n  - id: rollback-skill\n    path: skills/rollback.md\n    intent: \"How to roll back a production deploy\"\n    kind: skill\n    audience: [agent]\n    triggers: [deploy, rollback, production]\n",
+  "task": "how do I deploy a release to production?",
   "options": {
-    "asOf": "2026-07-05",
+    "strict": true,
+    "asOf": "2026-07-06",
     "capabilities": {
       "role": "agent",
       "paymentMethods": [
@@ -14,11 +15,11 @@
   },
   "expect": {
     "taskTerms": [
-      "sovereign",
-      "compute",
-      "award"
+      "deploy",
+      "release",
+      "production"
     ],
-    "asOf": "2026-07-05",
+    "asOf": "2026-07-06",
     "capabilities": {
       "role": "agent",
       "paymentMethods": [
@@ -29,43 +30,9 @@
     },
     "units": [
       {
-        "id": "award-rumour",
-        "path": "stories/rumour.md",
-        "intent": "Rumour round-up: who is favourite for the sovereign compute award?",
-        "outcome": "skipped",
-        "gates": [
-          {
-            "gate": "audience",
-            "passed": true,
-            "detail": "role 'agent' in [\"agent\"]"
-          },
-          {
-            "gate": "not_for",
-            "passed": true,
-            "detail": "no not_for declarations"
-          },
-          {
-            "gate": "temporal",
-            "passed": true,
-            "detail": "active as-of 2026-07-05"
-          },
-          {
-            "gate": "deprecated",
-            "passed": true,
-            "detail": "not deprecated"
-          },
-          {
-            "gate": "supersession",
-            "passed": false,
-            "detail": "superseded by award-exclusive (successor active)"
-          }
-        ],
-        "rejectedBy": "supersession"
-      },
-      {
-        "id": "award-exclusive",
-        "path": "stories/award.md",
-        "intent": "Exclusive: the sovereign compute award decision",
+        "id": "deploy-skill",
+        "path": "skills/deploy.md",
+        "intent": "How to deploy a release to production",
         "outcome": "selected",
         "gates": [
           {
@@ -81,7 +48,7 @@
           {
             "gate": "temporal",
             "passed": true,
-            "detail": "active as-of 2026-07-05"
+            "detail": "no temporal constraint"
           },
           {
             "gate": "deprecated",
@@ -101,7 +68,7 @@
           {
             "gate": "skill_eligibility",
             "passed": true,
-            "detail": "not a skill"
+            "detail": "kind: skill with explicit eligibility grant"
           },
           {
             "gate": "attestation",
@@ -121,7 +88,7 @@
           {
             "gate": "strict",
             "passed": true,
-            "detail": "non-strict mode"
+            "detail": "load-eligible under strict mode"
           },
           {
             "gate": "max_units",
@@ -143,6 +110,51 @@
         "tokens": {
           "source": "unmeasured"
         }
+      },
+      {
+        "id": "rollback-skill",
+        "path": "skills/rollback.md",
+        "intent": "How to roll back a production deploy",
+        "outcome": "skipped",
+        "gates": [
+          {
+            "gate": "audience",
+            "passed": true,
+            "detail": "role 'agent' in [\"agent\"]"
+          },
+          {
+            "gate": "not_for",
+            "passed": true,
+            "detail": "no not_for declarations"
+          },
+          {
+            "gate": "temporal",
+            "passed": true,
+            "detail": "no temporal constraint"
+          },
+          {
+            "gate": "deprecated",
+            "passed": true,
+            "detail": "not deprecated"
+          },
+          {
+            "gate": "supersession",
+            "passed": true,
+            "detail": "no supersession declared"
+          },
+          {
+            "gate": "relevance",
+            "passed": true,
+            "detail": "score 14: intent matches 2 term(s); triggers match 2 term(s)"
+          },
+          {
+            "gate": "skill_eligibility",
+            "passed": false,
+            "detail": "kind: skill not invoke-eligible: no explicit eligibility grant"
+          }
+        ],
+        "rejectedBy": "skill_eligibility",
+        "score": 14
       }
     ],
     "gateSummary": [
@@ -168,18 +180,18 @@
       },
       {
         "gate": "supersession",
-        "passed": 1,
-        "failed": 1
+        "passed": 2,
+        "failed": 0
       },
       {
         "gate": "relevance",
-        "passed": 1,
+        "passed": 2,
         "failed": 0
       },
       {
         "gate": "skill_eligibility",
         "passed": 1,
-        "failed": 0
+        "failed": 1
       },
       {
         "gate": "attestation",

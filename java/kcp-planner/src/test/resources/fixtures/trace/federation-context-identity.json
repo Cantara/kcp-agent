@@ -65,6 +65,11 @@
             "detail": "score 16: intent matches 2 term(s); triggers match 2 term(s); id/path matches 1 term(s)"
           },
           {
+            "gate": "skill_eligibility",
+            "passed": true,
+            "detail": "not a skill"
+          },
+          {
             "gate": "attestation",
             "passed": true,
             "detail": "no attestation required"
@@ -134,6 +139,11 @@
       },
       {
         "gate": "relevance",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "skill_eligibility",
         "passed": 1,
         "failed": 0
       },
