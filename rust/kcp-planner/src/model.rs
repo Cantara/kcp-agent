@@ -90,6 +90,19 @@ pub struct ActionScope {
     pub paths: Option<Vec<String>>,
     #[serde(default)]
     pub capabilities: Option<Vec<String>>,
+    #[serde(default)]
+    pub spend: Option<Spend>,
+}
+
+/// Spend limits declared under a skill's action scope (#107).
+#[derive(Debug, Clone, Deserialize)]
+pub struct Spend {
+    #[serde(default)]
+    pub max_spend: Option<f64>,
+    #[serde(default)]
+    pub allowed_vendors: Option<Vec<String>>,
+    #[serde(default)]
+    pub currency: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

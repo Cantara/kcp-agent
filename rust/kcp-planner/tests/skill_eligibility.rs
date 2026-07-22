@@ -12,6 +12,23 @@
 use kcp_planner::planner::{CapabilitiesInput, PlanOptions};
 use kcp_planner::{parse_manifest, plan, trace, GateName, GATE_ORDER};
 
+#[test]
+fn parses_action_scope_onto_the_eligible_skill() {
+    let manifest = parse_manifest(SKILLS, Some("test")).expect("parse");
+    let skill = manifest.units.iter().find(|u| u.id == "deploy-skill").expect("deploy-skill unit");
+    let scope = skill.action_scope.as_ref().expect("action_scope present");
+    assert_eq!(scope.tools.as_deref(), Some(&["Bash".to_string()][..]));
+    assert_eq!(scope.paths.as_deref(), Some(&["scripts/**".to_string()][..]));
+    assert_eq!(scope.capabilities.as_deref(), Some(&["shell".to_string()][..]));
+    let spend = scope.spend.as_ref().expect("spend present");
+    assert_eq!(spend.max_spend, Some(25.0));
+    assert_eq!(
+        spend.allowed_vendors.as_deref(),
+        Some(&["anthropic".to_string(), "openai".to_string()][..])
+    );
+    assert_eq!(spend.currency.as_deref(), Some("USD"));
+}
+
 const SKILLS: &str = r#"
 project: skills-kb
 version: 1.0.0
@@ -27,6 +44,10 @@ units:
       tools: [Bash]
       paths: ["scripts/**"]
       capabilities: [shell]
+      spend:
+        max_spend: 25
+        allowed_vendors: [anthropic, openai]
+        currency: USD
   - id: rollback-skill
     path: skills/rollback.md
     intent: "How to roll back a production deploy"
