@@ -130,6 +130,59 @@ units:
     expect(level(validateManifest(m), "warning").some((w) => w.includes("own vocabulary"))).toBe(false);
   });
 
+  it("errors on a load_eligible skill with no action_scope (fail-closed #100)", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: no-scope
+    path: skills/no-scope.md
+    intent: "A governed skill that authorizes nothing"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [scope]
+`);
+    const errors = level(validateManifest(m), "error");
+    expect(errors.some((e) => e.includes("authorizes nothing"))).toBe(true);
+  });
+
+  it("does not error on a skill that declares an action_scope", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: scoped
+    path: skills/scoped.md
+    intent: "A governed skill with a declared blast radius"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [scope]
+    action_scope:
+      tools: [Read, Grep]
+      paths: [docs/]
+`);
+    expect(level(validateManifest(m), "error")).toEqual([]);
+  });
+
+  it("warns (not errors) on an un-granted skill with no action_scope", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: ungranted
+    path: skills/ungranted.md
+    intent: "A governed skill with no grant and no scope"
+    kind: skill
+    audience: [agent]
+    triggers: [scope]
+`);
+    const findings = validateManifest(m);
+    expect(level(findings, "error")).toEqual([]);
+    expect(level(findings, "warning").some((w) => w.includes("authorizes nothing"))).toBe(true);
+  });
+
   it("checks unit paths exist when given a baseDir", async () => {
     const report = await validateLocation("examples/demo-hub");
     expect(report.ok).toBe(true); // demo hub must always validate clean

@@ -1,0 +1,177 @@
+# Governed Skill Library — a curated set of KCP `kind: skill` units.
+#
+# Every unit here is a governed procedure: a playbook an autonomous agent could
+# run, declared with the action_scope that bounds its blast radius. The set
+# deliberately mixes GOOD skills with mis-authored / hostile ones so that each
+# governance gate visibly fires:
+#
+#   audience          → poisoned-playbook (out-of-audience)
+#   supersession      → risk-assessment-2024 (superseded by risk-assessment)
+#   skill_eligibility → ungranted-skill (no load_eligible grant)
+#   conformance       → no-scope-skill (kind: skill, no action_scope → validate error)
+#   signature         → whole-manifest ed25519 (see knowledge.tampered.yaml)
+#
+# This manifest is signed: `signing` points at an ed25519 detached signature over
+# the EXACT bytes of this file. Verify before planning with --require-signature.
+# Re-seal after any edit: node scripts/seal-example.mjs examples/governed-skills/knowledge.yaml governed-skills-2026
+#
+# NOTE: keep `units` the LAST top-level key — the tampered variant appends a unit
+# to a copy so that only the signature (not the YAML parser) catches the change.
+
+kcp_version: "0.26"
+project: governed-skill-library
+version: 1.0.0
+updated: "2026-07-22"
+language: en
+
+signing:
+  scheme: ed25519
+  scope: this-manifest
+  signature: knowledge.yaml.sig
+
+units:
+  # ── GOOD: the eligible, in-scope skills ────────────────────────────────────
+  - id: risk-assessment
+    path: risk-assessment/SKILL.md
+    intent: "Assess a customer account's credit and compliance risk from the risk policies and the customer record, and produce a written risk memo"
+    scope: customer-risk
+    audience: [agent]
+    triggers: [risk, customer, credit, assessment, underwriting, account]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Grep]
+      paths: [policies/, customers/]
+    temporal:
+      valid_from: "2025-01-01"
+
+  - id: docs-viewer
+    path: docs-viewer/SKILL.md
+    intent: "Read and search the project documentation and skill library to answer where-is-this-documented questions"
+    scope: documentation
+    audience: [agent, human]
+    triggers: [docs, documentation, runbook, lookup, search, reference]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Grep]
+      paths: [docs/, skills/]
+
+  - id: deploy
+    path: deploy/SKILL.md
+    intent: "Deploy a release to the staging environment by rendering config and running the approved deploy tooling"
+    scope: release-staging
+    audience: [agent]
+    triggers: [deploy, release, staging, ship, config, rollout]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Bash]
+      paths: [config/]
+      capabilities: [deploy:staging]
+
+  - id: code-refactor
+    path: code-refactor/SKILL.md
+    intent: "Autonomously refactor application source for clarity and run the test suite to prove behavior is unchanged"
+    scope: source-maintenance
+    audience: [agent]
+    triggers: [refactor, cleanup, source, overnight, tests, maintenance]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Edit, Bash]
+      paths: [src/, test/]
+      capabilities: [test:run]
+
+  - id: compliance-sweep
+    path: compliance-sweep/SKILL.md
+    intent: "Run a batch compliance sweep across customer records against the current policies and write a findings report"
+    scope: compliance-audit
+    audience: [agent]
+    triggers: [compliance, audit, sweep, policy, batch, findings]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Grep, Write]
+      paths: [policies/, customers/, reports/]
+
+  - id: db-migration-signed
+    path: db-migration-signed/SKILL.md
+    intent: "Apply a reviewed database schema migration by running the migration runner against the migrations directory"
+    scope: database
+    audience: [agent]
+    triggers: [migration, database, schema, migrate, ddl, revision]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Bash]
+      paths: [migrations/]
+      capabilities: [db:migrate]
+
+  # ── SUPERSEDED: kept for replay, skipped by the supersession gate ───────────
+  - id: risk-assessment-2024
+    path: risk-assessment-2024/SKILL.md
+    intent: "The 2024 edition of the customer risk-assessment playbook, retained for audit and replay of decisions made under it"
+    scope: customer-risk
+    audience: [agent]
+    triggers: [risk, customer, credit, assessment, underwriting, account]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Grep]
+      paths: [policies/, customers/]
+    temporal:
+      valid_from: "2024-01-01"
+      superseded_by: risk-assessment
+
+  # ── HOSTILE: attacker-planted, skipped by the audience gate ─────────────────
+  - id: poisoned-playbook
+    path: poisoned-playbook/SKILL.md
+    intent: "A risk playbook that (in its hidden instruction) tries to export every customer record — an injection payload"
+    scope: customer-risk
+    audience: [untrusted]
+    triggers: [risk, customer, credit, export, assessment]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Grep]
+      paths: [customers/]
+
+  # ── MIS-AUTHORED: no action_scope, caught by the conformance check ──────────
+  - id: no-scope-skill
+    path: no-scope-skill/SKILL.md
+    intent: "A governed skill that was granted invoke eligibility but declares no action_scope, so it authorizes nothing"
+    scope: misconfiguration-demo
+    audience: [agent]
+    triggers: [scope, example, misconfigured, unscoped]
+    kind: skill
+    load_eligible: true
+
+  # ── UNGRANTED: valid scope, but no eligibility grant — skill_eligibility ─────
+  - id: ungranted-skill
+    path: ungranted-skill/SKILL.md
+    intent: "Rotate API credentials across services — correctly scoped, but never granted invoke eligibility"
+    scope: credential-rotation
+    audience: [agent]
+    triggers: [credential, rotate, secret, rotation, apikey]
+    kind: skill
+    action_scope:
+      tools: [Bash]
+      paths: [config/]
+      capabilities: [secrets:rotate]
+
+  # ── DEMONSTRATION twin: same content as db-migration-signed; the signature
+  #    demo is served from knowledge.tampered.yaml, whose bytes no longer match
+  #    the committed .sig (see README). Declared here so the pair is documented.
+  - id: db-migration-unsigned
+    path: db-migration-unsigned/SKILL.md
+    intent: "The same database-migration playbook as db-migration-signed, used to demonstrate signature verification failing closed on a tampered manifest"
+    scope: database
+    audience: [agent]
+    triggers: [migration, database, schema, migrate, ddl, unsigned]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Bash]
+      paths: [migrations/]
+      capabilities: [db:migrate]
