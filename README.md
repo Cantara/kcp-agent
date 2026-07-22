@@ -1,5 +1,8 @@
 # kcp-agent
 
+### 🧾 See it run — [interactive KCP playground](https://cantara.github.io/pi-kcp/playground/) · [read the reveal](https://wiki.totto.org/blog/2026/07/22/the-ai-agent-that-keeps-the-receipts/)
+
+
 **The reference agent for the [Knowledge Context Protocol](https://github.com/Cantara/knowledge-context-protocol).**
 
 > **[The Arena →](https://cantara.github.io/kcp-agent/)** — the real planner, bundled unmodified,
