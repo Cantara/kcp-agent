@@ -8,8 +8,8 @@
 
 kcp_version: "0.26"
 project: kcp-agent
-version: 0.11.0
-updated: "2026-07-07"
+version: 0.16.0
+updated: "2026-07-22"
 language: en
 
 trust:
@@ -95,7 +95,7 @@ units:
 
   - id: decision-trace
     path: src/trace.ts
-    intent: "How the decision trace re-walks every unit through the 13-gate cascade — structured GateVerdict annotations cross-validated against the canonical plan, making every skip a sentence not a silence"
+    intent: "How the decision trace re-walks every unit through the 14-gate cascade — structured GateVerdict annotations cross-validated against the canonical plan, making every skip a sentence not a silence"
     scope: project
     audience: [agent, developer]
     triggers: [trace, gate cascade, decision, audit trail, inspectable, gates]
@@ -165,14 +165,19 @@ units:
 
   - id: navigator-skill
     path: skills/kcp-navigator/SKILL.md
+    kind: skill
     intent: "Portable skill packaging the plan-first, fail-closed KCP navigation discipline for agents that drive the CLI themselves"
     scope: project
     audience: [agent]
     triggers: [skill, navigator, discipline, plan first]
+    load_eligible: true
+    action_scope:
+      tools: ["shell.exec"]
+      capabilities: ["kcp.navigate"]
 
   - id: demo-suite
     path: examples/demos.js
-    intent: "Eighteen narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, answer grounding, the signature seal, the incident page, the summer plan, the milky-way estate, decision trace, dogfood — each CI-asserted"
+    intent: "Twenty narrated demo scenarios driving the real CLI — budget, supersession, auth-vs-payment gates, federation, plan diffing, the critique loop, answer grounding, the signature seal, the incident page, the summer plan, the milky-way estate, decision trace, dogfood, the confidence gate, governed skills — each CI-asserted"
     scope: project
     audience: [agent, developer]
     triggers: [demos, scenarios, showcase, newsstand, vault, audit]
@@ -249,7 +254,7 @@ units:
 
   - id: guide-trace
     path: guides/trace-your-decisions.md
-    intent: "Trace every navigation decision — run plan --trace for the 13-gate cascade, save two plans and diff them, use kcp_trace over MCP"
+    intent: "Trace every navigation decision — run plan --trace for the 14-gate cascade, save two plans and diff them, use kcp_trace over MCP"
     scope: global
     audience: [agent, human]
     triggers: [guide, trace, decision trace, diff, gate cascade, audit trail]
