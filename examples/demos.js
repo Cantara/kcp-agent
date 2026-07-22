@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// kcp-agent demo suite — nineteen narrated scenarios driving the SHIPPING CLI
+// kcp-agent demo suite — twenty narrated scenarios driving the SHIPPING CLI
 // (dist/cli.js) and library against the example manifests in this directory.
 // No mocks: every fact each scenario states is parsed or computed from real
 // output, so the demos cannot drift from the agent. test/demos.test.ts runs
-// all nineteen in CI as regression tests.
+// all twenty in CI as regression tests.
 //
 //   node examples/demos.js              # run every scenario, narrated
 //   node examples/demos.js newsstand    # run one scenario by id
@@ -30,6 +30,7 @@ const INCIDENT = path.join(EX, 'incident');
 const SUMMER = path.join(EX, 'summer', 'tourism');
 const MILKY = path.join(EX, 'milky-way');
 const DEMO_HUB = path.join(EX, 'demo-hub');
+const PROCEDURES = path.join(EX, 'procedures');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -61,6 +62,7 @@ function agent(args) {
     .replaceAll(SUMMER, 'examples/summer/tourism')
     .replaceAll(MILKY, 'examples/milky-way')
     .replaceAll(DEMO_HUB, 'examples/demo-hub')
+    .replaceAll(PROCEDURES, 'examples/procedures')
     .replaceAll(ROOT, '.');
   return {
     stdout: stripAnsi((r.stdout || '').toString()).replaceAll(ROOT + path.sep, ''),
@@ -1029,6 +1031,39 @@ const SCENARIOS = [
       'propose scores — the deterministic layer min-aggregates them, so a cocky 0.92 self-report ' +
       'cannot outvote a 0.35 skeptic, and a draft with no signal at all fails closed. The held ' +
       'verdicts are exactly what kcp-harness routes to a named human as approval-ticket evidence.',
+  },
+  {
+    id: 'governed-skill',
+    title: 'The Governed Skill — a procedure fails closed until someone grants it',
+    useCase:
+      'kind: skill (spec §4.3a, v0.26.1) marks a unit as a procedure, not just a document — ' +
+      'something an agent could DO, not only read. Skills fail closed by default: not invoke-' +
+      'eligible unless the manifest carries an explicit load_eligible: true grant, bounded by an ' +
+      'action_scope. Same task, two skills, two postures — one runbook is planned but withheld, ' +
+      'the other is eligible because its grant is explicit.',
+    run() {
+      const p = agent(['plan', 'rotate the signing keys and restart the web service',
+        '--manifest', PROCEDURES, '--as-of', '2026-07-22']);
+      const strict = agent(['plan', 'rotate the signing keys and restart the web service',
+        '--manifest', PROCEDURES, '--as-of', '2026-07-22', '--strict']);
+      return { blocks: [
+        { command: p.command, lines: [
+          ...pick(p.stdout, ['●', '○']).map((l) => '  ' + l.trim()),
+          ...pick(p.stdout, ['not load-eligible']).map((l) => '  ' + c.yellow(l.trim())),
+        ] },
+        { command: strict.command, lines: [
+          ...pick(strict.stdout, ['Load plan', '●', '○']).map((l) => '  ' + l.trim()),
+          ...pick(strict.stdout, ['rotate-signing-keys:']).map((l) => '  ' + c.yellow(l.trim())),
+        ] },
+      ] };
+    },
+    verdict:
+      'restart-web-service carries an explicit action_scope grant, so it plans eligible (●). ' +
+      'rotate-signing-keys has none, so it is planned — the agent can see it exists and why it ' +
+      'matched — but withheld (○), exactly like an unaffordable or unauthenticated unit. Under ' +
+      '--strict the ungranted skill is dropped from the plan entirely, attributed to its own ' +
+      'skill_eligibility gate rather than the generic strict cutoff. Planning a skill is always ' +
+      'safe — audit before action — invoking one is a separate, explicitly-granted decision.',
   },
 ];
 
