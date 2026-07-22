@@ -66,6 +66,11 @@
             "detail": "score 34: intent matches 4 term(s); triggers match 4 term(s); id/path matches 3 term(s)"
           },
           {
+            "gate": "skill_eligibility",
+            "passed": true,
+            "detail": "not a skill"
+          },
+          {
             "gate": "attestation",
             "passed": true,
             "detail": "restricted: requires attestation the agent cannot present (loadEligible=false)"
@@ -135,6 +140,11 @@
       },
       {
         "gate": "relevance",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "gate": "skill_eligibility",
         "passed": 1,
         "failed": 0
       },

@@ -143,6 +143,29 @@ manifests:
     agent_identity: { required: true, credential_hint: vendor_token }
 `;
 
+const SKILLS = `kcp_version: "0.25"
+project: skills-kb
+version: 1.0.0
+units:
+  - id: deploy-skill
+    path: skills/deploy.md
+    intent: "How to deploy a release to production"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [deploy, release, production]
+    action_scope:
+      tools: [Bash]
+      paths: ["scripts/**"]
+      capabilities: [shell]
+  - id: rollback-skill
+    path: skills/rollback.md
+    intent: "How to roll back a production deploy"
+    kind: skill
+    audience: [agent]
+    triggers: [deploy, rollback, production]
+`;
+
 const cap = (extra = {}) => ({ role: 'agent', paymentMethods: ['free', 'x402'], ...extra });
 
 // ── the corpus ───────────────────────────────────────────────────────────────
@@ -179,6 +202,12 @@ const inputs = [
 
   { name: 'context-budget-skip', spec: '§4.15', description: 'a token ceiling is greedy by score; an over-budget unit is skipped with the token arithmetic',
     manifest: NEWSROOM, task: 'sovereign compute award', options: { asOf: '2026-07-06', capabilities: cap(), contextBudget: 3000 } },
+
+  { name: 'skill-eligibility-granted', spec: '§4.3a', description: 'a kind: skill unit with an explicit load_eligible: true grant is invoke-eligible; one without a grant is soft-gated',
+    manifest: SKILLS, task: 'how do I deploy a release to production?', options: { asOf: '2026-07-06', capabilities: cap() } },
+
+  { name: 'skill-eligibility-strict-reject', spec: '§4.3a', description: 'without an explicit eligibility grant, --strict fails closed and skips the kind: skill unit entirely',
+    manifest: SKILLS, task: 'how do I deploy a release to production?', options: { strict: true, asOf: '2026-07-06', capabilities: cap() } },
 ];
 
 const dir = path.join(ROOT, 'vectors');

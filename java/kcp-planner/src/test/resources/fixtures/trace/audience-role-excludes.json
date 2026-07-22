@@ -94,6 +94,11 @@
         "failed": 0
       },
       {
+        "gate": "skill_eligibility",
+        "passed": 0,
+        "failed": 0
+      },
+      {
         "gate": "attestation",
         "passed": 0,
         "failed": 0
