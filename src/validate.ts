@@ -69,6 +69,7 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
     }
     validateTemporal(unit, where, findings);
     validateNotFor(unit, where, findings);
+    validateSkillScope(unit, where, findings);
     for (const m of unit.payment?.methods ?? []) {
       if (!m.type) err(where, "payment method missing 'type'");
       if (m.type === "x402" && (!m.price_per_request || !m.currency)) {
@@ -160,6 +161,42 @@ function validateNotFor(unit: Unit, where: string, findings: Finding[]) {
           `name the excluded topic in its own words (e.g. "CCPA", "accounting"), never as a negation of this unit's topic ("non-X", "outside X")`,
       });
     }
+  }
+}
+
+/**
+ * Governed-skill conformance (#100): a `kind: skill` unit is an invoke-eligible
+ * procedure whose `action_scope` is the *only* thing that authorizes it to touch
+ * a tool or path. Skills fail closed — so a skill that is granted invoke
+ * eligibility (`load_eligible: true`) but declares no action_scope (or an empty
+ * one) authorizes *nothing*: a publisher error that hands an autonomous agent a
+ * runnable procedure with no declared blast radius. Flag it at publish time as
+ * an error, the same fail-closed posture the planner takes at plan time.
+ */
+function validateSkillScope(unit: Unit, where: string, findings: Finding[]) {
+  if (unit.kind !== "skill") return;
+  const as = unit.action_scope;
+  const empty =
+    !as ||
+    ((as.tools ?? []).length === 0 &&
+      (as.paths ?? []).length === 0 &&
+      (as.capabilities ?? []).length === 0);
+  if (unit.load_eligible === true && empty) {
+    findings.push({
+      level: "error",
+      where,
+      message:
+        "kind: skill is load_eligible but declares no action_scope — a governed skill authorizes nothing " +
+        "until it lists the tools/paths/capabilities it may touch (fail-closed, #100)",
+    });
+  } else if (empty) {
+    findings.push({
+      level: "warning",
+      where,
+      message:
+        "kind: skill declares no action_scope — it authorizes nothing and can never be invoked until it " +
+        "declares one (fail-closed, #100)",
+    });
   }
 }
 
