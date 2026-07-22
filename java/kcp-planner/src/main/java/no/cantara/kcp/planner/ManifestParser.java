@@ -135,8 +135,34 @@ public final class ManifestParser {
                 parsePayment(get(v, "payment")),
                 parseRateLimits(get(v, "rate_limits")),
                 temporal,
+                asStr(get(v, "kind")),
+                parseActionScope(get(v, "action_scope")),
+                optBool(v, "load_eligible"),
                 asNum(get(v, "size_tokens")),
                 asNum(get(v, "bytes")));
+    }
+
+    private static Unit.ActionScope parseActionScope(Object v) {
+        Map<?, ?> d = asObj(v);
+        if (d == null) {
+            return null;
+        }
+        return new Unit.ActionScope(
+                asStrArr(get(d, "tools")),
+                asStrArr(get(d, "paths")),
+                asStrArr(get(d, "capabilities")),
+                parseSpend(get(d, "spend")));
+    }
+
+    private static Unit.ActionScope.Spend parseSpend(Object v) {
+        Map<?, ?> d = asObj(v);
+        if (d == null) {
+            return null;
+        }
+        return new Unit.ActionScope.Spend(
+                asNum(get(d, "max_spend")),
+                asStrArr(get(d, "allowed_vendors")),
+                asStr(get(d, "currency")));
     }
 
     private static ManifestRef parseManifestRef(Map<?, ?> v) {

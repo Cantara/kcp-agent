@@ -312,20 +312,29 @@ public final class KcpPlanner {
                 continue;
             }
             List<String> reasons = new ArrayList<>(sr.reasons());
-            // 7. attestation
-            boolean unitRequiresAttestation = requiresAttestation && "restricted".equals(unit.access());
+            // 7. skill_eligibility: a procedure/skill (kind: skill) is a governed unit
+            // that fails closed — it is load/invoke-eligible only with an explicit
+            // grant (load_eligible: true). Non-skill units and eligible skills pass.
+            // Soft-gate so --trace shows the verdict; strict mode converts it to a
+            // skip below.
             boolean loadEligible = true;
+            if ("skill".equals(unit.kind()) && !Boolean.TRUE.equals(unit.loadEligible())) {
+                loadEligible = false;
+                reasons.add("kind: skill not invoke-eligible: no explicit eligibility grant");
+            }
+            // 8. attestation
+            boolean unitRequiresAttestation = requiresAttestation && "restricted".equals(unit.access());
             if (unitRequiresAttestation && !agentCanAttest) {
                 loadEligible = false;
                 reasons.add("restricted: requires attestation the agent cannot present");
             }
-            // 8. payment
+            // 9. payment
             PaymentPlan payment = planPayment(unit.payment() != null ? unit.payment() : manifest.payment(), caps);
             if (!payment.affordable()) {
                 loadEligible = false;
                 reasons.add("unaffordable: " + payment.method());
             }
-            // 9. access is the auth axis
+            // 10. access is the auth axis
             String access = unit.access();
             if ("authenticated".equals(access) || "restricted".equals(access)) {
                 if (caps.credentials().isEmpty()) {
@@ -339,7 +348,7 @@ public final class KcpPlanner {
                     }
                 }
             }
-            // 10. strict
+            // 11. strict
             if (options.strict() && !loadEligible) {
                 String reason = reasons.isEmpty() ? "not load-eligible" : reasons.get(reasons.size() - 1);
                 skipped.add(new SkippedUnit(unit.id(), reason));
@@ -627,7 +636,29 @@ public final class KcpPlanner {
                 candidates.add(c);
                 continue;
             }
-            // 7. attestation
+            // 7. skill_eligibility — a governed procedure/skill (kind: skill) fails
+            // closed: load/invoke-eligible only with an explicit load_eligible grant.
+            // Soft-gate in non-strict mode (mirrors attestation/payment: pass with
+            // loadEligible=false so the plan still lists it); under strict it
+            // fail-closes at its own gate, which keeps the trace outcome equal to the
+            // canonical plan and attributes the skip precisely to skill_eligibility
+            // rather than the generic strict gate.
+            if ("skill".equals(unit.kind()) && !Boolean.TRUE.equals(unit.loadEligible())) {
+                c.loadEligible = false;
+                if (options.strict()) {
+                    c.reject(GateName.SKILL_ELIGIBILITY, "kind: skill not invoke-eligible: no explicit eligibility grant");
+                } else {
+                    c.pass(GateName.SKILL_ELIGIBILITY, "kind: skill not invoke-eligible: no explicit eligibility grant (loadEligible=false)");
+                }
+            } else {
+                c.pass(GateName.SKILL_ELIGIBILITY, "skill".equals(unit.kind())
+                        ? "kind: skill with explicit eligibility grant" : "not a skill");
+            }
+            if (c.rejected) {
+                candidates.add(c);
+                continue;
+            }
+            // 8. attestation
             boolean unitRequiresAttestation = requiresAttestation && "restricted".equals(unit.access());
             if (unitRequiresAttestation && !agentCanAttest) {
                 c.loadEligible = false;
@@ -636,7 +667,7 @@ public final class KcpPlanner {
                 c.pass(GateName.ATTESTATION, unitRequiresAttestation
                         ? "agent can present required attestation" : "no attestation required");
             }
-            // 8. payment
+            // 9. payment
             if (!c.payment.affordable()) {
                 c.loadEligible = false;
                 c.pass(GateName.PAYMENT, "unaffordable: " + c.payment.method() + " (loadEligible=false)");
@@ -644,7 +675,7 @@ public final class KcpPlanner {
                 c.pass(GateName.PAYMENT, "free".equals(c.payment.method())
                         ? "free" : c.payment.method() + ": " + c.payment.cost());
             }
-            // 9. access
+            // 10. access
             String access = unit.access();
             if (("authenticated".equals(access) || "restricted".equals(access)) && caps.credentials().isEmpty()) {
                 if ("restricted".equals(access)) {
@@ -656,7 +687,7 @@ public final class KcpPlanner {
                 c.pass(GateName.ACCESS, access != null
                         ? "access '" + access + "' — agent has credentials" : "public access");
             }
-            // 10. strict
+            // 11. strict
             if (options.strict() && !c.loadEligible) {
                 c.reject(GateName.STRICT, "not load-eligible under strict mode");
             } else {
@@ -681,13 +712,13 @@ public final class KcpPlanner {
         BigDecimal spend = BigDecimal.ZERO;
         long usedTokens = 0;
         for (Candidate c : passed) {
-            // 11. max_units
+            // 12. max_units
             if (accepted >= maxUnits) {
                 c.reject(GateName.MAX_UNITS, "position " + (accepted + 1) + " exceeds cap of " + maxUnits);
                 continue;
             }
             c.pass(GateName.MAX_UNITS, "position " + (accepted + 1) + " within cap of " + maxUnits);
-            // 12. money_budget
+            // 13. money_budget
             BigDecimal price = c.payment.pricePerRequest();
             if (budget != null && c.loadEligible && price != null && price.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal amount = BigDecimal.valueOf(budget.amount());
@@ -707,7 +738,7 @@ public final class KcpPlanner {
             } else {
                 c.pass(GateName.MONEY_BUDGET, budget != null ? "free unit" : "no budget ceiling set");
             }
-            // 13. context_budget
+            // 14. context_budget
             if (contextBudget != null && c.loadEligible) {
                 long cb = contextBudget;
                 TokenInfo info = unitTokens(c.unit);

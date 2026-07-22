@@ -18,7 +18,7 @@ proven identical by reproducing every vector in [`vectors/`](../../vectors).
 <dependency>
   <groupId>no.cantara.kcp</groupId>
   <artifactId>kcp-planner</artifactId>
-  <version>0.11.0</version>
+  <version>0.16.0</version>
 </dependency>
 ```
 

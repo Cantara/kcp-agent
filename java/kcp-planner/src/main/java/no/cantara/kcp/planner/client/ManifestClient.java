@@ -41,7 +41,7 @@ import no.cantara.kcp.planner.verify.VerifyOptions;
 public final class ManifestClient {
 
     /** The User-Agent this client presents. */
-    public static final String USER_AGENT = "kcp-planner-java/0.11.0";
+    public static final String USER_AGENT = "kcp-planner-java/0.16.0";
     private static final int MAX_REDIRECTS = 5;
     private static final Pattern URL_SCHEME = Pattern.compile("^https?://.*", Pattern.CASE_INSENSITIVE);
 

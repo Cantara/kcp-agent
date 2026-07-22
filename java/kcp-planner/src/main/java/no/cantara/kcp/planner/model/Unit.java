@@ -20,7 +20,13 @@ import java.util.List;
  * @param notFor      negative-space phrases: tasks the unit explicitly does not serve
  * @param payment     unit-level payment block (overrides the manifest default)
  * @param rateLimits  unit-level rate limits
- * @param temporal    validity window and supersession pointer
+ * @param temporal     validity window and supersession pointer
+ * @param kind         unit classification — e.g. {@code "skill"} for a procedure governed
+ *                     as an invoke-eligible unit (#100)
+ * @param actionScope  declared action scope for a governed procedure/skill — the tools,
+ *                     paths, and capabilities it is permitted to touch when invoked (#100)
+ * @param loadEligible explicit eligibility grant for a skill; skills fail closed by default,
+ *                     only a unit with {@code load_eligible: true} is load/invoke-eligible (#100)
  * @param sizeTokens  declared token cost — the faithful input for context budgeting
  * @param bytes       declared byte size — the estimate source when {@code sizeTokens} is absent
  */
@@ -38,6 +44,38 @@ public record Unit(
         Payment payment,
         RateLimits rateLimits,
         Temporal temporal,
+        String kind,
+        ActionScope actionScope,
+        Boolean loadEligible,
         Long sizeTokens,
         Long bytes) {
+
+    /**
+     * Declared action scope for a governed procedure/skill (#100). Mirrors the
+     * {@code action_scope} object in {@code src/model.ts}.
+     *
+     * @param tools        tool names the skill may invoke
+     * @param paths        path globs the skill may touch
+     * @param capabilities capability tags the skill declares
+     * @param spend        optional spend limits for the skill
+     */
+    public record ActionScope(
+            List<String> tools,
+            List<String> paths,
+            List<String> capabilities,
+            Spend spend) {
+
+        /**
+         * Spend limits declared under a skill's action scope.
+         *
+         * @param maxSpend       the maximum spend the skill may authorize
+         * @param allowedVendors vendors the skill may spend with
+         * @param currency       the settlement currency
+         */
+        public record Spend(
+                Long maxSpend,
+                List<String> allowedVendors,
+                String currency) {
+        }
+    }
 }
