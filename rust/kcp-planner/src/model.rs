@@ -67,6 +67,29 @@ pub struct Unit {
     pub bytes: Option<i64>,
     #[serde(default)]
     pub temporal: Option<Temporal>,
+    /// Unit classification — e.g. "skill" for a procedure governed as an
+    /// invoke-eligible unit (#100).
+    #[serde(default)]
+    pub kind: Option<String>,
+    /// Explicit eligibility grant for a skill. Skills fail closed by default;
+    /// only a unit with `load_eligible: true` is load/invoke-eligible (#100).
+    #[serde(default)]
+    pub load_eligible: Option<bool>,
+    /// Declared action scope for a governed procedure/skill — the tools, paths,
+    /// and capabilities it is permitted to touch when invoked (#100).
+    #[serde(default)]
+    pub action_scope: Option<ActionScope>,
+}
+
+/// Declared action scope for a governed procedure/skill (#100).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ActionScope {
+    #[serde(default)]
+    pub tools: Option<Vec<String>>,
+    #[serde(default)]
+    pub paths: Option<Vec<String>>,
+    #[serde(default)]
+    pub capabilities: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
