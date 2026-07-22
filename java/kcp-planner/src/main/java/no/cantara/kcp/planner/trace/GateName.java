@@ -3,7 +3,7 @@ package no.cantara.kcp.planner.trace;
 import java.util.List;
 
 /**
- * The 13 gates of the planner cascade, in the exact evaluation order the planner
+ * The 14 gates of the planner cascade, in the exact evaluation order the planner
  * walks. Each constant carries its wire name — the lowercase, snake_case identifier
  * that appears in trace output and matches the TypeScript reference
  * ({@code audience}, {@code not_for}, …, {@code context_budget}).
@@ -15,6 +15,7 @@ public enum GateName {
     DEPRECATED("deprecated"),
     SUPERSESSION("supersession"),
     RELEVANCE("relevance"),
+    SKILL_ELIGIBILITY("skill_eligibility"),
     ATTESTATION("attestation"),
     PAYMENT("payment"),
     ACCESS("access"),

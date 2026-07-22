@@ -54,7 +54,7 @@ public final class McpServer {
     /** The MCP protocol version this server speaks. */
     public static final String PROTOCOL_VERSION = "2025-06-18";
     private static final String SERVER_NAME = "kcp-planner-java";
-    private static final String SERVER_VERSION = "0.11.0";
+    private static final String SERVER_VERSION = "0.16.0";
 
     /** Handle one JSON-RPC message; returns the response object, or {@code null} for notifications. */
     public static Map<String, Object> handleMessage(Map<?, ?> msg) {

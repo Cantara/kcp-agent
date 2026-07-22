@@ -21,4 +21,5 @@ module no.cantara.kcp.planner {
     exports no.cantara.kcp.planner.validate;
     exports no.cantara.kcp.planner.content;
     exports no.cantara.kcp.planner.replay;
+    exports no.cantara.kcp.planner.assess;
 }

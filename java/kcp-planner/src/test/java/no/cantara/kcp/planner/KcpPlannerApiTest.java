@@ -93,8 +93,8 @@ class KcpPlannerApiTest {
         assertEquals(GateName.AUDIENCE, hr.rejectedBy());
         assertEquals(1, hr.gates().size()); // stops after the first rejection
 
-        // The gate summary spans all 13 gates.
-        assertEquals(13, t.gateSummary().size());
+        // The gate summary spans all 14 gates.
+        assertEquals(14, t.gateSummary().size());
     }
 
     @Test
