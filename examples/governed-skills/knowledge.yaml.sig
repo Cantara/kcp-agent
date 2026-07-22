@@ -1,6 +1,6 @@
 {
   "key_id": "governed-skills-2026",
   "algorithm": "EdDSA",
-  "public_key": "MCowBQYDK2VwAyEAKmmwlA6cDdHG+Ug2Rd6KbY7ootvA0W+hBCB2EYlwRUQ=",
-  "signature": "mYcT0vlDF2ovf6n81ygiE+tpzNPqTqL6L89JWxl9bRLS1gyor3tKPX7xMqXsTCAxQmrzzMHiYLFS8jYTmuluAg=="
+  "public_key": "MCowBQYDK2VwAyEAuamJ4IVQ8dhlHm8mDm3IbhzMWXpHS1a2yTTdb8FP13g=",
+  "signature": "+OIZJuRu/naTjvlPkjSXW5+V99mbY7AR/Mm1QhHk/W5U207Fw+oLQggDDD6XPhHg41KoOsJ2JcYh5jtRSkAoBA=="
 }

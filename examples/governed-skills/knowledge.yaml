@@ -45,6 +45,18 @@ units:
     temporal:
       valid_from: "2025-01-01"
 
+  - id: research-topic
+    path: research-topic/SKILL.md
+    intent: "Comprehensively research a topic: gather governed sources, cross-check, synthesize a grounded cited report, remember findings"
+    scope: research
+    audience: [agent, researcher]
+    triggers: [research, investigate, "look into", brief, "what do we know about"]
+    kind: skill
+    load_eligible: true
+    action_scope:
+      tools: [Read, Grep, WebFetch, kcp_plan, kcp_load, kcp_memory_search, kcp_memory_remember]
+      paths: [research/, docs/, knowledge/]
+
   - id: docs-viewer
     path: docs-viewer/SKILL.md
     intent: "Read and search the project documentation and skill library to answer where-is-this-documented questions"

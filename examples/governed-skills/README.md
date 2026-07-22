@@ -24,6 +24,7 @@ signed with a detached ed25519 signature (`knowledge.yaml.sig`).
 
 | Skill | `action_scope` (tools · paths · caps) | Audience | State | Gate / demo it exercises |
 |---|---|---|---|---|
+| **research-topic** | `Read,Grep,WebFetch,kcp_plan,kcp_load,kcp_memory_search,kcp_memory_remember` · `research/,docs/,knowledge/` | `agent,researcher` | current, granted, **read-only** | Bootstrap / read-only / grounding+memory showcase → the "Research Assistant" demo. Trips **nothing** — governance as an enabler. |
 | **risk-assessment** | `Read,Grep` · `policies/,customers/` | `agent` | current, granted | The eligible skill that **loads**. Read-only; setting account status is out of scope (needs approval). |
 | **docs-viewer** | `Read,Grep` · `docs/,skills/` | `agent,human` | current, granted | The clean in-scope template — tools it *may* touch = tools it *needs*. |
 | **deploy** | `Read,Bash` · `config/` · `deploy:staging` | `agent` | current, granted | Conformance-violation target: `prod/` and `secrets/` are **absent** from the allow-list, so touching them is unauthorized. |
@@ -57,6 +58,32 @@ that fails verification never reaches the planner.
 All output below is captured verbatim from this branch
 (`node dist/cli.js …`, i.e. `kcp-agent`), against this manifest.
 
+### 0. The bootstrap skill loads cleanly — governance as an enabler
+
+The flagship read-only `research-topic` skill is an autonomous agent's safe
+starting point: eligible, in-audience, current, and read-only, so it passes
+every gate and **loads**. Nothing to trip — the gates clear the way.
+
+Task: *"research our refund policy"*
+
+```
+$ kcp-agent plan "research our refund policy" --manifest examples/governed-skills/knowledge.yaml --trace
+
+Load plan (3 units):
+  ● 1. research-topic (score 9)  research-topic/SKILL.md  free
+     Comprehensively research a topic: gather governed sources, cross-check, synthesize a grounded cited report, remember findings
+     why: intent matches 1 term(s); triggers match 1 term(s); id/path matches 1 term(s)
+  ● 2. compliance-sweep (score 4)  compliance-sweep/SKILL.md  free
+  ● 3. docs-viewer (score 4)  docs-viewer/SKILL.md  free
+```
+
+`--json` for `research-topic`:
+
+```
+research-topic   selected   rejectedBy=None
+  skill_eligibility  passed=true  :: kind: skill with explicit eligibility grant
+```
+
 ### 1. Conformance — `validate` catches the unscoped skill (fail-closed)
 
 ```
@@ -81,7 +108,8 @@ Load plan (2 units):
      why: intent matches 8 term(s); triggers match 5 term(s); id/path matches 2 term(s)
   ● 2. compliance-sweep (score 15)  compliance-sweep/SKILL.md  free
 
-Skipped (9):
+Skipped (10):
+  · research-topic: no task-relevance match
   · docs-viewer: no task-relevance match
   · deploy: no task-relevance match
   · code-refactor: no task-relevance match
