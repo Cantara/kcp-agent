@@ -90,6 +90,13 @@ function parseUnit(v: Raw): Unit {
           tools: asStrArr(v["action_scope"]["tools"]),
           paths: asStrArr(v["action_scope"]["paths"]),
           capabilities: asStrArr(v["action_scope"]["capabilities"]),
+          spend: isObj(v["action_scope"]["spend"])
+            ? {
+                max_spend: asNum(v["action_scope"]["spend"]["max_spend"]),
+                allowed_vendors: asStrArr(v["action_scope"]["spend"]["allowed_vendors"]),
+                currency: asStr(v["action_scope"]["spend"]["currency"]),
+              }
+            : undefined,
         }
       : undefined,
     payment: parsePayment(v["payment"]),
