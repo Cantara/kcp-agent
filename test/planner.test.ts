@@ -344,6 +344,10 @@ units:
       tools: [Bash]
       paths: ["scripts/**"]
       capabilities: [shell]
+      spend:
+        max_spend: 25
+        allowed_vendors: [anthropic, openai]
+        currency: USD
   - id: rollback-skill
     path: skills/rollback.md
     intent: "How to roll back a production deploy"
@@ -389,6 +393,9 @@ units:
     expect(skill?.action_scope?.tools).toEqual(["Bash"]);
     expect(skill?.action_scope?.paths).toEqual(["scripts/**"]);
     expect(skill?.action_scope?.capabilities).toEqual(["shell"]);
+    expect(skill?.action_scope?.spend?.max_spend).toBe(25);
+    expect(skill?.action_scope?.spend?.allowed_vendors).toEqual(["anthropic", "openai"]);
+    expect(skill?.action_scope?.spend?.currency).toBe("USD");
   });
 
   it("an eligible-but-superseded skill is still skipped by supersession (gates compose)", () => {

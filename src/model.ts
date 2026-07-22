@@ -77,7 +77,12 @@ export interface Unit {
    * Declared action scope for a governed procedure/skill — the tools, paths, and
    * capabilities it is permitted to touch when invoked (#100).
    */
-  action_scope?: { tools?: string[]; paths?: string[]; capabilities?: string[] };
+  action_scope?: {
+    tools?: string[];
+    paths?: string[];
+    capabilities?: string[];
+    spend?: { max_spend?: number; allowed_vendors?: string[]; currency?: string };
+  };
   /**
    * Explicit eligibility grant for a skill. Skills fail closed by default; only a
    * unit with `load_eligible: true` is load/invoke-eligible (#100).
