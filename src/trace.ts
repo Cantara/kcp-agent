@@ -30,6 +30,7 @@ export type GateName =
   | "deprecated"
   | "supersession"
   | "relevance"
+  | "skill_eligibility"
   | "attestation"
   | "payment"
   | "access"
@@ -41,7 +42,7 @@ export type GateName =
 /** The full cascade in order. */
 export const GATE_ORDER: readonly GateName[] = [
   "audience", "not_for", "temporal", "deprecated", "supersession",
-  "relevance", "attestation", "payment", "access", "strict",
+  "relevance", "skill_eligibility", "attestation", "payment", "access", "strict",
   "max_units", "money_budget", "context_budget",
 ] as const;
 
@@ -199,7 +200,25 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
     }
     if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
 
-    // 7. attestation
+    // 7. skill_eligibility — a governed procedure/skill (kind: skill) fails closed:
+    // load/invoke-eligible only with an explicit load_eligible grant. Soft-gate in
+    // non-strict mode (mirrors attestation/payment: pass with loadEligible=false so
+    // the plan still lists it); under strict it fail-closes at its own gate, which
+    // keeps the trace outcome equal to the canonical plan and attributes the skip
+    // precisely to skill_eligibility rather than the generic strict gate.
+    if (unit.kind === "skill" && unit.load_eligible !== true) {
+      loadEligible = false;
+      if (options.strict) {
+        reject("skill_eligibility", "kind: skill not invoke-eligible: no explicit eligibility grant");
+      } else {
+        pass("skill_eligibility", "kind: skill not invoke-eligible: no explicit eligibility grant (loadEligible=false)");
+      }
+    } else {
+      pass("skill_eligibility", unit.kind === "skill" ? "kind: skill with explicit eligibility grant" : "not a skill");
+    }
+    if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
+
+    // 8. attestation
     const unitRequiresAttestation = requiresAttestation && unit.access === "restricted";
     if (unitRequiresAttestation && !agentCanAttest) {
       loadEligible = false;
@@ -208,7 +227,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       pass("attestation", unitRequiresAttestation ? "agent can present required attestation" : "no attestation required");
     }
 
-    // 8. payment
+    // 9. payment
     if (!payment.affordable) {
       loadEligible = false;
       pass("payment", `unaffordable: ${payment.method} (loadEligible=false)`);
@@ -216,7 +235,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       pass("payment", payment.method === "free" ? "free" : `${payment.method}: ${payment.cost}`);
     }
 
-    // 9. access
+    // 10. access
     if ((unit.access === "authenticated" || unit.access === "restricted") && caps.credentials.length === 0) {
       if (unit.access === "restricted") loadEligible = false;
       pass("access", `access '${unit.access}': agent holds no credentials${unit.access === "restricted" ? " (loadEligible=false)" : ""}`);
@@ -224,7 +243,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       pass("access", unit.access ? `access '${unit.access}' — agent has credentials` : "public access");
     }
 
-    // 10. strict
+    // 11. strict
     if (options.strict && !loadEligible) {
       reject("strict", "not load-eligible under strict mode");
     } else {
@@ -245,7 +264,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
   let usedTokens = 0;
 
   for (const c of passed) {
-    // 11. max_units
+    // 12. max_units
     if (accepted >= maxUnits) {
       c.rejected = true;
       c.rejectedBy = "max_units";
@@ -254,7 +273,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
     }
     c.gates.push({ gate: "max_units", passed: true, detail: `position ${accepted + 1} within cap of ${maxUnits}` });
 
-    // 12. money_budget
+    // 13. money_budget
     const price = c.payment.pricePerRequest;
     if (budget && c.loadEligible && price !== undefined && price > 0) {
       if (c.payment.currency !== budgetCurrency) {
@@ -275,7 +294,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       c.gates.push({ gate: "money_budget", passed: true, detail: budget ? "free unit" : "no budget ceiling set" });
     }
 
-    // 13. context_budget
+    // 14. context_budget
     if (contextBudget !== undefined && c.loadEligible) {
       const { tokens, measured, approximate } = unitTokens(c.unit);
       if (!measured) {

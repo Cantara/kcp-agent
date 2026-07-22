@@ -391,9 +391,18 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     const { score, reasons } = scoreUnit(unit, taskTerms);
     if (score === 0) { skipped.push({ id: unit.id, reason: "no task-relevance match" }); continue; }
 
+    // skill eligibility: a procedure/skill (kind: skill) is a governed unit that
+    // fails closed — it is load/invoke-eligible only with an explicit grant
+    // (load_eligible: true). Non-skill units and eligible skills pass. Soft-gate
+    // so --trace shows the verdict; strict mode converts it to a skip below.
+    let loadEligible = true;
+    if (unit.kind === "skill" && unit.load_eligible !== true) {
+      loadEligible = false;
+      reasons.push("kind: skill not invoke-eligible: no explicit eligibility grant");
+    }
+
     // trust: restricted units need attestation the agent can present
     const unitRequiresAttestation = requiresAttestation && unit.access === "restricted";
-    let loadEligible = true;
     if (unitRequiresAttestation && !agentCanAttest) {
       loadEligible = false;
       reasons.push("restricted: requires attestation the agent cannot present");

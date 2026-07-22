@@ -324,3 +324,77 @@ units:
     expect(p.selected.find((u) => u.id === "honest")?.loadEligible).toBe(true);
   });
 });
+
+// Procedures/skills as governed units (#100): a `kind: skill` unit fails closed —
+// load/invoke-eligible only with an explicit `load_eligible: true` grant. The gate
+// composes with the others: a superseded skill is still skipped by supersession.
+describe("skill eligibility (#100)", () => {
+  const SKILLS = `
+project: skills-kb
+version: 1.0.0
+units:
+  - id: deploy-skill
+    path: skills/deploy.md
+    intent: "How to deploy a release to production"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [deploy, release, production]
+    action_scope:
+      tools: [Bash]
+      paths: ["scripts/**"]
+      capabilities: [shell]
+  - id: rollback-skill
+    path: skills/rollback.md
+    intent: "How to roll back a production deploy"
+    kind: skill
+    audience: [agent]
+    triggers: [deploy, rollback, production]
+  - id: old-deploy-skill
+    path: skills/old-deploy.md
+    intent: "Legacy deploy procedure, superseded"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [deploy, release, production]
+    temporal: {superseded_by: deploy-skill}
+`;
+  const m = parseManifest(SKILLS, "test");
+  const TASK = "how do I deploy a release to production?";
+
+  it("loads an explicitly eligible skill", () => {
+    const p = plan(m, TASK, { capabilities: { role: "agent" } });
+    const skill = p.selected.find((u) => u.id === "deploy-skill");
+    expect(skill).toBeDefined();
+    expect(skill?.loadEligible).toBe(true);
+  });
+
+  it("soft-gates a skill with no eligibility grant, then fail-closed under strict", () => {
+    const p = plan(m, TASK, { capabilities: { role: "agent" } });
+    const skill = p.selected.find((u) => u.id === "rollback-skill");
+    expect(skill).toBeDefined();
+    expect(skill?.loadEligible).toBe(false);
+    expect(skill?.reasons.join(" ")).toContain(
+      "kind: skill not invoke-eligible: no explicit eligibility grant",
+    );
+    // strict mode converts the soft-gate to a skip
+    const strict = plan(m, TASK, { strict: true, capabilities: { role: "agent" } });
+    expect(strict.selected.some((u) => u.id === "rollback-skill")).toBe(false);
+    const skip = strict.skipped.find((s) => s.id === "rollback-skill");
+    expect(skip?.reason).toBe("kind: skill not invoke-eligible: no explicit eligibility grant");
+  });
+
+  it("parses action_scope onto the eligible skill", () => {
+    const skill = m.units.find((u) => u.id === "deploy-skill");
+    expect(skill?.action_scope?.tools).toEqual(["Bash"]);
+    expect(skill?.action_scope?.paths).toEqual(["scripts/**"]);
+    expect(skill?.action_scope?.capabilities).toEqual(["shell"]);
+  });
+
+  it("an eligible-but-superseded skill is still skipped by supersession (gates compose)", () => {
+    const p = plan(m, TASK, { capabilities: { role: "agent" } });
+    expect(p.selected.some((u) => u.id === "old-deploy-skill")).toBe(false);
+    const skip = p.skipped.find((s) => s.id === "old-deploy-skill");
+    expect(skip?.reason).toBe("superseded by deploy-skill (successor active)");
+  });
+});

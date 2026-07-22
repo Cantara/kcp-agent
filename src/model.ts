@@ -71,6 +71,18 @@ export interface Unit {
   payment?: Payment;
   rate_limits?: RateLimits;
   temporal?: Temporal;
+  /** Unit classification — e.g. "skill" for a procedure governed as an invoke-eligible unit (#100). */
+  kind?: string;
+  /**
+   * Declared action scope for a governed procedure/skill — the tools, paths, and
+   * capabilities it is permitted to touch when invoked (#100).
+   */
+  action_scope?: { tools?: string[]; paths?: string[]; capabilities?: string[] };
+  /**
+   * Explicit eligibility grant for a skill. Skills fail closed by default; only a
+   * unit with `load_eligible: true` is load/invoke-eligible (#100).
+   */
+  load_eligible?: boolean;
   /** Declared token cost — the faithful input for context-window budgeting (#33). */
   size_tokens?: number;
   /** Declared byte size — the estimate source when size_tokens is absent (tokens ≈ bytes/4). */

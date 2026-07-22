@@ -83,6 +83,15 @@ function parseUnit(v: Raw): Unit {
     auth_scope: asStr(v["auth_scope"]),
     deprecated: v["deprecated"] === undefined ? undefined : Boolean(v["deprecated"]),
     not_for: asStrArr(v["not_for"]),
+    kind: asStr(v["kind"]),
+    load_eligible: v["load_eligible"] === undefined ? undefined : Boolean(v["load_eligible"]),
+    action_scope: isObj(v["action_scope"])
+      ? {
+          tools: asStrArr(v["action_scope"]["tools"]),
+          paths: asStrArr(v["action_scope"]["paths"]),
+          capabilities: asStrArr(v["action_scope"]["capabilities"]),
+        }
+      : undefined,
     payment: parsePayment(v["payment"]),
     rate_limits: parseRateLimits(v["rate_limits"]),
     size_tokens: asNum(v["size_tokens"]),
