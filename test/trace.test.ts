@@ -255,3 +255,62 @@ units:
     expect(expensive.rejectedBy).toBe("money_budget");
   });
 });
+
+// Skill eligibility gate (#100): governed procedures/skills sit in the cascade
+// after relevance, before attestation, and fail closed without an explicit grant.
+describe("trace() — skill_eligibility gate (#100)", () => {
+  const SKILLS = `
+project: skills-kb
+version: 1.0.0
+units:
+  - id: deploy-skill
+    path: skills/deploy.md
+    intent: "How to deploy a release to production"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [deploy, release, production]
+  - id: rollback-skill
+    path: skills/rollback.md
+    intent: "How to roll back a production deploy"
+    kind: skill
+    audience: [agent]
+    triggers: [deploy, rollback, production]
+`;
+  const m = parseManifest(SKILLS, "test");
+  const TASK = "how do I deploy a release to production?";
+
+  it("places skill_eligibility after relevance and before attestation in GATE_ORDER", () => {
+    const rel = GATE_ORDER.indexOf("relevance");
+    const skill = GATE_ORDER.indexOf("skill_eligibility");
+    const att = GATE_ORDER.indexOf("attestation");
+    expect(skill).toBe(rel + 1);
+    expect(att).toBe(skill + 1);
+  });
+
+  it("an eligible skill passes skill_eligibility and is selected", () => {
+    const t = trace(m, TASK, { capabilities: { role: "agent" } });
+    const skill = t.units.find((u) => u.id === "deploy-skill")!;
+    expect(skill.outcome).toBe("selected");
+    const gate = skill.gates.find((g) => g.gate === "skill_eligibility");
+    expect(gate?.passed).toBe(true);
+  });
+
+  it("an ineligible skill soft-passes (non-strict) but is fail-closed under strict with rejectedBy skill_eligibility", () => {
+    // non-strict: soft-gated, still selected, loadEligible=false rendered in the gate detail
+    const t = trace(m, TASK, { capabilities: { role: "agent" } });
+    const soft = t.units.find((u) => u.id === "rollback-skill")!;
+    const softGate = soft.gates.find((g) => g.gate === "skill_eligibility");
+    expect(softGate?.passed).toBe(true);
+    expect(softGate?.detail).toContain("no explicit eligibility grant");
+
+    // strict: fail-closed at its own gate
+    const ts = trace(m, TASK, { strict: true, capabilities: { role: "agent" } });
+    const hard = ts.units.find((u) => u.id === "rollback-skill")!;
+    expect(hard.outcome).toBe("skipped");
+    expect(hard.rejectedBy).toBe("skill_eligibility");
+    const hardGate = hard.gates.find((g) => g.gate === "skill_eligibility");
+    expect(hardGate?.passed).toBe(false);
+    expect(hardGate?.detail).toBe("kind: skill not invoke-eligible: no explicit eligibility grant");
+  });
+});
