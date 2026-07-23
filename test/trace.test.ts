@@ -270,6 +270,12 @@ units:
     load_eligible: true
     audience: [agent]
     triggers: [deploy, release, production]
+    action_scope:
+      tools: [Bash]
+      spend:
+        max_spend: 25
+        allowed_vendors: [anthropic]
+        currency: USD
   - id: rollback-skill
     path: skills/rollback.md
     intent: "How to roll back a production deploy"
@@ -294,6 +300,17 @@ units:
     expect(skill.outcome).toBe("selected");
     const gate = skill.gates.find((g) => g.gate === "skill_eligibility");
     expect(gate?.passed).toBe(true);
+  });
+
+  it("carries action_scope onto the selected unit's trace entry", () => {
+    // A downstream enforcer (e.g. kcp-harness's purchase conformance gate) reads
+    // the trace/plan JSON — action_scope.spend must be visible there directly,
+    // not require re-fetching and re-parsing the raw manifest.
+    const t = trace(m, TASK, { capabilities: { role: "agent" } });
+    const skill = t.units.find((u) => u.id === "deploy-skill")!;
+    expect(skill.action_scope?.spend?.max_spend).toBe(25);
+    expect(skill.action_scope?.spend?.allowed_vendors).toEqual(["anthropic"]);
+    expect(skill.action_scope?.spend?.currency).toBe("USD");
   });
 
   it("an ineligible skill soft-passes (non-strict) but is fail-closed under strict with rejectedBy skill_eligibility", () => {

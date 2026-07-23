@@ -160,7 +160,7 @@ public final class ManifestParser {
             return null;
         }
         return new Unit.ActionScope.Spend(
-                asNum(get(d, "max_spend")),
+                asDecimal(get(d, "max_spend")),
                 asStrArr(get(d, "allowed_vendors")),
                 asStr(get(d, "currency")));
     }
@@ -300,6 +300,30 @@ public final class ManifestParser {
     /** An optional numeric field: null when the key is absent, else {@code asNum}. */
     private static Long optNum(Map<?, ?> m, String key) {
         return m.containsKey(key) ? asNum(m.get(key)) : null;
+    }
+
+    /**
+     * Like {@code asNum}, but preserves the fraction (Double, not Long). Used for
+     * currency amounts such as action_scope.spend.max_spend, where truncating
+     * 4.99 to 4 would silently loosen a declared spend ceiling — unlike asNum's
+     * integer fields (size_tokens, bytes, free_requests_per_day), which are
+     * genuinely counts and have no meaningful fraction.
+     */
+    private static Double asDecimal(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (v instanceof Number n) {
+            return n.doubleValue();
+        }
+        if (v instanceof Boolean b) {
+            return b ? 1.0 : 0.0;
+        }
+        try {
+            return Double.parseDouble(v.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**

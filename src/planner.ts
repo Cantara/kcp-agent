@@ -74,6 +74,15 @@ export interface PlannedUnit {
   payment: PaymentPlan;
   requiresAttestation: boolean;
   loadEligible: boolean;
+  /**
+   * Declared action scope, verbatim from the manifest (#100). A downstream
+   * enforcer (e.g. a runtime spend gate) must be able to read this from the
+   * plan itself — without it, the only way to recover a selected skill's
+   * action_scope.spend is to re-fetch and re-parse the raw manifest, which
+   * both duplicates parsing logic and can drift from what was actually
+   * evaluated if the manifest changes between plan and invoke.
+   */
+  action_scope?: Unit["action_scope"];
 }
 
 export interface SkippedUnit {
@@ -432,6 +441,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     selected.push({
       id: unit.id, path: unit.path, intent: unit.intent, score, reasons,
       payment, requiresAttestation: unitRequiresAttestation, loadEligible,
+      action_scope: unit.action_scope,
     });
   }
 

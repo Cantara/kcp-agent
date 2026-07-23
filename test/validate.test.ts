@@ -183,6 +183,43 @@ units:
     expect(level(findings, "warning").some((w) => w.includes("authorizes nothing"))).toBe(true);
   });
 
+  it("warns on an unrecognized kind (typo or unsupported class) — it loads ungoverned", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: typo-kind
+    path: skills/typo.md
+    intent: "A skill with a typo'd kind"
+    kind: Skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [scope]
+    action_scope:
+      tools: [Bash]
+`);
+    const findings = validateManifest(m);
+    expect(level(findings, "warning").some((w) => w.includes("unknown kind 'Skill'"))).toBe(true);
+  });
+
+  it("does not warn on kind: skill", () => {
+    const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: real-skill
+    path: skills/real.md
+    intent: "A properly declared skill"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [scope]
+    action_scope:
+      tools: [Bash]
+`);
+    expect(level(validateManifest(m), "warning").some((w) => w.includes("unknown kind"))).toBe(false);
+  });
+
   it("checks unit paths exist when given a baseDir", async () => {
     const report = await validateLocation("examples/demo-hub");
     expect(report.ok).toBe(true); // demo hub must always validate clean
