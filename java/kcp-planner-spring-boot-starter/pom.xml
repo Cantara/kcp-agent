@@ -7,7 +7,7 @@
   <parent>
     <groupId>no.cantara.kcp</groupId>
     <artifactId>kcp-planner-parent</artifactId>
-    <version>0.16.0</version>
+    <version>0.17.0</version>
   </parent>
 
   <artifactId>kcp-planner-spring-boot-starter</artifactId>
@@ -43,7 +43,7 @@
     <dependency>
       <groupId>no.cantara.kcp</groupId>
       <artifactId>kcp-planner</artifactId>
-      <version>0.16.0</version>
+      <version>0.17.0</version>
     </dependency>
 
     <dependency>
