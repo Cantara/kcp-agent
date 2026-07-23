@@ -6,7 +6,7 @@
 
   <groupId>no.cantara.kcp</groupId>
   <artifactId>kcp-planner-parent</artifactId>
-  <version>0.17.0</version>
+  <version>0.17.1</version>
   <packaging>pom</packaging>
 
   <name>KCP Planner (parent)</name>
