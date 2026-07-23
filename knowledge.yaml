@@ -8,8 +8,8 @@
 
 kcp_version: "0.26"
 project: kcp-agent
-version: 0.16.0
-updated: "2026-07-22"
+version: 0.18.0
+updated: "2026-07-23"
 language: en
 
 trust:
