@@ -68,12 +68,16 @@ public record Unit(
         /**
          * Spend limits declared under a skill's action scope.
          *
-         * @param maxSpend       the maximum spend the skill may authorize
+         * @param maxSpend       the maximum spend the skill may authorize — a
+         *                       currency amount (e.g. 4.99), not a count, so this
+         *                       is a Double (mirrors the TS `number` and Rust
+         *                       `f64` reference/port; do not change to Long/Long,
+         *                       which would silently truncate fractional ceilings)
          * @param allowedVendors vendors the skill may spend with
          * @param currency       the settlement currency
          */
         public record Spend(
-                Long maxSpend,
+                Double maxSpend,
                 List<String> allowedVendors,
                 String currency) {
         }

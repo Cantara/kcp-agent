@@ -70,6 +70,8 @@ export interface UnitTrace {
   tokens?: { value?: number; source: "declared" | "estimated" | "unmeasured" };
   /** Money cost attribution (only for pay-per-request selected units). */
   cost?: { amount?: number; currency?: string; method: string };
+  /** Declared action scope, verbatim from the manifest (only for selected units, #100). */
+  action_scope?: Unit["action_scope"];
 }
 
 /** The complete decision trace. */
@@ -343,6 +345,7 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       if (c.payment.method !== "free" && c.payment.pricePerRequest !== undefined) {
         ut.cost = { amount: c.payment.pricePerRequest, currency: c.payment.currency, method: c.payment.method };
       }
+      if (c.unit.action_scope) ut.action_scope = c.unit.action_scope;
     }
     return ut;
   });

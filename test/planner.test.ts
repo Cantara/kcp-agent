@@ -398,6 +398,17 @@ units:
     expect(skill?.action_scope?.spend?.currency).toBe("USD");
   });
 
+  it("carries action_scope through to the plan's selected unit, not just the parsed manifest", () => {
+    // A downstream enforcer (e.g. a runtime spend gate) reads the *plan*, not the
+    // raw manifest — action_scope.spend must survive into PlannedUnit or it's
+    // unusable without re-fetching and re-parsing the manifest independently.
+    const p = plan(m, TASK, { capabilities: { role: "agent" } });
+    const skill = p.selected.find((u) => u.id === "deploy-skill");
+    expect(skill?.action_scope?.spend?.max_spend).toBe(25);
+    expect(skill?.action_scope?.spend?.allowed_vendors).toEqual(["anthropic", "openai"]);
+    expect(skill?.action_scope?.spend?.currency).toBe("USD");
+  });
+
   it("an eligible-but-superseded skill is still skipped by supersession (gates compose)", () => {
     const p = plan(m, TASK, { capabilities: { role: "agent" } });
     expect(p.selected.some((u) => u.id === "old-deploy-skill")).toBe(false);

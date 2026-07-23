@@ -109,9 +109,36 @@ class SkillEligibilityTest {
         assertEquals(List.of("Bash"), skill.actionScope().tools());
         assertEquals(List.of("scripts/**"), skill.actionScope().paths());
         assertEquals(List.of("shell"), skill.actionScope().capabilities());
-        assertEquals(25L, skill.actionScope().spend().maxSpend());
+        assertEquals(25.0, skill.actionScope().spend().maxSpend());
         assertEquals(List.of("anthropic", "openai"), skill.actionScope().spend().allowedVendors());
         assertEquals("USD", skill.actionScope().spend().currency());
+    }
+
+    @Test
+    void maxSpendPreservesFractionalCurrencyAmounts() {
+        // A Long-typed maxSpend would silently truncate 4.99 to 4, loosening the
+        // declared ceiling. The TS reference (number) and Rust port (f64) both
+        // preserve the fraction — the Java port must match.
+        Manifest m = ManifestParser.parse("""
+                project: p
+                version: 1.0.0
+                units:
+                  - id: metered-skill
+                    path: skills/metered.md
+                    intent: "A skill with a fractional spend ceiling"
+                    kind: skill
+                    load_eligible: true
+                    audience: [agent]
+                    triggers: [scope]
+                    action_scope:
+                      tools: [Bash]
+                      spend:
+                        max_spend: 4.99
+                        currency: USD
+                """, "test");
+        Unit skill = m.units().stream().filter(u -> u.id().equals("metered-skill")).findFirst().orElse(null);
+        assertNotNull(skill);
+        assertEquals(4.99, skill.actionScope().spend().maxSpend());
     }
 
     @Test
