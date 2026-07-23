@@ -48,15 +48,30 @@ jobs:
           server-password: CENTRAL_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      # `secrets` can't be interpolated directly inside an `if:` condition —
+      # GitHub Actions rejects the whole workflow at parse time if it is (this
+      # is what made every run since this workflow was first added fail
+      # instantly with zero jobs). Route it through env first instead.
+      - name: Check Maven Central credentials
+        id: creds
+        env:
+          CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$CENTRAL_TOKEN" ] && [ -n "$MAVEN_GPG_PRIVATE_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish to Maven Central
-        if: ${{ secrets.CENTRAL_TOKEN != '' && secrets.MAVEN_GPG_PRIVATE_KEY != '' }}
+        if: steps.creds.outputs.configured == 'true'
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: mvn -B -f java/pom.xml -Prelease -DskipTests deploy
       - name: Skip publish (no credentials configured)
-        if: ${{ secrets.CENTRAL_TOKEN == '' || secrets.MAVEN_GPG_PRIVATE_KEY == '' }}
+        if: steps.creds.outputs.configured != 'true'
         run: echo "CENTRAL_TOKEN / MAVEN_GPG_PRIVATE_KEY not set — skipping Maven Central publish (the gate proved the release artifacts build)."
 
   github-release:
