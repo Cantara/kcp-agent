@@ -2,6 +2,8 @@ package no.cantara.kcp.planner;
 
 import java.util.List;
 
+import no.cantara.kcp.planner.model.Unit;
+
 /**
  * A unit the planner selected, with its relevance score and the reasons behind
  * every decision. Mirrors {@code PlannedUnit} in {@code src/planner.ts}.
@@ -14,6 +16,7 @@ import java.util.List;
  * @param payment             the payment decision
  * @param requiresAttestation whether this unit requires attestation
  * @param loadEligible        whether the unit can actually be loaded (vs listed but gated)
+ * @param actionScope         the unit's declared action scope, echoed from the manifest, or {@code null}
  */
 public record PlannedUnit(
         String id,
@@ -23,5 +26,6 @@ public record PlannedUnit(
         List<String> reasons,
         PaymentPlan payment,
         boolean requiresAttestation,
-        boolean loadEligible) {
+        boolean loadEligible,
+        Unit.ActionScope actionScope) {
 }

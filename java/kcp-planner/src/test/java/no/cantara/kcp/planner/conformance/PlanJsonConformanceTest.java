@@ -17,6 +17,7 @@ import no.cantara.kcp.planner.AgentPlan;
 import no.cantara.kcp.planner.KcpPlanner;
 import no.cantara.kcp.planner.ManifestParser;
 import no.cantara.kcp.planner.PlanOptions;
+import no.cantara.kcp.planner.json.Json;
 import no.cantara.kcp.planner.json.PlanJson;
 import no.cantara.kcp.planner.model.Manifest;
 
@@ -24,10 +25,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Plan-serialization conformance. The {@code fixtures/plan/*.json} carry the exact
- * {@code JSON.stringify(plan, null, 2)} the TypeScript reference produces for every
- * vector. The Java {@link PlanJson} serializer must reproduce it byte-for-byte —
- * field order, JS number formatting, and optional-field omission included. This is
- * what the {@code kcp_plan} MCP tool and saved plan artifacts carry.
+ * output {@code plan --json} writes for every vector — the pure plan wrapped in the
+ * {@code schemaVersion}/{@code kind} envelope. The Java {@link PlanJson} serializer
+ * plus {@link Json#versioned} must reproduce it byte-for-byte — field order, JS number
+ * formatting, and optional-field omission included.
  */
 class PlanJsonConformanceTest {
 
@@ -41,7 +42,7 @@ class PlanJsonConformanceTest {
             Manifest m = ManifestParser.parse(str(fx.get("manifest")), str(fx.get("name")));
             PlanOptions options = ConformanceVectors.optionsFromMap((Map<?, ?>) fx.get("options"));
             AgentPlan plan = KcpPlanner.plan(m, str(fx.get("task")), options);
-            String actual = PlanJson.toJson(plan, options);
+            String actual = Json.write(Json.versioned(PlanJson.toValue(plan, options), "plan"));
             String expected = str(fx.get("expect"));
             if (!actual.equals(expected)) {
                 failures.add("\n=== " + str(fx.get("name")) + " ===\n" + firstDiff(expected, actual));

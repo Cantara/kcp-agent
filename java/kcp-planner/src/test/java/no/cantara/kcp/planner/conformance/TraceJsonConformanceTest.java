@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import no.cantara.kcp.planner.KcpPlanner;
 import no.cantara.kcp.planner.ManifestParser;
 import no.cantara.kcp.planner.PlanOptions;
+import no.cantara.kcp.planner.json.Json;
 import no.cantara.kcp.planner.json.TraceJson;
 import no.cantara.kcp.planner.model.Manifest;
 import no.cantara.kcp.planner.trace.DecisionTrace;
@@ -24,9 +25,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Trace-serialization conformance. The {@code fixtures/tracejson/*.json} carry the
- * exact {@code JSON.stringify(trace, null, 2)} the {@code kcp_trace} MCP tool returns
- * — embedded plan and all. The Java {@link TraceJson} serializer must reproduce it
- * byte-for-byte.
+ * exact output {@code plan --trace --json} writes — the full trace (embedded plan and
+ * all) wrapped in the {@code schemaVersion}/{@code kind} envelope. The Java
+ * {@link TraceJson} serializer plus {@link Json#versioned} must reproduce it byte-for-byte.
  */
 class TraceJsonConformanceTest {
 
@@ -40,7 +41,7 @@ class TraceJsonConformanceTest {
             Manifest m = ManifestParser.parse(str(fx.get("manifest")), str(fx.get("name")));
             PlanOptions options = ConformanceVectors.optionsFromMap((Map<?, ?>) fx.get("options"));
             DecisionTrace trace = KcpPlanner.trace(m, str(fx.get("task")), options);
-            String actual = TraceJson.toJson(trace, options);
+            String actual = Json.write(Json.versioned(TraceJson.toValue(trace, options), "trace"));
             String expected = str(fx.get("expect"));
             if (!actual.equals(expected)) {
                 failures.add("\n=== " + str(fx.get("name")) + " ===\n" + firstDiff(expected, actual));

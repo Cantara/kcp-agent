@@ -2,20 +2,23 @@ package no.cantara.kcp.planner.trace;
 
 import java.util.List;
 
+import no.cantara.kcp.planner.model.Unit;
+
 /**
  * The per-unit trace: every gate the unit was evaluated against, in order.
  * Mirrors {@code UnitTrace} in {@code src/trace.ts}. For a skipped unit the gate
  * list stops after the first rejection; {@code rejectedBy} names that gate.
  *
- * @param id         the unit id
- * @param path       the unit content path
- * @param intent     the unit intent
- * @param outcome    {@code "selected"} or {@code "skipped"} (per the canonical plan)
- * @param gates      the gate verdicts in evaluation order
- * @param rejectedBy the gate that rejected the unit, or {@code null} for selected units
- * @param score      the relevance score when the unit passed relevance, else {@code null}
- * @param tokens     token-cost attribution for selected units, else {@code null}
- * @param cost       money-cost attribution for pay-per-request selected units, else {@code null}
+ * @param id          the unit id
+ * @param path        the unit content path
+ * @param intent      the unit intent
+ * @param outcome     {@code "selected"} or {@code "skipped"} (per the canonical plan)
+ * @param gates       the gate verdicts in evaluation order
+ * @param rejectedBy  the gate that rejected the unit, or {@code null} for selected units
+ * @param score       the relevance score when the unit passed relevance, else {@code null}
+ * @param tokens      token-cost attribution for selected units, else {@code null}
+ * @param cost        money-cost attribution for pay-per-request selected units, else {@code null}
+ * @param actionScope the unit's declared action scope, echoed from the manifest, or {@code null}
  */
 public record UnitTrace(
         String id,
@@ -26,7 +29,8 @@ public record UnitTrace(
         GateName rejectedBy,
         Integer score,
         Tokens tokens,
-        Cost cost) {
+        Cost cost,
+        Unit.ActionScope actionScope) {
 
     /**
      * Token-cost attribution.
