@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { planTree, plans } from "../src/follow.js";
 import { replayArtifact, collectSavedPlans } from "../src/replay.js";
+import { versionPlanJson } from "../src/plan-json.js";
 import type { AgentPlan } from "../src/planner.js";
 
 const HUB = "test/fixtures/fed/hub";
@@ -25,6 +26,20 @@ describe("replay — the plan artifact survives cross-examination", () => {
     expect(report.checks).toHaveLength(1);
     expect(report.checks[0].status).toBe("identical");
     expect(report.checks[0].detail).toContain("manifest sha256 matches");
+    expect(report.ok).toBe(true);
+  });
+
+  it("replays a versioned `plan --json` envelope as identical (schemaVersion/kind stripped)", async () => {
+    // Regression: `plan --json` wraps the artifact via versionPlanJson(), adding
+    // top-level `schemaVersion` and `kind`. The freshly recomputed plan has neither, so
+    // before the fix every saved artifact false-drifted on exactly `kind, schemaVersion`.
+    const tree = await planTree(HUB, TASK, { planOptions: OPTS });
+    const artifact = roundTrip(versionPlanJson(plans(tree)[0], "plan"));
+    expect(artifact.schemaVersion).toBe(1);
+    expect(artifact.kind).toBe("plan");
+    const report = await replayArtifact(artifact);
+    expect(report.checks).toHaveLength(1);
+    expect(report.checks[0].status).toBe("identical");
     expect(report.ok).toBe(true);
   });
 

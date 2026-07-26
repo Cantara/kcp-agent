@@ -52,10 +52,16 @@ export function collectSavedPlans(json: unknown): AgentPlan[] {
   throw new Error("unrecognized artifact — expected the JSON output of `kcp-agent plan --json` (a plan or a --follow tree)");
 }
 
-/** Strip what the pure planner cannot reproduce: fields attached by the loading layer. */
+/** Strip what the pure planner cannot reproduce: fields attached by the loading and
+ *  serialization layers. `signature` and `manifest.sha256` are added by the loader; the
+ *  `schemaVersion`/`kind` envelope is added by `versionPlanJson()` when `plan --json`
+ *  serializes the artifact — the freshly recomputed plan carries none of these, so
+ *  leaving them in makes every saved artifact false-drift on exactly those keys. */
 function comparable(p: AgentPlan): Record<string, unknown> {
   const c = JSON.parse(JSON.stringify(p)) as Record<string, unknown>;
   delete c.signature;
+  delete c.schemaVersion;
+  delete c.kind;
   const m = c.manifest as Record<string, unknown> | undefined;
   if (m) delete m.sha256;
   return c;
