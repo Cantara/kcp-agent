@@ -24,6 +24,7 @@ import no.cantara.kcp.planner.diff.ScoreChange;
 import no.cantara.kcp.planner.diff.UnitMove;
 import no.cantara.kcp.planner.diff.UnitPresence;
 import no.cantara.kcp.planner.model.Manifest;
+import no.cantara.kcp.planner.model.Unit;
 import no.cantara.kcp.planner.trace.DecisionTrace;
 import no.cantara.kcp.planner.trace.GateName;
 import no.cantara.kcp.planner.trace.GateVerdict;
@@ -139,8 +140,20 @@ class TraceDiffConformanceTest {
             String currency = co.get("currency") != null ? str(co.get("currency")) : null;
             cost = new UnitTrace.Cost(num(co.get("amount")).doubleValue(), currency, str(co.get("method")));
         }
+        Unit.ActionScope actionScope = u.get("action_scope") != null ? actionScopeFrom(asMap(u.get("action_scope"))) : null;
         return new UnitTrace(str(u.get("id")), str(u.get("path")), str(u.get("intent")), str(u.get("outcome")),
-                gates, rejectedBy, score, tokens, cost);
+                gates, rejectedBy, score, tokens, cost, actionScope);
+    }
+
+    private static Unit.ActionScope actionScopeFrom(Map<?, ?> a) {
+        Unit.ActionScope.Spend spend = null;
+        if (a.get("spend") != null) {
+            Map<?, ?> s = asMap(a.get("spend"));
+            Double maxSpend = s.get("max_spend") != null ? num(s.get("max_spend")).doubleValue() : null;
+            spend = new Unit.ActionScope.Spend(maxSpend, strList(s.get("allowed_vendors")), str(s.get("currency")));
+        }
+        return new Unit.ActionScope(strList(a.get("tools")), strList(a.get("paths")),
+                strList(a.get("capabilities")), spend);
     }
 
     private static PlanDiff expectedDiff(Map<?, ?> e) {

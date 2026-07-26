@@ -109,6 +109,17 @@
         "score": 23,
         "tokens": {
           "source": "unmeasured"
+        },
+        "action_scope": {
+          "tools": [
+            "Bash"
+          ],
+          "paths": [
+            "scripts/**"
+          ],
+          "capabilities": [
+            "shell"
+          ]
         }
       },
       {

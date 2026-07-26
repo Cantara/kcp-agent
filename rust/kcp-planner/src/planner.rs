@@ -6,7 +6,7 @@
 //! no model, no clock (the point-in-time is the injected `as_of`).
 
 use crate::budget::{fmt_tokens, money, plan_budget, plan_context, plan_payment, unit_tokens};
-use crate::model::{Count, Manifest, Unit};
+use crate::model::{ActionScope, Count, Manifest, Unit};
 use serde::Deserialize;
 
 // ── inputs ───────────────────────────────────────────────────────────────────
@@ -110,6 +110,8 @@ pub struct PlannedUnit {
     pub payment: PaymentPlan,
     pub requires_attestation: bool,
     pub load_eligible: bool,
+    /// The unit's declared action scope, echoed from the manifest (#100), or `None`.
+    pub action_scope: Option<ActionScope>,
 }
 
 #[derive(Debug, Clone)]
@@ -410,6 +412,7 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
             payment,
             requires_attestation: unit_requires_attestation,
             load_eligible,
+            action_scope: unit.action_scope.clone(),
         });
     }
 

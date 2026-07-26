@@ -14,6 +14,7 @@ import no.cantara.kcp.planner.PlanOptions;
 import no.cantara.kcp.planner.PlannedUnit;
 import no.cantara.kcp.planner.SkippedUnit;
 import no.cantara.kcp.planner.model.RequestCount;
+import no.cantara.kcp.planner.model.Unit;
 
 /**
  * Serializes an {@link AgentPlan} to the exact JSON the TypeScript reference emits
@@ -36,14 +37,19 @@ public final class PlanJson {
         return Json.write(toValue(p, options));
     }
 
-    /** Serialize a plan with the manifest's SHA-256 attached (as the loader adds it). */
+    /** Build the ordered value tree for a plan with the manifest's SHA-256 attached. */
     @SuppressWarnings("unchecked")
-    public static String toJson(AgentPlan p, PlanOptions options, String sha256) {
+    public static Map<String, Object> toValue(AgentPlan p, PlanOptions options, String sha256) {
         Map<String, Object> root = toValue(p, options);
         if (sha256 != null) {
             ((Map<String, Object>) root.get("manifest")).put("sha256", sha256);
         }
-        return Json.write(root);
+        return root;
+    }
+
+    /** Serialize a plan with the manifest's SHA-256 attached (as the loader adds it). */
+    public static String toJson(AgentPlan p, PlanOptions options, String sha256) {
+        return Json.write(toValue(p, options, sha256));
     }
 
     /** Build the ordered value tree for an {@link AgentPlan}. */
@@ -144,6 +150,30 @@ public final class PlanJson {
         o.put("payment", pay);
         o.put("requiresAttestation", u.requiresAttestation());
         o.put("loadEligible", u.loadEligible());
+        if (u.actionScope() != null) {
+            o.put("action_scope", actionScopeValue(u.actionScope()));
+        }
+        return o;
+    }
+
+    /**
+     * The value tree for a unit's {@code action_scope}, echoed from the manifest with its
+     * snake_case keys — {@code tools}/{@code paths}/{@code capabilities} are always present
+     * (possibly empty, matching {@code asStrArr}); {@code spend} and the nullable
+     * {@code max_spend}/{@code currency} are omitted when absent. Shared with the trace serializer.
+     */
+    public static Map<String, Object> actionScopeValue(Unit.ActionScope a) {
+        Map<String, Object> o = new LinkedHashMap<>();
+        o.put("tools", new ArrayList<Object>(a.tools()));
+        o.put("paths", new ArrayList<Object>(a.paths()));
+        o.put("capabilities", new ArrayList<Object>(a.capabilities()));
+        if (a.spend() != null) {
+            Map<String, Object> spend = new LinkedHashMap<>();
+            putIfNotNull(spend, "max_spend", a.spend().maxSpend());
+            spend.put("allowed_vendors", new ArrayList<Object>(a.spend().allowedVendors()));
+            putIfNotNull(spend, "currency", a.spend().currency());
+            o.put("spend", spend);
+        }
         return o;
     }
 

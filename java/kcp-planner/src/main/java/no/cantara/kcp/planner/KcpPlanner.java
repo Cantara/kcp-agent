@@ -355,7 +355,7 @@ public final class KcpPlanner {
                 continue;
             }
             selected.add(new PlannedUnit(unit.id(), unit.path(), unit.intent(), sr.score(), reasons,
-                    payment, unitRequiresAttestation, loadEligible));
+                    payment, unitRequiresAttestation, loadEligible, unit.actionScope()));
         }
 
         // sort by score desc, then id asc (total, deterministic tie-break)
@@ -782,7 +782,7 @@ public final class KcpPlanner {
                 }
             }
             unitTraces.add(new UnitTrace(c.unit.id(), c.unit.path(), c.unit.intent(), outcome,
-                    List.copyOf(c.gates), c.rejectedBy, score, tokens, cost));
+                    List.copyOf(c.gates), c.rejectedBy, score, tokens, cost, c.unit.actionScope()));
         }
 
         // Gate summary: pass/fail counts per gate across all units.

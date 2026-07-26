@@ -149,6 +149,9 @@ public final class Replay {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> comparable(Map<String, Object> plan) {
         plan.remove("signature");
+        // The versioned envelope (added by `plan --json`) is not part of the pure plan.
+        plan.remove("schemaVersion");
+        plan.remove("kind");
         Object m = plan.get("manifest");
         if (m instanceof Map<?, ?>) {
             ((Map<String, Object>) m).remove("sha256");

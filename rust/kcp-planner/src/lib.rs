@@ -58,7 +58,7 @@ pub use synthesize::{load_planned_units, LoadedUnit};
 #[cfg(feature = "network")]
 pub use replay::{replay_artifact, ReplayReport};
 pub use format::{format_diff, format_plan, format_trace, format_validation, Colors};
-pub use json::{plan_to_json, plan_to_value, trace_to_json};
+pub use json::{plan_to_json, plan_to_value, trace_to_json, versioned};
 pub use model::{parse_manifest, Manifest, Unit};
 pub use plan_io::plan_from_artifact;
 pub use planner::{plan, score_unit, terms, AgentPlan, PlanOptions};

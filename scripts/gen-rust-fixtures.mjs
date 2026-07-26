@@ -17,6 +17,7 @@ const { parseManifest } = await load('client.js');
 const { plan } = await load('planner.js');
 const { trace } = await load('trace.js');
 const { diffPlans } = await load('diff.js');
+const { encodePlanJson } = await load('plan-json.js');
 
 const VDIR = path.join(ROOT, 'vectors');
 // The golden fixtures back the trace/diff conformance tests in BOTH ports; write
@@ -54,8 +55,9 @@ for (const f of vectors) {
 console.log(`wrote ${vectors.length} trace fixtures`);
 
 // Plan-JSON fixtures (Java only — the Rust port has its own json.rs tests). `expect`
-// is the exact `JSON.stringify(plan, null, 2)` of the pure plan (no loader-added
-// sha256/signature), so the Java plan serializer can be checked byte-for-byte.
+// is exactly what `plan --json` writes: the pure plan (no loader-added sha256/
+// signature) wrapped in the schemaVersion/kind envelope via encodePlanJson(). The Java
+// serializer is checked byte-for-byte against it.
 const JAVA_PLAN = path.join(OUT_DIRS[1], 'plan');
 mkdirSync(JAVA_PLAN, { recursive: true });
 for (const f of vectors) {
@@ -63,13 +65,13 @@ for (const f of vectors) {
   const p = plan(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
   writeFileSync(
     path.join(JAVA_PLAN, f),
-    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: JSON.stringify(p, null, 2) }, null, 2) + '\n'
+    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: encodePlanJson(p, 'plan') }, null, 2) + '\n'
   );
 }
 console.log(`wrote ${vectors.length} plan-json fixtures`);
 
-// Trace-JSON fixtures (Java only) — the full `JSON.stringify(trace, null, 2)` the
-// kcp_trace MCP tool returns, embedded plan and all.
+// Trace-JSON fixtures (Java only) — exactly what `plan --trace --json` writes: the full
+// trace (embedded plan and all) wrapped in the schemaVersion/kind envelope.
 const JAVA_TRACEJSON = path.join(OUT_DIRS[1], 'tracejson');
 mkdirSync(JAVA_TRACEJSON, { recursive: true });
 for (const f of vectors) {
@@ -77,7 +79,7 @@ for (const f of vectors) {
   const t = trace(parseManifest(v.manifest, v.name), v.task, v.options ?? {});
   writeFileSync(
     path.join(JAVA_TRACEJSON, f),
-    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: JSON.stringify(t, null, 2) }, null, 2) + '\n'
+    JSON.stringify({ name: v.name, manifest: v.manifest, task: v.task, options: v.options ?? {}, expect: encodePlanJson(t, 'trace') }, null, 2) + '\n'
   );
 }
 console.log(`wrote ${vectors.length} trace-json fixtures`);

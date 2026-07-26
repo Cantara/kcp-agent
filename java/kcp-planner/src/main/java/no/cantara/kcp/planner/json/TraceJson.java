@@ -105,6 +105,9 @@ public final class TraceJson {
             co.put("method", u.cost().method());
             o.put("cost", co);
         }
+        if (u.actionScope() != null) {
+            o.put("action_scope", PlanJson.actionScopeValue(u.actionScope()));
+        }
         return o;
     }
 }

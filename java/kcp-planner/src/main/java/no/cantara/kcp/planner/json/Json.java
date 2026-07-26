@@ -1,6 +1,7 @@
 package no.cantara.kcp.planner.json;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,11 +20,30 @@ public final class Json {
     private Json() {
     }
 
+    /** The plan-JSON envelope schema version — mirrors {@code PLAN_JSON_SCHEMA_VERSION} in {@code src/plan-json.ts}. */
+    public static final long SCHEMA_VERSION = 1;
+
     /** Serialize a value tree to pretty JSON (2-space indent), matching {@code JSON.stringify(v, null, 2)}. */
     public static String write(Object value) {
         StringBuilder sb = new StringBuilder();
         write(value, sb, 0);
         return sb.toString();
+    }
+
+    /**
+     * Wrap a serialized value in the versioned envelope — {@code {...value, schemaVersion, kind}} —
+     * exactly as {@code versionPlanJson()} does for {@code plan --json} / {@code --trace} / a
+     * {@code --follow} tree. The envelope keys are appended last.
+     *
+     * @param value the plan/trace/tree value tree
+     * @param kind  {@code "plan"}, {@code "trace"}, or {@code "tree"}
+     * @return a new ordered map with {@code schemaVersion} and {@code kind} appended
+     */
+    public static Map<String, Object> versioned(Map<String, Object> value, String kind) {
+        Map<String, Object> out = new LinkedHashMap<>(value);
+        out.put("schemaVersion", SCHEMA_VERSION);
+        out.put("kind", kind);
+        return out;
     }
 
     /** Serialize to compact single-line JSON, matching {@code JSON.stringify(v)}. Used for the JSON-RPC framing. */

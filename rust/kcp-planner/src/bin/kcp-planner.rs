@@ -5,7 +5,7 @@
 
 use kcp_planner::{
     diff_plans, format_diff, format_plan, format_trace, format_validation, parse_manifest, plan, plan_from_artifact, plan_to_json, trace, trace_to_json,
-    validate_location, verify_manifest_text, Colors, PlanOptions,
+    validate_location, verify_manifest_text, versioned, Colors, PlanOptions,
 };
 use kcp_planner::planner::{BudgetInput, CapabilitiesInput};
 use kcp_planner::validate::load_local_manifest_text;
@@ -193,7 +193,7 @@ fn cmd_plan(a: &Args) {
     if a.trace {
         let t = trace(&manifest, &task, &options);
         if a.json {
-            let v = trace_to_json(&t, &manifest, &options, &source);
+            let v = versioned(trace_to_json(&t, &manifest, &options, &source), "trace");
             println!("{}", serde_json::to_string_pretty(&v).unwrap());
         } else {
             let c = Colors::auto();
@@ -209,7 +209,7 @@ fn cmd_plan(a: &Args) {
     // to the plan (mirrors the TS reference); the pure planner stays signature-free.
     let sig = verify_manifest_text(&text, manifest.signing.as_ref(), Some(&source));
     if a.json {
-        let v = plan_to_json(&p, &manifest, &options, &source, &sha256, &sig);
+        let v = versioned(plan_to_json(&p, &manifest, &options, &source, &sha256, &sig), "plan");
         println!("{}", serde_json::to_string_pretty(&v).unwrap());
     } else {
         println!("{}", format_plan(&p, manifest.kcp_version.as_deref(), Some(&source), Some(&sig), &Colors::auto()));
@@ -267,7 +267,7 @@ fn cmd_diff(a: &Args) {
 mod net {
     use super::{build_options, Args};
     use kcp_planner::follow::PlanNode;
-    use kcp_planner::{format_plan, node_to_json, plan_tree, replay_artifact, serve_mcp, Colors, FetchGuard, FollowOptions};
+    use kcp_planner::{format_plan, node_to_json, plan_tree, replay_artifact, serve_mcp, versioned, Colors, FetchGuard, FollowOptions};
     use std::process::exit;
 
     fn runtime() -> tokio::runtime::Runtime {
@@ -305,7 +305,7 @@ mod net {
             exit(1);
         }
         if a.json {
-            println!("{}", serde_json::to_string_pretty(&node_to_json(&tree, &opts.plan_options)).unwrap());
+            println!("{}", serde_json::to_string_pretty(&versioned(node_to_json(&tree, &opts.plan_options), "tree")).unwrap());
         } else {
             print_tree_human(&tree, &Colors::auto());
         }

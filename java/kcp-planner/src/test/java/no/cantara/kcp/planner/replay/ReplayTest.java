@@ -13,6 +13,7 @@ import no.cantara.kcp.planner.KcpPlanner;
 import no.cantara.kcp.planner.PlanOptions;
 import no.cantara.kcp.planner.client.LoadedManifest;
 import no.cantara.kcp.planner.client.ManifestClient;
+import no.cantara.kcp.planner.json.Json;
 import no.cantara.kcp.planner.json.PlanJson;
 
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,23 @@ class ReplayTest {
 
         Replay.ReplayReport report = Replay.replayArtifact(artifact, "test", client);
         assertEquals(1, report.checks().size());
+        assertEquals("identical", report.checks().get(0).status(), report.checks().get(0).detail());
+        assertTrue(report.ok());
+    }
+
+    @Test
+    void envelopedArtifactReplaysIdentical(@TempDir Path dir) throws IOException {
+        Path manifest = dir.resolve("knowledge.yaml");
+        Files.writeString(manifest, MANIFEST);
+        ManifestClient client = ManifestClient.create();
+        LoadedManifest lm = client.load(manifest.toString(), false);
+        PlanOptions options = PlanOptions.builder().role("agent").asOf("2026-07-06").build();
+        AgentPlan plan = KcpPlanner.plan(lm.manifest(), "how do I deploy to production", options);
+        // A saved artifact as `plan --json` writes it: the plan wrapped in the schemaVersion/kind envelope.
+        String json = Json.write(Json.versioned(PlanJson.toValue(plan, options, lm.sha256()), "plan"));
+        Object artifact = new Load(LoadSettings.builder().build()).loadFromString(json);
+
+        Replay.ReplayReport report = Replay.replayArtifact(artifact, "test", client);
         assertEquals("identical", report.checks().get(0).status(), report.checks().get(0).detail());
         assertTrue(report.ok());
     }

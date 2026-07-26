@@ -2,7 +2,8 @@
 //! parsing in `src/client.ts`. Field names are snake_case to match the YAML
 //! wire format; serde ignores unknown fields (lenient, like the TS parser).
 
-use serde::Deserialize;
+use serde::ser::{SerializeMap, Serializer};
+use serde::{Deserialize, Serialize};
 
 fn default_project() -> String {
     "(unnamed)".to_string()
@@ -82,7 +83,7 @@ pub struct Unit {
 }
 
 /// Declared action scope for a governed procedure/skill (#100).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct ActionScope {
     #[serde(default)]
     pub tools: Option<Vec<String>>,
@@ -95,7 +96,7 @@ pub struct ActionScope {
 }
 
 /// Spend limits declared under a skill's action scope (#107).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Spend {
     #[serde(default)]
     pub max_spend: Option<f64>,
@@ -103,6 +104,47 @@ pub struct Spend {
     pub allowed_vendors: Option<Vec<String>>,
     #[serde(default)]
     pub currency: Option<String>,
+}
+
+// Serialization mirrors the TS wire shape exactly (`action_scope` echoed onto a
+// planned/traced unit): `tools`/`paths`/`capabilities` are always present as arrays
+// (like the reference's `asStrArr`), `spend` is emitted only when declared. Within
+// `spend`, `max_spend` is emitted only when set (with JS number formatting — a whole
+// value prints as an integer), `allowed_vendors` is always an array, and `currency`
+// is emitted only when set. Hand-written (not derived) so field order and array/number
+// formatting match byte-for-byte.
+impl Serialize for ActionScope {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        let empty: &[String] = &[];
+        let mut m = s.serialize_map(None)?;
+        m.serialize_entry("tools", self.tools.as_deref().unwrap_or(empty))?;
+        m.serialize_entry("paths", self.paths.as_deref().unwrap_or(empty))?;
+        m.serialize_entry("capabilities", self.capabilities.as_deref().unwrap_or(empty))?;
+        if let Some(spend) = &self.spend {
+            m.serialize_entry("spend", spend)?;
+        }
+        m.end()
+    }
+}
+
+impl Serialize for Spend {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        let empty: &[String] = &[];
+        let mut m = s.serialize_map(None)?;
+        if let Some(ms) = self.max_spend {
+            // JS number formatting: a whole value prints as an integer (5, not 5.0).
+            if ms.fract() == 0.0 && ms.abs() < 9.0e15 {
+                m.serialize_entry("max_spend", &(ms as i64))?;
+            } else {
+                m.serialize_entry("max_spend", &ms)?;
+            }
+        }
+        m.serialize_entry("allowed_vendors", self.allowed_vendors.as_deref().unwrap_or(empty))?;
+        if let Some(currency) = &self.currency {
+            m.serialize_entry("currency", currency)?;
+        }
+        m.end()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
