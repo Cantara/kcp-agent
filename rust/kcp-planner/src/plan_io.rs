@@ -37,6 +37,7 @@ pub fn plan_from_artifact(text: &str) -> Result<AgentPlan, String> {
                     payment: PaymentPlan { method: "free".to_string(), cost: None, price_per_request: None, currency: None, affordable: true },
                     requires_attestation: false,
                     load_eligible: u.get("loadEligible").and_then(|x| x.as_bool()).unwrap_or(false),
+                    action_scope: None,
                 })
                 .collect()
         })

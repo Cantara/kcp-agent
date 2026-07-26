@@ -66,10 +66,13 @@ fn walk_tree(node: &Value, out: &mut Vec<Value>) {
 }
 
 /// Strip what the pure planner cannot reproduce: the loading layer's signature
-/// and manifest sha256. Mirrors TS `comparable`.
+/// and manifest sha256, plus the `plan --json` versioned envelope. Mirrors TS `comparable`.
 fn comparable(mut p: Value) -> Value {
     if let Value::Object(map) = &mut p {
         map.remove("signature");
+        // The versioned envelope is not part of the pure plan.
+        map.remove("schemaVersion");
+        map.remove("kind");
         if let Some(Value::Object(m)) = map.get_mut("manifest") {
             m.remove("sha256");
         }

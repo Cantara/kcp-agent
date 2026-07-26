@@ -12,7 +12,7 @@
 
 use kcp_planner::{
     diff_plans as core_diff, format_plan as core_format_plan, parse_manifest as core_parse, plan as core_plan, plan_from_artifact, plan_to_json,
-    trace as core_trace, trace_to_json, validate_manifest, verify_manifest_text, Colors, Finding, Manifest, PlanOptions, ValidationReport,
+    trace as core_trace, trace_to_json, validate_manifest, verify_manifest_text, versioned, Colors, Finding, Manifest, PlanOptions, ValidationReport,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -57,7 +57,7 @@ pub fn plan(manifest_yaml: &str, task: &str, options_json: &str) -> String {
     // so signed manifests read as `unverifiable` here (never fail-open) while
     // unsigned manifests match the CLI exactly.
     let sig = verify_manifest_text(manifest_yaml, manifest.signing.as_ref(), Some(SOURCE));
-    let v = plan_to_json(&p, &manifest, &options, SOURCE, &sha256, &sig);
+    let v = versioned(plan_to_json(&p, &manifest, &options, SOURCE, &sha256, &sig), "plan");
     serde_json::to_string_pretty(&v).unwrap_or_else(|e| error_json(e.to_string()))
 }
 
@@ -74,7 +74,7 @@ pub fn trace(manifest_yaml: &str, task: &str, options_json: &str) -> String {
         Err(e) => return error_json(e),
     };
     let t = core_trace(&manifest, task, &options);
-    let v = trace_to_json(&t, &manifest, &options, SOURCE);
+    let v = versioned(trace_to_json(&t, &manifest, &options, SOURCE), "trace");
     serde_json::to_string_pretty(&v).unwrap_or_else(|e| error_json(e.to_string()))
 }
 

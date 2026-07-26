@@ -18,6 +18,22 @@ fn num(f: f64) -> Value {
     }
 }
 
+/// The plan-JSON envelope schema version — mirrors `PLAN_JSON_SCHEMA_VERSION`
+/// in `src/plan-json.ts`.
+pub const SCHEMA_VERSION: i64 = 1;
+
+/// Wrap a plan/trace/tree value in the versioned envelope — `{...value,
+/// schemaVersion, kind}` — exactly as `versionPlanJson()` does for `plan --json`
+/// / `--trace` / a `--follow` tree. The envelope keys are appended last; a
+/// non-object value is returned unchanged. `kind` is `"plan"`, `"trace"`, or `"tree"`.
+pub fn versioned(mut value: Value, kind: &str) -> Value {
+    if let Value::Object(map) = &mut value {
+        map.insert("schemaVersion".to_string(), Value::from(SCHEMA_VERSION));
+        map.insert("kind".to_string(), Value::from(kind));
+    }
+    value
+}
+
 fn obj(pairs: Vec<(&str, Value)>) -> Value {
     let mut m = Map::new();
     for (k, v) in pairs {
@@ -123,7 +139,7 @@ pub fn plan_to_value(
                 pay.push(("currency", Value::from(cur.clone())));
             }
             pay.push(("affordable", Value::from(u.payment.affordable)));
-            obj(vec![
+            let mut unit_pairs = vec![
                 ("id", Value::from(u.id.clone())),
                 ("path", Value::from(u.path.clone())),
                 ("intent", Value::from(u.intent.clone())),
@@ -132,7 +148,11 @@ pub fn plan_to_value(
                 ("payment", obj(pay)),
                 ("requiresAttestation", Value::from(u.requires_attestation)),
                 ("loadEligible", Value::from(u.load_eligible)),
-            ])
+            ];
+            if let Some(scope) = &u.action_scope {
+                unit_pairs.push(("action_scope", serde_json::to_value(scope).unwrap_or(Value::Null)));
+            }
+            obj(unit_pairs)
         })
         .collect();
 

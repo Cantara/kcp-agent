@@ -4,7 +4,7 @@
 //! trace is a read, annotated with structured per-gate detail. Pure.
 
 use crate::budget::{fmt_tokens, money, unit_tokens};
-use crate::model::{Manifest, Unit};
+use crate::model::{ActionScope, Manifest, Unit};
 use crate::planner::{
     fmt_num, plan, score_unit, selectable_successor, temporal_status, terms, AgentCapabilities, AgentPlan, PaymentPlan, PlanOptions, TemporalStatus,
 };
@@ -84,6 +84,9 @@ pub struct UnitTrace {
     pub tokens: Option<TokensOut>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<CostOut>,
+    /// The unit's declared action scope, echoed from the manifest (#100), or `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_scope: Option<ActionScope>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -433,6 +436,7 @@ pub fn trace(manifest: &Manifest, task: &str, options: &PlanOptions) -> Decision
                 score: if c.score > 0 { Some(c.score) } else { None },
                 tokens: None,
                 cost: None,
+                action_scope: c.unit.action_scope.clone(),
             };
             if outcome == "selected" {
                 let ti = unit_tokens(c.unit);
