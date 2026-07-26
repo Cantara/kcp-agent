@@ -28,15 +28,18 @@ export interface ValidationReport {
 
 const ACCESS_VALUES = new Set(["public", "authenticated", "restricted"]);
 /**
- * The only `kind` the planner treats as governed (spec §4.3a, v0.26.1). Any
- * other non-empty value — a typo ("Skill", "skil") or an unsupported class
- * ("procedure") — silently falls through the planner's `unit.kind === "skill"`
- * check as an ordinary knowledge unit: the skill_eligibility gate never
- * applies, and action_scope/load_eligible are ignored. That's an
- * unknown-data-passes-through gap in an otherwise fail-closed gate, so flag
- * it at publish time instead of letting it load silently ungoverned.
+ * The `kind` values the spec blesses (§4.3a): all are valid on a conformant
+ * manifest and none deserve a warning — only `skill` carries governance
+ * semantics, and a policy/schema/... unit not being governed like a skill is
+ * correct behavior, not a defect. A value outside this set — a typo ("Skill",
+ * "skil") or an unsupported class ("procedure") — is what §4.3a tells parsers
+ * to silently ignore, but it silently falls through the planner's
+ * `unit.kind === "skill"` check as an ordinary knowledge unit: the
+ * skill_eligibility gate never applies, and action_scope/load_eligible are
+ * ignored. That's an unknown-data-passes-through gap in an otherwise
+ * fail-closed gate, so the linter still flags it at publish time.
  */
-const KIND_VALUES = new Set(["skill"]);
+const KIND_VALUES = new Set(["knowledge", "schema", "service", "policy", "executable", "skill"]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ].*)?$/;
 
 function unsafePath(path: string): string | undefined {
@@ -78,8 +81,9 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
       warn(where, `unknown access '${unit.access}' (expected public/authenticated/restricted)`);
     }
     if (unit.kind && !KIND_VALUES.has(unit.kind)) {
-      warn(where, `unknown kind '${unit.kind}' (expected 'skill') — will load as an ungoverned ` +
-        `plain knowledge unit: action_scope/load_eligible/skill_eligibility will NOT apply to it`);
+      warn(where, `unknown kind '${unit.kind}' — not a §4.3a kind (knowledge/schema/service/policy/` +
+        `executable/skill); parsers ignore it and the unit loads as plain knowledge. If 'skill' was ` +
+        `meant, note action_scope/load_eligible/skill_eligibility will NOT apply as written`);
     }
     validateTemporal(unit, where, findings);
     validateNotFor(unit, where, findings);

@@ -202,6 +202,24 @@ units:
     expect(level(findings, "warning").some((w) => w.includes("unknown kind 'Skill'"))).toBe(true);
   });
 
+  it("does not warn on any §4.3a kind — policy/schema/... are spec-valid, not defects (#115)", () => {
+    for (const kind of ["knowledge", "schema", "service", "policy", "executable", "skill"]) {
+      const m = parseManifest(`
+project: p
+version: 1.0.0
+units:
+  - id: security
+    path: SECURITY.md
+    intent: "Security Policy"
+    audience: [human, agent]
+    triggers: [security]
+    kind: ${kind}
+`);
+      const warnings = level(validateManifest(m), "warning");
+      expect(warnings.some((w) => w.includes("unknown kind")), `kind '${kind}' should not warn`).toBe(false);
+    }
+  });
+
   it("does not warn on kind: skill", () => {
     const m = parseManifest(`
 project: p
