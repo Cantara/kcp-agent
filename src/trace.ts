@@ -202,21 +202,36 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
     }
     if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
 
-    // 7. skill_eligibility — a governed procedure/skill (kind: skill) fails closed:
-    // load/invoke-eligible only with an explicit load_eligible grant. Soft-gate in
-    // non-strict mode (mirrors attestation/payment: pass with loadEligible=false so
-    // the plan still lists it); under strict it fail-closes at its own gate, which
-    // keeps the trace outcome equal to the canonical plan and attributes the skip
-    // precisely to skill_eligibility rather than the generic strict gate.
-    if (unit.kind === "skill" && unit.load_eligible !== true) {
+    // 7. skill_eligibility — a governed procedure (kind: skill, and kind: playbook since
+    // v0.29) fails closed: load/invoke-eligible only with an explicit load_eligible
+    // grant. Soft-gate in non-strict mode (mirrors attestation/payment: pass with
+    // loadEligible=false so the plan still lists it); under strict it fail-closes at its
+    // own gate, which keeps the trace outcome equal to the canonical plan and attributes
+    // the skip precisely to skill_eligibility rather than the generic strict gate.
+    //
+    // Playbooks are governed here too (#118). Testing `kind === "skill"` literally let a
+    // playbook fall to the else branch and pass as "not a skill", so the planner refused
+    // a skill while offering the playbook that invokes that same skill at commit — the
+    // composition escaping the gate its components are held to. A playbook is strictly
+    // more dangerous than a skill by the reasoning that put skills behind this gate: it
+    // composes several of them, it reaches commit by design (§4.3b), and its own
+    // action_scope is a declaration for review rather than a grant.
+    const governed = unit.kind === "skill" || unit.kind === "playbook";
+    if (governed && unit.load_eligible !== true) {
       loadEligible = false;
+      const why = `kind: ${unit.kind} not invoke-eligible: no explicit eligibility grant`;
       if (options.strict) {
-        reject("skill_eligibility", "kind: skill not invoke-eligible: no explicit eligibility grant");
+        reject("skill_eligibility", why);
       } else {
-        pass("skill_eligibility", "kind: skill not invoke-eligible: no explicit eligibility grant (loadEligible=false)");
+        pass("skill_eligibility", `${why} (loadEligible=false)`);
       }
     } else {
-      pass("skill_eligibility", unit.kind === "skill" ? "kind: skill with explicit eligibility grant" : "not a skill");
+      pass(
+        "skill_eligibility",
+        governed
+          ? `kind: ${unit.kind} with explicit eligibility grant`
+          : "not a governed procedure",
+      );
     }
     if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
 

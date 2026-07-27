@@ -84,14 +84,54 @@ export interface Unit {
     spend?: { max_spend?: number; allowed_vendors?: string[]; currency?: string };
   };
   /**
-   * Explicit eligibility grant for a skill. Skills fail closed by default; only a
-   * unit with `load_eligible: true` is load/invoke-eligible (#100).
+   * Ordered composition a `kind: playbook` declares — §4.3b (v0.29, RFC-0027).
+   *
+   * The step, not the playbook, is the unit of governance: `authority_level` is a
+   * ceiling on one step, and effective authority is the minimum across it, the
+   * playbook's, the task-type grant_ceiling, any tenant ceiling, and the enacting
+   * agent's grant. A playbook can therefore never raise authority.
+   *
+   * Absent means "declares no steps", which is distinct from an empty composition and
+   * fails closed at the eligibility gate (#118).
+   */
+  steps?: PlaybookStep[];
+  /**
+   * Explicit eligibility grant for a skill or playbook. Both fail closed by default;
+   * only a unit with `load_eligible: true` is load/invoke-eligible (#100, #118).
    */
   load_eligible?: boolean;
   /** Declared token cost — the faithful input for context-window budgeting (#33). */
   size_tokens?: number;
   /** Declared byte size — the estimate source when size_tokens is absent (tokens ≈ bytes/4). */
   bytes?: number;
+}
+
+/**
+ * One step of a `kind: playbook` composition — §4.3b (v0.29, RFC-0027).
+ *
+ * `uses` is a reference to another unit rather than prose, which is the whole point:
+ * a checker can resolve it, confirm the target is `kind: skill`, and compare the
+ * declared authority against that unit's action_scope. Prose steps cannot be checked.
+ */
+export interface PlaybookStep {
+  /** Unique within the playbook. */
+  id: string;
+  /** Unit id this step enacts; SHOULD name a `kind: skill` unit. */
+  uses?: string;
+  /** Inline description, when no unit exists yet. Scope-unbounded — see §4.3b. */
+  action?: string;
+  /** Step ids that must complete successfully first. The graph MUST be acyclic. */
+  depends_on?: string[];
+  /** RFC-0025 scale. Ceiling semantics: at most this level. */
+  authority_level?: string;
+  /** RFC-0026 triggers, evaluated before enactment. Disjunctive; always a list here. */
+  escalation?: string[];
+  /** Prose assertion. The protocol defines no evaluation mechanism. */
+  success_condition?: string;
+  /** `abort` | `continue` | `escalate`. Default `abort`. */
+  on_failure?: string;
+  /** ISO 8601 duration; elapsing constitutes failure. */
+  timeout?: string;
 }
 
 export interface Signing {
