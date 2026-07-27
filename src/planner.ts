@@ -400,14 +400,20 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     const { score, reasons } = scoreUnit(unit, taskTerms);
     if (score === 0) { skipped.push({ id: unit.id, reason: "no task-relevance match" }); continue; }
 
-    // skill eligibility: a procedure/skill (kind: skill) is a governed unit that
-    // fails closed — it is load/invoke-eligible only with an explicit grant
-    // (load_eligible: true). Non-skill units and eligible skills pass. Soft-gate
+    // skill eligibility: a governed procedure (kind: skill, and kind: playbook since
+    // v0.29) fails closed — load/invoke-eligible only with an explicit grant
+    // (load_eligible: true). Ungoverned kinds and granted procedures pass. Soft-gate
     // so --trace shows the verdict; strict mode converts it to a skip below.
+    //
+    // This condition is duplicated in trace.ts, which reimplements the cascade to
+    // produce per-gate verdicts. The two must agree or the trace stops explaining the
+    // plan — and #118 is what divergence costs: the literal `kind === "skill"` test let
+    // a playbook through both copies, so the planner refused a skill while offering the
+    // playbook that invokes it at commit. Change one, change the other.
     let loadEligible = true;
-    if (unit.kind === "skill" && unit.load_eligible !== true) {
+    if ((unit.kind === "skill" || unit.kind === "playbook") && unit.load_eligible !== true) {
       loadEligible = false;
-      reasons.push("kind: skill not invoke-eligible: no explicit eligibility grant");
+      reasons.push(`kind: ${unit.kind} not invoke-eligible: no explicit eligibility grant`);
     }
 
     // trust: restricted units need attestation the agent can present

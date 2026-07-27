@@ -8,12 +8,51 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import { guardedFetchTextFinal, type FetchGuard } from "./fetch.js";
-import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier, Signing, Serving } from "./model.js";
+import type { Manifest, Unit, ManifestRef, Payment, PaymentMethod, RateLimits, RateLimitTier, Signing, Serving, PlaybookStep } from "./model.js";
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => !!v && typeof v === "object" && !Array.isArray(v);
 const asStr = (v: unknown): string | undefined => (v === undefined || v === null ? undefined : String(v));
 const asStrArr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+
+/**
+ * §4.3b (v0.29, RFC-0027): the ordered composition a `kind: playbook` declares.
+ *
+ * Anything that is not a list yields undefined, matching how action_scope treats a
+ * malformed envelope: a manifest is untrusted input, and a bad block must degrade to
+ * "declares no steps" — which fails closed at the eligibility gate — rather than take
+ * down the parse. Entries without an `id` are dropped, because a step with no identity
+ * cannot be named by depends_on and so cannot participate in the graph at all.
+ */
+const parseSteps = (raw: unknown): PlaybookStep[] | undefined => {
+  if (!Array.isArray(raw)) return undefined;
+  const steps: PlaybookStep[] = [];
+  for (const item of raw) {
+    if (!isObj(item) || item["id"] === undefined) continue;
+    steps.push({
+      id: String(item["id"]),
+      uses: asStr(item["uses"]),
+      action: asStr(item["action"]),
+      depends_on: asStrArr(item["depends_on"]),
+      authority_level: asStr(item["authority_level"]),
+      escalation: parseEscalation(item["escalation"]),
+      success_condition: asStr(item["success_condition"]),
+      on_failure: asStr(item["on_failure"]),
+      timeout: asStr(item["timeout"]),
+    });
+  }
+  return steps;
+};
+
+/**
+ * §4.3b: `escalation` accepts a single trigger or a list. The triggers are disjunctive,
+ * so a scalar means a list of one; normalising here means no consumer handles both.
+ */
+const parseEscalation = (raw: unknown): string[] | undefined => {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === "string") return [raw];
+  return asStrArr(raw);
+};
 const asNum = (v: unknown): number | undefined => {
   if (v === undefined || v === null) return undefined;
   const n = Number(v);
@@ -84,6 +123,7 @@ function parseUnit(v: Raw): Unit {
     deprecated: v["deprecated"] === undefined ? undefined : Boolean(v["deprecated"]),
     not_for: asStrArr(v["not_for"]),
     kind: asStr(v["kind"]),
+    steps: parseSteps(v["steps"]),
     load_eligible: v["load_eligible"] === undefined ? undefined : Boolean(v["load_eligible"]),
     action_scope: isObj(v["action_scope"])
       ? {
