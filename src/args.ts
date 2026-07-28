@@ -148,7 +148,7 @@ export const USAGE =
   '  kcp-agent mcp\n' +
   '  kcp-agent serve    [<port>] [--api-key <key>] [--manifest <path|dir|url>] [--public-url <url>]\n' +
   '  kcp-agent watch    <path|dir> [--task "<task>"] [--diff] [--once] [--json]\n' +
-  '  kcp-agent init     [dir] [--publisher <name>] [--dry-run] [--force]\n' +
+  '  kcp-agent init     [dir] [--publisher <name>] [--from-llms-txt <url|path>] [--dry-run] [--force]\n' +
   '  kcp-agent discover <url>\n' +
   "\nRun `kcp-agent plan --help` for options.";
 
@@ -188,4 +188,6 @@ export const OPTIONS =
   '  --memory <dir>          (remember/recall/plan) episodic-memory directory\n' +
   '  --replay                (recall) re-verify each hit against the live world\n' +
   '  --limit <n>             (recall) max hits returned\n' +
-  '  --public-url <url>      (serve) advertised public base URL';
+  '  --public-url <url>      (serve) advertised public base URL\n' +
+  '  --correlation-id <id>   opaque caller id echoed into the --json envelope (for audit joins)\n' +
+  '  --from-llms-txt <loc>   (init) draft a manifest from an existing llms.txt (URL or path)';
