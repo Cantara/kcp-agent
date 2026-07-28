@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +25,35 @@ function demo(id: string): string {
 }
 
 describe("demo suite (examples/demos.js) — narrated claims hold against the real CLI", () => {
+  // Every scenario in demos.js must be exercised here. Twenty demos had twenty tests and
+  // the twenty-first shipped without one — a demo whose narration nothing checks is exactly
+  // the drift this file exists to catch, and it fails silently by being absent.
+  it("every registered scenario has a test in this file", () => {
+    const source = readFileSync(DEMOS, "utf8");
+    const ids = [...source.matchAll(/^\s*id: '([a-z0-9-]+)',/gm)].map((m) => m[1]);
+    expect(ids.length, "no scenarios found — the scrape broke").toBeGreaterThanOrEqual(20);
+
+    const self = readFileSync(fileURLToPath(import.meta.url), "utf8");
+    for (const id of ids) {
+      expect(self.includes(`it("${id}: `), `demos.js registers '${id}' but no test drives it`).toBe(true);
+    }
+  });
+
+  it("upgrade: an llms.txt becomes a draft manifest, with what it cannot say marked TODO", () => {
+    const out = demo("upgrade");
+    // The publisher's own title and blockquote become project and intent.
+    expect(out).toContain('project: "Fjordwire Docs"');
+    expect(out).toContain("Everything a developer needs to integrate Fjordwire payments.");
+    // Links become units at relative paths — an absolute URL would fail `kcp-agent validate`.
+    expect(out).toMatch(/quickstart\s+→\s+quickstart/);
+    expect(out).toMatch(/authentication\s+→\s+auth/);
+    // What llms.txt cannot express is marked, not invented.
+    expect(out).toContain("TODO: add `signing:`");
+    expect(out).toContain("TODO: narrow `audience:`");
+    // The partner link is on another origin, so it is federation, not a unit.
+    expect(out).toMatch(/TODO: 1 link\(s\) point at other origins/);
+  });
+
   it("newsstand: budget arithmetic lives in the skip reason", () => {
     const out = demo("newsstand");
     expect(out).toContain("chipfab-exclusive");

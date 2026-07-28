@@ -187,6 +187,31 @@ final plan: datacenter-power, subsea-cable-feature
       re-navigates, loads the feed, and grounds the claim against its real <code>sha256</code>.</p>
   </section>
 
+  <!-- ================= UPGRADE ================= -->
+  <section id="upgrade" class="section">
+    <h2>The Upgrade — llms.txt is the easy half, already published</h2>
+    <p>
+      <a href="https://llmstxt.org">llms.txt</a> answered the same question — what does this site
+      contain — and publishers adopted it. It is a flat link list, and that is all it can ever be:
+      no audiences, no validity window, no signature, no price, no federation.
+    </p>
+    <p>
+      So convert it rather than compete with it. Deterministic, no model call, and it never
+      overwrites a manifest you already have:
+    </p>
+    <pre><code>kcp-agent init --from-llms-txt https://acme.dev/llms.txt --dry-run</code></pre>
+    <p>
+      Everything the source could not express becomes a <code>TODO</code> rather than a guess. A
+      converted manifest that quietly claimed an audience would be asserting something the
+      publisher never said. Links to other origins are offered as federation, not smuggled in as
+      units.
+    </p>
+    <p>
+      <code>kcp-agent discover &lt;url&gt;</code> checks <code>/llms.txt</code> before it falls back
+      to crawling, and points at the upgrade.
+    </p>
+  </section>
+
   <!-- ================= PLAYGROUND ================= -->
   <section id="playground" class="section section--alt">
     <h2>The Playground — bring your own manifest</h2>
@@ -259,7 +284,7 @@ npx kcp-agent ask "your task" --manifest ./docs --loop
 
 # serve the planner to any MCP client (kcp_plan, kcp_load, kcp_trace, kcp_validate, kcp_replay)
 npx kcp-agent mcp</code></pre>
-      <p>Thirteen narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
+      <p>Twenty-one narrated demos ship in the repo — <code>node examples/demos.js</code> — all offline, no mocks,
         all asserted in CI. Native binaries for Linux/macOS/Windows on the
         <a href="https://github.com/Cantara/kcp-agent/releases" target="_blank" rel="noopener">releases page</a>.
         Apache-2.0.</p>

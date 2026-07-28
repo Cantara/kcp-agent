@@ -1,0 +1,21 @@
+# Fjordwire Docs
+
+> Everything a developer needs to integrate Fjordwire payments.
+
+Fjordwire is a Norwegian payments API. This file is what we published for agents
+before we knew there was anything better to publish.
+
+## Guides
+
+- [Quickstart](https://fjordwire.no/quickstart): Take your first payment in five minutes
+- [Authentication](https://fjordwire.no/auth): API keys, rotation, and scopes
+- [Webhooks](https://fjordwire.no/webhooks): Receive settlement events
+
+## Reference
+
+- [HTTP API](https://fjordwire.no/api)
+- [Error codes](https://fjordwire.no/errors): Every code we return, and what to do about it
+
+## Optional
+
+- [Partner SDK](https://partner-sdk.example/fjordwire): Maintained by a partner, not by us

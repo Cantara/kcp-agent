@@ -21,8 +21,32 @@ interface Row { layer: string; section: string; where: string; impl: string[]; p
 describe("conformance matrix (docs/conformance.json)", () => {
   const data = JSON.parse(read("docs/conformance.json")) as { spec: string; rows: Row[] };
 
+  // The matrix is the public claim of what this implements, so it must name the spec
+  // version this repo actually tracks. Hardcoding it here pinned the stale value instead of
+  // catching it: the site advertised KCP 0.25 for five releases while knowledge.yaml said
+  // 0.30, and the test that should have noticed was asserting the wrong number was correct.
+  it("names the spec version the manifest declares", () => {
+    const declared = read("knowledge.yaml").match(/^kcp_version:\s*["']?([\d.]+)/m);
+    expect(declared, "knowledge.yaml has no kcp_version").toBeTruthy();
+    expect(data.spec).toBe(`KCP ${declared![1]}`);
+  });
+
+  // The site advertised "Thirteen narrated demos" while demos.js registered twenty-one.
+  // A number on a public page is a claim like any other, and this one had no proof.
+  it("the demo count on the site matches what demos.js registers", () => {
+    const WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+      "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+      "Eighteen", "Nineteen", "Twenty", "Twenty-one", "Twenty-two", "Twenty-three",
+      "Twenty-four", "Twenty-five"];
+    const registered = [...read("examples/demos.js").matchAll(/^\s*id: '[a-z0-9-]+',/gm)].length;
+    expect(registered, "no scenarios found — the scrape broke").toBeGreaterThanOrEqual(20);
+    const claimed = read("docs/index.html").match(/([A-Z][a-z]+(?:-[a-z]+)?) narrated demos/);
+    expect(claimed, "the site no longer states a demo count").toBeTruthy();
+    expect(claimed![1], `site says ${claimed![1]}, demos.js registers ${registered}`)
+      .toBe(WORDS[registered]);
+  });
+
   it("covers the spec layers the README claims", () => {
-    expect(data.spec).toBe("KCP 0.25");
     expect(data.rows.length).toBeGreaterThanOrEqual(10);
     const sections = data.rows.map((r) => r.section);
     for (const s of ["§15", "§4", "§4.11", "§4.22", "§3.2", "§3.6", "§4.14", "§4.15", "§2"]) {
