@@ -66,6 +66,8 @@ export interface Args {
   /** Opaque caller-supplied id echoed into the --json envelope. Not validated: kcp-agent
    *  is not the authority on the caller's tracing format. */
   correlationId?: string;
+  /** Convert an existing llms.txt (URL or path) into a draft manifest. */
+  fromLlmsTxt?: string;
   positionals: string[];
 }
 
@@ -119,6 +121,7 @@ export function parseArgs(argv: string[]): Args {
       case "--force": a.force = true; break;
       case "--publisher": a.publisher = next(); break;
       case "--correlation-id": a.correlationId = next(); break;
+      case "--from-llms-txt": a.fromLlmsTxt = next(); break;
       // `watch --task "<task>"` is documented; without a case it was rejected, and
       // the only way to pass a task was positionally.
       case "--task": a.task = next(); explicitTask = true; break;
