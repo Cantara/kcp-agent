@@ -1,0 +1,20 @@
+{
+  "name": "no-signal-fails-closed",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "an answer with no self-report and no evaluator yields no signal, and no signal is a failure rather than a pass",
+  "task": "t",
+  "answer": "An answer with no stated certainty.",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": false,
+    "score": 0,
+    "threshold": 0.7,
+    "signals": [],
+    "detail": "no confidence signal obtainable (no self-report in answer, no evaluator) — fail-closed"
+  }
+}

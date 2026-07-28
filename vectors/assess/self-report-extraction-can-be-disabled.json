@@ -1,0 +1,21 @@
+{
+  "name": "self-report-extraction-can-be-disabled",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "includeSelfReport: false suppresses extraction, so an answer that states a confidence still yields no signal",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.9",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "includeSelfReport": false,
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": false,
+    "score": 0,
+    "threshold": 0.7,
+    "signals": [],
+    "detail": "no confidence signal obtainable (no self-report in answer, no evaluator) — fail-closed"
+  }
+}

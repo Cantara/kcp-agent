@@ -1,0 +1,33 @@
+{
+  "name": "aggregate-min-is-the-default",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "two signals combine by min unless told otherwise — the fail-closed choice",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.9",
+  "units": [],
+  "options": {
+    "threshold": 0.6,
+    "asOf": "2026-07-28"
+  },
+  "evaluator": {
+    "score": 0.5,
+    "reasoning": "the answer does not cite the unit it relies on"
+  },
+  "expect": {
+    "passed": false,
+    "score": 0.5,
+    "threshold": 0.6,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.9
+      },
+      {
+        "source": "evaluator",
+        "score": 0.5
+      }
+    ],
+    "detail": "confidence 0.5 < threshold 0.6 — evaluator: the answer does not cite the unit it relies on"
+  }
+}

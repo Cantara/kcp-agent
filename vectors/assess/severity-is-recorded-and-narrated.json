@@ -1,0 +1,27 @@
+{
+  "name": "severity-is-recorded-and-narrated",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "a caller-supplied severity is echoed on the verdict and named in the failure detail",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.4",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "severity": "critical",
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": false,
+    "score": 0.4,
+    "threshold": 0.7,
+    "severity": "critical",
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.4
+      }
+    ],
+    "detail": "confidence 0.4 < threshold 0.7 on critical task — self: self-reported: \"confidence: 0.4\""
+  }
+}

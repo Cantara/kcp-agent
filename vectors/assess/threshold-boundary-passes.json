@@ -1,0 +1,25 @@
+{
+  "name": "threshold-boundary-passes",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "the gate is >=, so a score exactly on the threshold passes",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.7",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": true,
+    "score": 0.7,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.7
+      }
+    ],
+    "detail": "confidence 0.7 >= threshold 0.7 (min of 1 signal)"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "self-report-clamped-to-one",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "a self-report above the scale is normalised then clamped to 1, never above it",
+  "task": "t",
+  "answer": "Certain.\nconfidence: 150",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": true,
+    "score": 1,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 1
+      }
+    ],
+    "detail": "confidence 1 >= threshold 0.7 (min of 1 signal)"
+  }
+}
