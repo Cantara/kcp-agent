@@ -63,6 +63,9 @@ export interface Args {
   dryRun: boolean;
   force: boolean;
   publisher?: string;
+  /** Opaque caller-supplied id echoed into the --json envelope. Not validated: kcp-agent
+   *  is not the authority on the caller's tracing format. */
+  correlationId?: string;
   positionals: string[];
 }
 
@@ -115,6 +118,7 @@ export function parseArgs(argv: string[]): Args {
       case "--dry-run": a.dryRun = true; break;
       case "--force": a.force = true; break;
       case "--publisher": a.publisher = next(); break;
+      case "--correlation-id": a.correlationId = next(); break;
       // `watch --task "<task>"` is documented; without a case it was rejected, and
       // the only way to pass a task was positionally.
       case "--task": a.task = next(); explicitTask = true; break;

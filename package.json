@@ -2,13 +2,15 @@
   "name": "kcp-agent",
   "version": "0.21.0",
   "mcpName": "no.cantara/kcp-agent",
-  "description": "Reference agent that consumes the Knowledge Context Protocol end-to-end — a deterministic, fail-closed navigation planner plus optional LLM synthesis.",
+  "description": "Reference agent that consumes the Knowledge Context Protocol end-to-end \u2014 a deterministic, fail-closed navigation planner plus optional LLM synthesis.",
   "type": "module",
   "bin": {
     "kcp-agent": "dist/cli.js"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./dist/cli.js": "./dist/cli.js",
+    "./cli": "./dist/cli.js"
   },
   "files": [
     "dist",

@@ -33,6 +33,7 @@
 //   --trust-key <loc>     pinned ed25519 public key (path, URL, or inline) for verification
 //   --trace               show the decision trace: per-unit gate cascade (plan only)
 //   --json                emit the result as JSON
+//   --correlation-id <id> opaque caller id echoed into the --json envelope (for audit joins)
 //   --help, -h            print usage and this option reference
 //   watch only:
 //   --once                run a single validate/plan cycle and exit (no watching)
@@ -403,12 +404,12 @@ async function main() {
     if (a.trace) {
       const manifest = await loadManifest(a.manifest!, buildFetchGuard(a));
       const t = traceDecision(manifest, a.task!, buildPlanOptions(a));
-      if (a.json) { console.log(encodePlanJson(t, "trace")); return; }
+      if (a.json) { console.log(encodePlanJson(t, "trace", a.correlationId)); return; }
       console.log(formatPlan(t.plan));
       console.log(formatTrace(t));
       return;
     }
-    if (a.json) console.log(encodePlanJson(a.follow ? tree : allPlans[0], a.follow ? "tree" : "plan"));
+    if (a.json) console.log(encodePlanJson(a.follow ? tree : allPlans[0], a.follow ? "tree" : "plan", a.correlationId));
     else console.log(a.follow ? formatPlanTree(tree) : formatPlan(allPlans[0]));
     // --memory: report determinism against a prior episode (fail-closed on sha drift), then record.
     if (a.memory) {
