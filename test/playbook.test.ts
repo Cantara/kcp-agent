@@ -48,6 +48,20 @@ units:
         authority_level: commit
         escalation: requires_approval
         on_failure: escalate
+  # Granted, and its step's target is granted too. Both are required as of KCP v0.30
+  # §4.3c: a grant on a playbook does not compose to the units its steps name, so this
+  # fixture needed granted-target adding when #123 landed — the composition was
+  # previously "granted" while naming a unit that was not.
+  - id: granted-target
+    path: skills/granted-target.md
+    intent: "How do I rotate the production signing key, granted?"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [rotate, signing, key]
+    action_scope:
+      tools: [Bash]
+      paths: ["infra/**"]
   - id: granted-playbook
     path: playbooks/granted.md
     intent: "How do I rotate the production signing key with approval?"
@@ -57,7 +71,7 @@ units:
     triggers: [rotate, signing, key]
     steps:
       - id: rotate
-        uses: rotate-key
+        uses: granted-target
         authority_level: commit
 `;
   const m = parseManifest(PLAYBOOKS, "test");
@@ -247,5 +261,110 @@ units:
     expect(pb.outcome).toBe("skipped");
     const failed = pb.gates.find((g) => !g.passed)!;
     expect(failed.gate).toBe("skill_eligibility");
+  });
+});
+
+// Eligibility does not compose (#123) — KCP v0.30, §4.3c / RFC-0028.
+//
+// A grant on a playbook does not reach the units its steps name. The v0.30 validator
+// makes a granted playbook whose step `uses` an ungranted unit a manifest ERROR; the
+// planner offered it anyway, handing an agent a procedure whose first step invokes
+// something it may not invoke.
+//
+// Same failure class as #118, direction reversed: that was an ungranted playbook being
+// offered, this is a granted playbook whose parts are not.
+describe("eligibility does not compose (#123)", () => {
+  const M = `
+kcp_version: "0.30"
+project: compose-kb
+version: 1.0.0
+units:
+  - id: ungranted-skill
+    path: skills/a.md
+    intent: "How do I promote a verified build to production?"
+    kind: skill
+    audience: [agent]
+    triggers: [promote, release, production]
+    action_scope: {tools: [Bash]}
+  - id: granted-skill
+    path: skills/b.md
+    intent: "How do I promote a verified build to production?"
+    kind: skill
+    load_eligible: true
+    audience: [agent]
+    triggers: [promote, release, production]
+    action_scope: {tools: [Bash]}
+  - id: leaky-playbook
+    path: playbooks/leaky.md
+    intent: "How do we promote a verified build to production?"
+    kind: playbook
+    load_eligible: true
+    audience: [agent]
+    triggers: [promote, release, production]
+    steps:
+      - id: go
+        uses: ungranted-skill
+        authority_level: commit
+  - id: sound-playbook
+    path: playbooks/sound.md
+    intent: "How do we promote a verified build to production safely?"
+    kind: playbook
+    load_eligible: true
+    audience: [agent]
+    triggers: [promote, release, production]
+    steps:
+      - id: go
+        uses: granted-skill
+        authority_level: commit
+`;
+  const m = parseManifest(M, "test");
+  const TASK = "promote a verified build to production";
+  const AGENT = { capabilities: { role: "agent" } };
+
+  it("does not offer a granted playbook whose step uses an ungranted unit", () => {
+    // The defect. A grant on the composition is not a grant on the parts, so this
+    // playbook cannot be enacted as written and must not reach an agent.
+    const p = plan(m, TASK, { strict: true, ...AGENT });
+    expect(p.selected.some((u) => u.id === "leaky-playbook")).toBe(false);
+  });
+
+  it("says why, naming the step and the unit that is not eligible", () => {
+    const p = plan(m, TASK, { strict: true, ...AGENT });
+    const skip = p.skipped.find((s) => s.id === "leaky-playbook");
+    expect(skip?.reason).toMatch(/ungranted-skill/);
+    expect(skip?.reason).toMatch(/not invoke-eligible|does not compose/);
+  });
+
+  it("still offers a playbook whose steps are all eligible", () => {
+    // The rule must not swallow the valid case: a composition whose parts are granted
+    // is exactly what §4.3c permits.
+    const p = plan(m, TASK, { strict: true, ...AGENT });
+    expect(p.selected.some((u) => u.id === "sound-playbook")).toBe(true);
+  });
+
+  it("the trace agrees with the plan", () => {
+    // #119's lesson: trace.ts reimplements the cascade, so a divergence emits an audit
+    // record claiming an agent was refused something it was in fact offered.
+    const opts = { strict: true, ...AGENT };
+    const t = trace(m, TASK, opts);
+    const p = plan(m, TASK, opts);
+    for (const ut of t.units) {
+      expect(ut.outcome === "selected").toBe(p.selected.some((s) => s.id === ut.id));
+    }
+  });
+
+  it("attributes the refusal to a gate, with the reason", () => {
+    // Outcome equality alone is too weak, and mutation testing proved it: removing the
+    // trace's compose check still skipped the playbook — via no gate at all, leaving
+    // `rejectedBy: undefined`. The trace agreed with the plan and could not say why,
+    // which is an audit record that cannot be traced back to a rule. That is the exact
+    // failure #119 was filed for, so assert the attribution rather than the verdict.
+    const t = trace(m, TASK, { strict: true, ...AGENT });
+    const leaky = t.units.find((u) => u.id === "leaky-playbook")!;
+    expect(leaky.outcome).toBe("skipped");
+    expect(leaky.rejectedBy).toBe("skill_eligibility");
+    const failed = leaky.gates.find((g) => !g.passed);
+    expect(failed?.detail).toMatch(/ungranted-skill/);
+    expect(failed?.detail).toMatch(/does not compose/);
   });
 });
