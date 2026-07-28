@@ -416,6 +416,28 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       reasons.push(`kind: ${unit.kind} not invoke-eligible: no explicit eligibility grant`);
     }
 
+    // §4.3c (KCP v0.30, RFC-0028): eligibility does not compose. A grant on a playbook
+    // does not reach the units its steps name, so a granted playbook whose step `uses`
+    // an ungranted unit cannot be enacted as written — the v0.30 validator makes it a
+    // manifest error, and offering it here hands an agent a procedure whose first step
+    // invokes something it may not invoke (#123).
+    //
+    // Same failure class as #118 with the direction reversed: that was an ungranted
+    // playbook being offered, this is a granted playbook whose parts are not.
+    if (unit.kind === "playbook" && loadEligible && unit.steps) {
+      for (const step of unit.steps) {
+        if (!step.uses) continue;
+        const target = manifest.units.find((u) => u.id === step.uses);
+        if (target && target.load_eligible !== true) {
+          loadEligible = false;
+          reasons.push(
+            `step '${step.id}' uses '${step.uses}', which is not invoke-eligible — a grant on a playbook does not compose to the units its steps name (§4.3c)`,
+          );
+          break;
+        }
+      }
+    }
+
     // trust: restricted units need attestation the agent can present
     const unitRequiresAttestation = requiresAttestation && unit.access === "restricted";
     if (unitRequiresAttestation && !agentCanAttest) {

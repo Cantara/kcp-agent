@@ -217,7 +217,30 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
     // composes several of them, it reaches commit by design (§4.3b), and its own
     // action_scope is a declaration for review rather than a grant.
     const governed = unit.kind === "skill" || unit.kind === "playbook";
-    if (governed && unit.load_eligible !== true) {
+
+    // §4.3c (KCP v0.30): eligibility does not compose (#123). Computed before the gate
+    // below so the verdict names the real reason — a playbook may hold its own grant and
+    // still be unenactable because a step's target does not.
+    let composeFailure: string | undefined;
+    if (unit.kind === "playbook" && unit.load_eligible === true && unit.steps) {
+      for (const step of unit.steps) {
+        if (!step.uses) continue;
+        const target = manifest.units.find((u) => u.id === step.uses);
+        if (target && target.load_eligible !== true) {
+          composeFailure = `step '${step.id}' uses '${step.uses}', which is not invoke-eligible — a grant on a playbook does not compose to the units its steps name (§4.3c)`;
+          break;
+        }
+      }
+    }
+
+    if (composeFailure) {
+      loadEligible = false;
+      if (options.strict) {
+        reject("skill_eligibility", composeFailure);
+      } else {
+        pass("skill_eligibility", `${composeFailure} (loadEligible=false)`);
+      }
+    } else if (governed && unit.load_eligible !== true) {
       loadEligible = false;
       const why = `kind: ${unit.kind} not invoke-eligible: no explicit eligibility grant`;
       if (options.strict) {
