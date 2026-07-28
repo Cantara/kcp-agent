@@ -31,6 +31,7 @@ const SUMMER = path.join(EX, 'summer', 'tourism');
 const MILKY = path.join(EX, 'milky-way');
 const DEMO_HUB = path.join(EX, 'demo-hub');
 const PROCEDURES = path.join(EX, 'procedures');
+const UPGRADE = path.join(EX, 'upgrade');
 
 // ── tiny ANSI helpers ────────────────────────────────────────────────────────
 let COLOR = process.stdout.isTTY === true;
@@ -63,6 +64,7 @@ function agent(args) {
     .replaceAll(MILKY, 'examples/milky-way')
     .replaceAll(DEMO_HUB, 'examples/demo-hub')
     .replaceAll(PROCEDURES, 'examples/procedures')
+    .replaceAll(UPGRADE, 'examples/upgrade')
     .replaceAll(ROOT, '.');
   return {
     stdout: stripAnsi((r.stdout || '').toString()).replaceAll(ROOT + path.sep, ''),
@@ -80,6 +82,18 @@ function planJson(args) {
 }
 
 /** Lines of `text` containing any of `patterns`, right-trimmed. */
+/** `- id: "x"` / `path: "y"` line pairs from a generated manifest, as [id, path]. */
+function units(text) {
+  const out = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const id = lines[i].match(/^\s*- id:\s*"([^"]+)"/);
+    const p = lines[i + 1]?.match(/^\s*path:\s*"([^"]+)"/);
+    if (id && p) out.push([id[1], p[1]]);
+  }
+  return out;
+}
+
 function pick(text, patterns) {
   return text.split('\n')
     .filter((line) => patterns.some((p) => line.includes(p)))
@@ -994,6 +1008,40 @@ const SCENARIOS = [
       'The repo is its own example: the planner routes "how does the planner score units?" to ' +
       'src/planner.ts, and the federation block points onward to the KCP spec itself. If the ' +
       'manifest rots, CI fails — the dogfood is load-bearing.',
+  },
+  {
+    id: 'upgrade',
+    title: 'The Upgrade — llms.txt is the easy half, already published',
+    useCase:
+      'A publisher already wrote an llms.txt: a flat link list, which is all that format can ' +
+      'ever be. It carries no audiences, no validity window, no signature, no price, no ' +
+      'federation. Rather than ask them to start again, convert what they have — and mark ' +
+      'everything the source could not say.',
+    run() {
+      const g = agent(['init', UPGRADE, '--from-llms-txt', path.join(UPGRADE, 'llms.txt'), '--dry-run']);
+      return {
+        blocks: [
+          { command: g.command, lines: [
+            ...pick(g.stdout, ['project:']).map((l) => '  ' + l.trim()),
+            // The blockquote summary becomes the manifest's own intent.
+            '  ' + (g.stdout.split('\n').find((l) => l.startsWith('intent:')) ?? '').trim(),
+            '',
+            // Pair each unit with the path it resolves to: the conversion's actual work.
+            ...units(g.stdout).slice(0, 3).map(([id, unitPath]) => `  - ${id}  →  ${unitPath}`),
+            `  ${c.dim(`… ${units(g.stdout).length} units in total`)}`,
+            '',
+            ...g.stdout.split('\n').filter((l) => l.startsWith('# TODO:')).slice(0, 4)
+              .map((l) => '  ' + c.dim(l.replace(/^#\s*/, ''))),
+          ] },
+        ],
+      };
+    },
+    verdict:
+      'The link list became a draft manifest: one unit per link, the description as the intent, ' +
+      'the section as a trigger. What llms.txt cannot express is a TODO rather than a guess — a ' +
+      'converted manifest that quietly claimed an audience would be asserting something the ' +
+      'publisher never said. The partner link points at another origin, so it is offered as ' +
+      'federation rather than smuggled in as a unit.',
   },
   {
     id: 'second-opinion',

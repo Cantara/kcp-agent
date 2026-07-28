@@ -1,256 +1,569 @@
 {
   "$comment": "The conformance matrix rendered on the gh-pages site. test/docs.test.ts enforces that every impl file exists and every proof names a real test in the referenced file — a claim cannot outlive its proof.",
-  "spec": "KCP 0.25",
+  "spec": "KCP 0.30",
   "rows": [
     {
       "layer": "Query scoring (intent / triggers / id+path)",
       "section": "§15",
       "where": "planner.ts · scoreUnit",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/planner.test.ts", "test": "selects task-relevant, agent-audience, in-time units and ranks by score" }
+        {
+          "file": "test/planner.test.ts",
+          "test": "selects task-relevant, agent-audience, in-time units and ranks by score"
+        }
       ]
     },
     {
       "layer": "Audience & not_for targeting",
       "section": "§4",
       "where": "planner.ts · audience / negative gates",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/planner.test.ts", "test": "not_for negative targeting skips a unit its publisher scoped out (spec §4)" }
+        {
+          "file": "test/planner.test.ts",
+          "test": "not_for negative targeting skips a unit its publisher scoped out (spec §4)"
+        }
       ]
     },
     {
       "layer": "Access is the auth axis — payment never substitutes for identity",
       "section": "§4.11",
       "where": "planner.ts · access gate",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/economics.test.ts", "test": "fails closed on access:restricted without credentials, even when x402 is settleable" },
-        { "file": "test/invariants.test.ts", "test": "restricted units are never load-eligible when the agent holds no credentials" }
+        {
+          "file": "test/economics.test.ts",
+          "test": "fails closed on access:restricted without credentials, even when x402 is settleable"
+        },
+        {
+          "file": "test/invariants.test.ts",
+          "test": "restricted units are never load-eligible when the agent holds no credentials"
+        }
       ]
     },
     {
       "layer": "Temporal validity & supersession precedence",
       "section": "§4.22",
       "where": "planner.ts · temporalStatus",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/planner.test.ts", "test": "skips the predecessor on the overlap day when the successor is active" },
-        { "file": "test/invariants.test.ts", "test": "never selects a unit whose declared successor is itself selectable (spec §4.22)" }
+        {
+          "file": "test/planner.test.ts",
+          "test": "skips the predecessor on the overlap day when the successor is active"
+        },
+        {
+          "file": "test/invariants.test.ts",
+          "test": "never selects a unit whose declared successor is itself selectable (spec §4.22)"
+        }
       ]
     },
     {
       "layer": "Agent attestation requirements",
       "section": "§3.2",
       "where": "planner.ts · trust gate",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/planner.test.ts", "test": "gates a restricted unit when the agent cannot attest" },
-        { "file": "test/planner.test.ts", "test": "allows the restricted unit once the agent presents a trusted provider" }
+        {
+          "file": "test/planner.test.ts",
+          "test": "gates a restricted unit when the agent cannot attest"
+        },
+        {
+          "file": "test/planner.test.ts",
+          "test": "allows the restricted unit once the agent presents a trusted provider"
+        }
       ]
     },
     {
       "layer": "Federation context + agent_identity, fail-closed follow",
       "section": "§3.6",
       "where": "planner.ts + follow.ts",
-      "impl": ["src/planner.ts", "src/follow.ts"],
+      "impl": [
+        "src/planner.ts",
+        "src/follow.ts"
+      ],
       "proofs": [
-        { "file": "test/planner.test.ts", "test": "selects federation sub-manifests by env context and flags credential needs" },
-        { "file": "test/follow.test.ts", "test": "fails closed: never fetches context-excluded or credential-gated refs" }
+        {
+          "file": "test/planner.test.ts",
+          "test": "selects federation sub-manifests by env context and flags credential needs"
+        },
+        {
+          "file": "test/follow.test.ts",
+          "test": "fails closed: never fetches context-excluded or credential-gated refs"
+        }
       ]
     },
     {
       "layer": "Answer grounding — every asserted claim pinned to a loaded unit, or surfaced as a gap",
       "section": "hardening",
       "where": "ground.ts · groundAnswer",
-      "impl": ["src/ground.ts"],
+      "impl": [
+        "src/ground.ts"
+      ],
       "proofs": [
-        { "file": "test/ground.test.ts", "test": "FAIL-CLOSED: a verifier that cites a unit which was not loaded cannot ground the claim" },
-        { "file": "test/ground.test.ts", "test": "surfaces an unsupported claim as an explicit gap — never silently drops it" },
-        { "file": "test/ground.test.ts", "test": "caps surfaced gaps to guard against gap-flooding, and reports the truncation" }
+        {
+          "file": "test/ground.test.ts",
+          "test": "FAIL-CLOSED: a verifier that cites a unit which was not loaded cannot ground the claim"
+        },
+        {
+          "file": "test/ground.test.ts",
+          "test": "surfaces an unsupported claim as an explicit gap — never silently drops it"
+        },
+        {
+          "file": "test/ground.test.ts",
+          "test": "caps surfaced gaps to guard against gap-flooding, and reports the truncation"
+        }
       ]
     },
     {
       "layer": "Grounded-answer replay — a grounded answer is re-verified against a moved world; gaps have a lifecycle",
       "section": "hardening",
       "where": "replayground.ts · replayGroundedAnswer",
-      "impl": ["src/replayground.ts"],
+      "impl": [
+        "src/replayground.ts"
+      ],
       "proofs": [
-        { "file": "test/replayground.test.ts", "test": "drifted: the unit's bytes no longer match the pinned sha — fail-closed (ok false)" },
-        { "file": "test/replayground.test.ts", "test": "gone: the cited unit can no longer be read — fail-closed" },
-        { "file": "test/replayground.test.ts", "test": "gap-closes: a previously-unsupported claim now grounds against a grown manifest" }
+        {
+          "file": "test/replayground.test.ts",
+          "test": "drifted: the unit's bytes no longer match the pinned sha — fail-closed (ok false)"
+        },
+        {
+          "file": "test/replayground.test.ts",
+          "test": "gone: the cited unit can no longer be read — fail-closed"
+        },
+        {
+          "file": "test/replayground.test.ts",
+          "test": "gap-closes: a previously-unsupported claim now grounds against a grown manifest"
+        }
       ]
     },
     {
       "layer": "Episodic memory — a memory is a replayable plan, stripped of unit bytes so recall can't bypass the access gate",
       "section": "hardening",
       "where": "memory.ts · toEntry / recall",
-      "impl": ["src/memory.ts"],
+      "impl": [
+        "src/memory.ts"
+      ],
       "proofs": [
-        { "file": "test/memory.test.ts", "test": "SECURITY: strips unit content on ingest but keeps id/path/sha for replay" },
-        { "file": "test/memory.test.ts", "test": "is hash-addressed: the same artifact yields the same id regardless of recordedAt" },
-        { "file": "test/memory.test.ts", "test": "attaches replay-validated status to each hit" },
-        { "file": "test/memory.test.ts", "test": "without a replay hook, hits are returned unverified (never falsely 'valid')" }
+        {
+          "file": "test/memory.test.ts",
+          "test": "SECURITY: strips unit content on ingest but keeps id/path/sha for replay"
+        },
+        {
+          "file": "test/memory.test.ts",
+          "test": "is hash-addressed: the same artifact yields the same id regardless of recordedAt"
+        },
+        {
+          "file": "test/memory.test.ts",
+          "test": "attaches replay-validated status to each hit"
+        },
+        {
+          "file": "test/memory.test.ts",
+          "test": "without a replay hook, hits are returned unverified (never falsely 'valid')"
+        }
       ]
     },
     {
       "layer": "Memory red team — access-on-recall and poisoning fail closed (bytes stripped, integrity enforced, reuse capability-keyed, forgery caught by live replay)",
       "section": "hardening",
       "where": "memory.ts · verifyEntry + reuse.ts + session.ts",
-      "impl": ["src/memory.ts", "src/reuse.ts", "src/session.ts"],
+      "impl": [
+        "src/memory.ts",
+        "src/reuse.ts",
+        "src/session.ts"
+      ],
       "proofs": [
-        { "file": "test/memory-redteam.test.ts", "test": "does NOT reuse a credentialed answer for a request that lacks the credential" },
-        { "file": "test/memory-redteam.test.ts", "test": "kcp_load never returns a unit the caller lost access to, even when it declares it in `known`" },
-        { "file": "test/memory-redteam.test.ts", "test": "a tampered episode on disk is refused by recall and reuse, fail-closed" },
-        { "file": "test/memory-redteam.test.ts", "test": "even a self-consistent forgery is caught by live replay: a fabricated citation drifts" }
+        {
+          "file": "test/memory-redteam.test.ts",
+          "test": "does NOT reuse a credentialed answer for a request that lacks the credential"
+        },
+        {
+          "file": "test/memory-redteam.test.ts",
+          "test": "kcp_load never returns a unit the caller lost access to, even when it declares it in `known`"
+        },
+        {
+          "file": "test/memory-redteam.test.ts",
+          "test": "a tampered episode on disk is refused by recall and reuse, fail-closed"
+        },
+        {
+          "file": "test/memory-redteam.test.ts",
+          "test": "even a self-consistent forgery is caught by live replay: a fabricated citation drifts"
+        }
       ]
     },
     {
       "layer": "MCP session dedup — kcp_load withholds bytes the caller already holds, re-serving on any sha drift",
       "section": "hardening",
       "where": "session.ts · dedupeLoaded + mcp.ts · kcp_load",
-      "impl": ["src/session.ts", "src/mcp.ts"],
+      "impl": [
+        "src/session.ts",
+        "src/mcp.ts"
+      ],
       "proofs": [
-        { "file": "test/session.test.ts", "test": "withholds the content of a unit the caller holds at the same sha" },
-        { "file": "test/session.test.ts", "test": "FAIL-CLOSED: a stale caller sha (unit drifted) re-serves the fresh bytes, never a stub" },
-        { "file": "test/mcp.test.ts", "test": "kcp_load dedups a unit the caller already holds, and re-serves it once it drifts" }
+        {
+          "file": "test/session.test.ts",
+          "test": "withholds the content of a unit the caller holds at the same sha"
+        },
+        {
+          "file": "test/session.test.ts",
+          "test": "FAIL-CLOSED: a stale caller sha (unit drifted) re-serves the fresh bytes, never a stub"
+        },
+        {
+          "file": "test/mcp.test.ts",
+          "test": "kcp_load dedups a unit the caller already holds, and re-serves it once it drifts"
+        }
       ]
     },
     {
       "layer": "Memory-validated reuse — a determinism cache: reuse a prior episode only if it still replays clean, fail-closed on drift",
       "section": "hardening",
       "where": "reuse.ts · reuse",
-      "impl": ["src/reuse.ts"],
+      "impl": [
+        "src/reuse.ts"
+      ],
       "proofs": [
-        { "file": "test/reuse.test.ts", "test": "grants reuse when the episode matches and still replays clean" },
-        { "file": "test/reuse.test.ts", "test": "FAIL-CLOSED: refuses reuse when the manifest drifted since the episode" },
-        { "file": "test/reuse.test.ts", "test": "FAIL-CLOSED: without a replay hook, reuse is refused as unverifiable (never granted on faith)" },
-        { "file": "test/reuse.test.ts", "test": "misses on a different task, a different options set, or a different manifest" }
+        {
+          "file": "test/reuse.test.ts",
+          "test": "grants reuse when the episode matches and still replays clean"
+        },
+        {
+          "file": "test/reuse.test.ts",
+          "test": "FAIL-CLOSED: refuses reuse when the manifest drifted since the episode"
+        },
+        {
+          "file": "test/reuse.test.ts",
+          "test": "FAIL-CLOSED: without a replay hook, reuse is refused as unverifiable (never granted on faith)"
+        },
+        {
+          "file": "test/reuse.test.ts",
+          "test": "misses on a different task, a different options set, or a different manifest"
+        }
       ]
     },
     {
       "layer": "Closed-loop grounding — a gap re-navigates for evidence, with a bounded convergence proof",
       "section": "hardening",
       "where": "groundloop.ts · groundingLoop",
-      "impl": ["src/groundloop.ts"],
+      "impl": [
+        "src/groundloop.ts"
+      ],
       "proofs": [
-        { "file": "test/groundloop.test.ts", "test": "progress guard: a round that adds no new unit halts instead of spinning" },
-        { "file": "test/groundloop.test.ts", "test": "absorbing gate: a term seeded in one round is never seeded again" },
-        { "file": "test/groundloop.test.ts", "test": "gate-dry: when every gap term is already in the task, it halts WITHOUT re-navigating" },
-        { "file": "test/groundloop.test.ts", "test": "budget-blocked with no new units is reported as partial-budget, distinctly" }
+        {
+          "file": "test/groundloop.test.ts",
+          "test": "progress guard: a round that adds no new unit halts instead of spinning"
+        },
+        {
+          "file": "test/groundloop.test.ts",
+          "test": "absorbing gate: a term seeded in one round is never seeded again"
+        },
+        {
+          "file": "test/groundloop.test.ts",
+          "test": "gate-dry: when every gap term is already in the task, it halts WITHOUT re-navigating"
+        },
+        {
+          "file": "test/groundloop.test.ts",
+          "test": "budget-blocked with no new units is reported as partial-budget, distinctly"
+        }
       ]
     },
     {
       "layer": "Network boundary — SSRF, fan-out, and response-size guards on every remote fetch",
       "section": "hardening",
       "where": "fetch.ts + follow.ts",
-      "impl": ["src/fetch.ts", "src/follow.ts"],
+      "impl": [
+        "src/fetch.ts",
+        "src/follow.ts"
+      ],
       "proofs": [
-        { "file": "test/fetch.test.ts", "test": "refuses a loopback host by default (SSRF fail-closed)" },
-        { "file": "test/fetch.test.ts", "test": "refuses an IPv4-mapped-IPv6 metadata target over https (URL normalizes to hex)" },
-        { "file": "test/fetch.test.ts", "test": "re-checks each redirect target through the guard (never auto-follows)" },
-        { "file": "test/fetch.test.ts", "test": "stops fetching once the total-node cap is reached, fail-closed with a reason" },
-        { "file": "test/fetch.test.ts", "test": "rejects an oversize body while streaming (no content-length)" }
+        {
+          "file": "test/fetch.test.ts",
+          "test": "refuses a loopback host by default (SSRF fail-closed)"
+        },
+        {
+          "file": "test/fetch.test.ts",
+          "test": "refuses an IPv4-mapped-IPv6 metadata target over https (URL normalizes to hex)"
+        },
+        {
+          "file": "test/fetch.test.ts",
+          "test": "re-checks each redirect target through the guard (never auto-follows)"
+        },
+        {
+          "file": "test/fetch.test.ts",
+          "test": "stops fetching once the total-node cap is reached, fail-closed with a reason"
+        },
+        {
+          "file": "test/fetch.test.ts",
+          "test": "rejects an oversize body while streaming (no content-length)"
+        }
       ]
     },
     {
       "layer": "Context-window budget — a token ceiling on what a plan loads, greedy by score, fail-closed with the arithmetic",
       "section": "§4.15",
       "where": "planner.ts · unitTokens / planContext + greedy loop",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/context.test.ts", "test": "skips an over-budget unit with the token arithmetic, and a smaller unit still fits" },
-        { "file": "test/context.test.ts", "test": "uses declared size_tokens exactly, and estimates bytes/4 (flagged approximate)" },
-        { "file": "test/context.test.ts", "test": "admits an undeclared-size unit but counts it unmeasured; --strict excludes it" },
-        { "file": "test/context.test.ts", "test": "fits money but blown by tokens → skipped for context" }
+        {
+          "file": "test/context.test.ts",
+          "test": "skips an over-budget unit with the token arithmetic, and a smaller unit still fits"
+        },
+        {
+          "file": "test/context.test.ts",
+          "test": "uses declared size_tokens exactly, and estimates bytes/4 (flagged approximate)"
+        },
+        {
+          "file": "test/context.test.ts",
+          "test": "admits an undeclared-size unit but counts it unmeasured; --strict excludes it"
+        },
+        {
+          "file": "test/context.test.ts",
+          "test": "fits money but blown by tokens → skipped for context"
+        }
       ]
     },
     {
       "layer": "Payment methods & tiers",
       "section": "§4.14",
       "where": "planner.ts · planPayment",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/planner.test.ts", "test": "plans x402 payment and marks it unaffordable without the method" },
-        { "file": "test/economics.test.ts", "test": "anonymous-paid the §4.11 way — access:public + x402 — is load-eligible without credentials" }
+        {
+          "file": "test/planner.test.ts",
+          "test": "plans x402 payment and marks it unaffordable without the method"
+        },
+        {
+          "file": "test/economics.test.ts",
+          "test": "anonymous-paid the §4.11 way — access:public + x402 — is load-eligible without credentials"
+        }
       ]
     },
     {
       "layer": "Budget ceilings & rate-limit tiers",
       "section": "§4.15",
       "where": "planner.ts · planBudget",
-      "impl": ["src/planner.ts"],
+      "impl": [
+        "src/planner.ts"
+      ],
       "proofs": [
-        { "file": "test/economics.test.ts", "test": "buys by score until the ceiling, skips what would blow it, keeps walking" },
-        { "file": "test/planner.test.ts", "test": "resolves the rate-limit tier from agent credentials" },
-        { "file": "test/invariants.test.ts", "test": "projected spend of load-eligible units never exceeds the ceiling" }
+        {
+          "file": "test/economics.test.ts",
+          "test": "buys by score until the ceiling, skips what would blow it, keeps walking"
+        },
+        {
+          "file": "test/planner.test.ts",
+          "test": "resolves the rate-limit tier from agent credentials"
+        },
+        {
+          "file": "test/invariants.test.ts",
+          "test": "projected spend of load-eligible units never exceeds the ceiling"
+        }
       ]
     },
     {
       "layer": "Manifest signing (ed25519 over exact bytes, fail-closed)",
       "section": "signing block",
       "where": "verify.ts + follow.ts",
-      "impl": ["src/verify.ts", "src/follow.ts"],
+      "impl": [
+        "src/verify.ts",
+        "src/follow.ts"
+      ],
       "proofs": [
-        { "file": "test/verify.test.ts", "test": "fails closed on tampered content" },
-        { "file": "test/verify.test.ts", "test": "verifies a JSON signature envelope with embedded key (the Cantara convention)" },
-        { "file": "test/follow.test.ts", "test": "enforces requireSignature fail-closed on unsigned manifests" }
+        {
+          "file": "test/verify.test.ts",
+          "test": "fails closed on tampered content"
+        },
+        {
+          "file": "test/verify.test.ts",
+          "test": "verifies a JSON signature envelope with embedded key (the Cantara convention)"
+        },
+        {
+          "file": "test/follow.test.ts",
+          "test": "enforces requireSignature fail-closed on unsigned manifests"
+        }
       ]
     },
     {
       "layer": "Deterministic replay (plan artifacts re-verify against live manifests)",
       "section": "RFC-0019",
       "where": "replay.ts · replayArtifact",
-      "impl": ["src/replay.ts", "src/follow.ts"],
+      "impl": [
+        "src/replay.ts",
+        "src/follow.ts"
+      ],
       "proofs": [
-        { "file": "test/replay.test.ts", "test": "replays every node of a --follow tree artifact" },
-        { "file": "test/replay.test.ts", "test": "detects manifest drift by sha256 before re-planning" },
-        { "file": "test/replay.test.ts", "test": "detects a tampered artifact even when the manifest bytes still match" }
+        {
+          "file": "test/replay.test.ts",
+          "test": "replays every node of a --follow tree artifact"
+        },
+        {
+          "file": "test/replay.test.ts",
+          "test": "detects manifest drift by sha256 before re-planning"
+        },
+        {
+          "file": "test/replay.test.ts",
+          "test": "detects a tampered artifact even when the manifest bytes still match"
+        }
       ]
     },
     {
       "layer": "Conformance vectors — the planner's decisions frozen as portable data any implementation must reproduce",
       "section": "conformance",
       "where": "vectors/ + vectors.ts · runVector / outcomeOf",
-      "impl": ["src/vectors.ts", "scripts/gen-vectors.mjs"],
+      "impl": [
+        "src/vectors.ts",
+        "scripts/gen-vectors.mjs"
+      ],
       "proofs": [
-        { "file": "test/vectors.test.ts", "test": "ships a non-trivial corpus covering the core spec layers" },
-        { "file": "test/vectors.test.ts", "test": "every vector's name matches its filename (stable, addressable corpus)" }
+        {
+          "file": "test/vectors.test.ts",
+          "test": "ships a non-trivial corpus covering the core spec layers"
+        },
+        {
+          "file": "test/vectors.test.ts",
+          "test": "every vector's name matches its filename (stable, addressable corpus)"
+        }
       ]
     },
     {
       "layer": "Discovery (knowledge.yaml from path, directory, URL)",
       "section": "§2",
       "where": "client.ts",
-      "impl": ["src/client.ts"],
+      "impl": [
+        "src/client.ts"
+      ],
       "proofs": [
-        { "file": "test/manifest.test.ts", "test": "parses into the compact model" },
-        { "file": "test/manifest.test.ts", "test": "plans a typical task against itself" }
+        {
+          "file": "test/manifest.test.ts",
+          "test": "parses into the compact model"
+        },
+        {
+          "file": "test/manifest.test.ts",
+          "test": "plans a typical task against itself"
+        }
       ]
     },
     {
       "layer": "Decision trace — per-unit gate cascade (audience → context_budget), every verdict recorded",
       "section": "hardening",
       "where": "trace.ts · trace",
-      "impl": ["src/trace.ts"],
+      "impl": [
+        "src/trace.ts"
+      ],
       "proofs": [
-        { "file": "test/trace.test.ts", "test": "trace outcomes match the canonical plan exactly" },
-        { "file": "test/trace.test.ts", "test": "gate summary counts are consistent" },
-        { "file": "test/trace.test.ts", "test": "is deterministic: same inputs produce identical traces" },
-        { "file": "test/trace.test.ts", "test": "money_budget gate rejects over-budget units" }
+        {
+          "file": "test/trace.test.ts",
+          "test": "trace outcomes match the canonical plan exactly"
+        },
+        {
+          "file": "test/trace.test.ts",
+          "test": "gate summary counts are consistent"
+        },
+        {
+          "file": "test/trace.test.ts",
+          "test": "is deterministic: same inputs produce identical traces"
+        },
+        {
+          "file": "test/trace.test.ts",
+          "test": "money_budget gate rejects over-budget units"
+        }
       ]
     },
     {
       "layer": "Plan diff — what moved between two plans: units, scores, budgets, reasons",
       "section": "hardening",
       "where": "diff.ts · diffPlans",
-      "impl": ["src/diff.ts"],
+      "impl": [
+        "src/diff.ts"
+      ],
       "proofs": [
-        { "file": "test/diff.test.ts", "test": "identical plans produce an identical diff" },
-        { "file": "test/diff.test.ts", "test": "detects units moving from selected to skipped when the task changes" },
-        { "file": "test/diff.test.ts", "test": "detects budget shifts" },
-        { "file": "test/diff.test.ts", "test": "is deterministic" }
+        {
+          "file": "test/diff.test.ts",
+          "test": "identical plans produce an identical diff"
+        },
+        {
+          "file": "test/diff.test.ts",
+          "test": "detects units moving from selected to skipped when the task changes"
+        },
+        {
+          "file": "test/diff.test.ts",
+          "test": "detects budget shifts"
+        },
+        {
+          "file": "test/diff.test.ts",
+          "test": "is deterministic"
+        }
+      ]
+    },
+    {
+      "layer": "Confidence gate — an answer below the bar is refused, not shipped",
+      "section": "§4.3a",
+      "where": "assess.ts · assess",
+      "impl": [
+        "src/assess.ts"
+      ],
+      "proofs": [
+        {
+          "file": "test/assess-vectors.test.ts",
+          "test": "loads the corpus"
+        }
+      ]
+    },
+    {
+      "layer": "Confidence-gate conformance vectors — the gate frozen as portable JSON",
+      "section": "§4.3a",
+      "where": "vectors/assess/*.json",
+      "impl": [
+        "src/assess.ts",
+        "vectors/assess/README.md"
+      ],
+      "proofs": [
+        {
+          "file": "test/assess-vectors.test.ts",
+          "test": "loads the corpus"
+        }
+      ]
+    },
+    {
+      "layer": "Procedural plane — skills and playbooks are gated like knowledge, and eligibility does not compose",
+      "section": "§4.3b",
+      "where": "planner.ts · trace.ts",
+      "impl": [
+        "src/planner.ts",
+        "src/trace.ts"
+      ],
+      "proofs": [
+        {
+          "file": "test/playbook.test.ts",
+          "test": "never offers a playbook while refusing the skill it composes"
+        }
+      ]
+    },
+    {
+      "layer": "llms.txt bridge — an existing llms.txt converts to a draft manifest",
+      "section": "§4",
+      "where": "llms-txt.ts · generateManifestFromLlmsTxt",
+      "impl": [
+        "src/llms-txt.ts"
+      ],
+      "proofs": [
+        {
+          "file": "test/llms-txt.test.ts",
+          "test": "passes `kcp-agent validate` end to end"
+        }
       ]
     }
   ]
