@@ -10,7 +10,10 @@
 // every `--flag` the CLI advertises must parse.
 
 import { describe, expect, it } from "vitest";
-import { OPTIONS, USAGE, UnknownOptionError, parseArgs } from "../src/cli.js";
+// Deliberately src/args.js, not src/cli.js: importing cli.ts executes main() at module
+// load, which — with no argv to act on — exits(1) and fails the run even when every
+// assertion here passes. Being importable without that side effect is why args.ts exists.
+import { OPTIONS, USAGE, UnknownOptionError, parseArgs } from "../src/args.js";
 
 /** Every distinct `--flag` token the CLI advertises to users. */
 function documentedFlags(): string[] {
