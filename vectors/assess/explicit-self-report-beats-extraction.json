@@ -1,0 +1,30 @@
+{
+  "name": "explicit-self-report-beats-extraction",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "an explicit selfReport from the synthesis layer wins over whatever the answer text claims",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.95",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28",
+    "selfReport": {
+      "source": "self",
+      "score": 0.5,
+      "reasoning": "synthesis layer reported 0.5"
+    }
+  },
+  "expect": {
+    "passed": false,
+    "score": 0.5,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.5
+      }
+    ],
+    "detail": "confidence 0.5 < threshold 0.7 — self: synthesis layer reported 0.5"
+  }
+}

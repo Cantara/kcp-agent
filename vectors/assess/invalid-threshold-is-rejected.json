@@ -1,0 +1,14 @@
+{
+  "name": "invalid-threshold-is-rejected",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "a threshold outside 0..1 is a caller error and is refused, not silently clamped",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.9",
+  "units": [],
+  "options": {
+    "threshold": 1.5,
+    "asOf": "2026-07-28"
+  },
+  "expectError": "invalid threshold 1.5 — expected 0..1"
+}

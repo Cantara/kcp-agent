@@ -1,0 +1,25 @@
+{
+  "name": "self-report-last-wins",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "when an answer reports confidence more than once, the last report is the one that counts",
+  "task": "t",
+  "answer": "First pass.\nconfidence: 0.9\nOn reflection I am less sure.\nconfidence: 0.4",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": false,
+    "score": 0.4,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.4
+      }
+    ],
+    "detail": "confidence 0.4 < threshold 0.7 — self: self-reported: \"confidence: 0.4\""
+  }
+}

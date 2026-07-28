@@ -1,0 +1,34 @@
+{
+  "name": "aggregate-mean",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "mean aggregation averages the signals instead of taking the worst",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.9",
+  "units": [],
+  "options": {
+    "threshold": 0.6,
+    "aggregate": "mean",
+    "asOf": "2026-07-28"
+  },
+  "evaluator": {
+    "score": 0.5,
+    "reasoning": "thin but not wrong"
+  },
+  "expect": {
+    "passed": true,
+    "score": 0.7,
+    "threshold": 0.6,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.9
+      },
+      {
+        "source": "evaluator",
+        "score": 0.5
+      }
+    ],
+    "detail": "confidence 0.7 >= threshold 0.6 (mean of 2 signals)"
+  }
+}

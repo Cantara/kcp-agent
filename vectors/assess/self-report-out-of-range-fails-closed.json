@@ -1,0 +1,30 @@
+{
+  "name": "self-report-out-of-range-fails-closed",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "an explicit self-report outside 0..1 is rejected rather than clamped — the caller supplied it, so it is a contract violation, not sloppy prose",
+  "task": "t",
+  "answer": "An answer.",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28",
+    "selfReport": {
+      "source": "self",
+      "score": 1.5,
+      "reasoning": "supplied by the synthesis layer"
+    }
+  },
+  "expect": {
+    "passed": false,
+    "score": 0,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 1.5
+      }
+    ],
+    "detail": "self-report score 1.5 out of range — fail-closed"
+  }
+}

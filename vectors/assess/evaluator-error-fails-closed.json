@@ -1,0 +1,26 @@
+{
+  "name": "evaluator-error-fails-closed",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "an evaluator that throws does not pass the gate by omission",
+  "task": "t",
+  "answer": "An answer.\nconfidence: 0.9",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28"
+  },
+  "evaluatorError": "upstream timeout",
+  "expect": {
+    "passed": false,
+    "score": 0,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.9
+      }
+    ],
+    "detail": "evaluator failed: upstream timeout — fail-closed"
+  }
+}

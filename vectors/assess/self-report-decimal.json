@@ -1,0 +1,25 @@
+{
+  "name": "self-report-decimal",
+  "gate": "confidence",
+  "spec": "§confidence-gate",
+  "description": "a decimal self-report in the answer is extracted and adjudicated against the threshold",
+  "task": "how do I rotate the signing key?",
+  "answer": "Rotate it with `kcp sign --rotate`.\nconfidence: 0.82",
+  "units": [],
+  "options": {
+    "threshold": 0.7,
+    "asOf": "2026-07-28"
+  },
+  "expect": {
+    "passed": true,
+    "score": 0.82,
+    "threshold": 0.7,
+    "signals": [
+      {
+        "source": "self",
+        "score": 0.82
+      }
+    ],
+    "detail": "confidence 0.82 >= threshold 0.7 (min of 1 signal)"
+  }
+}
