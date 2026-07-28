@@ -41,6 +41,7 @@
 //   --task <task>         the task to re-plan on each cycle
 //   init only:
 //   --publisher <name>    publisher name written into the scaffolded manifest
+//   --from-llms-txt <loc> draft a manifest from an existing llms.txt (URL or path)
 //   --dry-run             print the generated knowledge.yaml instead of writing it
 //   --force               overwrite an existing knowledge.yaml
 //   ask only:
@@ -60,7 +61,8 @@
 //   --replay              recall only: re-verify each hit against today's manifests (drifted → exit 1)
 //   --limit <n>           recall only: cap the number of episodes returned
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PlanOptions } from "./planner.js";
 import type { FetchGuard } from "./fetch.js";
 import { planTree, plans, type FollowOptions } from "./follow.js";
@@ -242,11 +244,28 @@ async function main() {
 
   if (a.command === "init") {
     const { initManifest } = await import("./init.js");
+    if (a.fromLlmsTxt) {
+      const { loadLlmsTxt, parseLlmsTxt, generateManifestFromLlmsTxt } = await import("./llms-txt.js");
+      const target = join(a.positionals[0] ?? ".", "knowledge.yaml");
+      // Never overwrite: a hand-written manifest says more than any conversion can, and
+      // losing one to a convenience command is not a recoverable mistake.
+      if (!a.dryRun && existsSync(target) && !a.force) {
+        console.error(`${target} already exists — pass --force to replace it, or --dry-run to preview.`);
+        process.exit(2);
+      }
+      const text = await loadLlmsTxt(a.fromLlmsTxt, buildFetchGuard(a));
+      const yaml = generateManifestFromLlmsTxt(parseLlmsTxt(text), { publisher: a.publisher ?? a.attest });
+      if (a.dryRun) { console.log(yaml); return; }
+      writeFileSync(target, yaml);
+      console.log(`knowledge.yaml drafted from ${a.fromLlmsTxt} \u2192 ${target}`);
+      console.log("Review the TODOs: llms.txt cannot express audiences, validity, signing, payment or federation.");
+      return;
+    }
     const dir = a.positionals[0] ?? ".";
     const dryRun = a.dryRun;
     const force = a.force;
     // --publisher is now a real flag; --attest still works for backward compatibility.
-      const publisher = a.publisher ?? a.attest;
+    const publisher = a.publisher ?? a.attest;
     const yaml = await initManifest(dir, { publisher, dryRun, force });
     if (dryRun) { console.log(yaml); } else { console.log(`knowledge.yaml written to ${dir}`); }
     return;
@@ -262,6 +281,22 @@ async function main() {
       console.log(`Found manifest at ${result.url}`);
       if (a.json) console.log(JSON.stringify(result, null, 2));
     } else {
+      // Before crawling, check for an llms.txt. A publisher who wrote one has already done
+      // the hard part — deciding what matters — and converting that beats inferring
+      // structure from a crawl.
+      const { llmsTxtUrl, loadLlmsTxt, parseLlmsTxt } = await import("./llms-txt.js");
+      try {
+        const llmsUrl = llmsTxtUrl(url);
+        const doc = parseLlmsTxt(await loadLlmsTxt(llmsUrl, guard));
+        const linkCount = doc.sections.reduce((n, sec) => n + sec.links.length, 0);
+        if (linkCount > 0) {
+          console.log(`No manifest, but ${llmsUrl} exists — ${linkCount} link(s) in ${doc.sections.length} section(s).`);
+          console.log(`Upgrade it:  kcp-agent init --from-llms-txt ${llmsUrl}`);
+          return;
+        }
+      } catch {
+        // No llms.txt either — fall through to the crawl.
+      }
       console.log(`No manifest found. Crawling ${url}...`);
       const crawl = await crawlSite(url, { maxPages: 20 }, guard);
       const yaml = generateWebManifest(crawl);

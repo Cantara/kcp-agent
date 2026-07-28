@@ -361,7 +361,10 @@ export function generateWebManifest(crawl: CrawlResult, options: GenOptions = {}
     const triggers = buildTriggers(page);
 
     lines.push(`  - id: ${yamlQuote(id)}`);
-    lines.push(`    path: ${yamlQuote(page.url)}`);
+    // §4: a unit path is relative to the manifest. Emitting the absolute URL here made
+    // every manifest `discover` produced fail `kcp-agent validate` — the crawl is of one
+    // origin, so the URL path is the relative path.
+    lines.push(`    path: ${yamlQuote(relativeUnitPath(page.url))}`);
     lines.push(`    intent: ${yamlQuote(intent)}`);
     lines.push(`    scope: global`);
     lines.push(`    audience: [agent, human]`);
@@ -374,6 +377,21 @@ export function generateWebManifest(crawl: CrawlResult, options: GenOptions = {}
 
   lines.push("");
   return lines.join("\n");
+}
+
+/**
+ * A URL from the same site, expressed as a path relative to the manifest at its root.
+ * `https://acme.dev/docs/guide` -> `docs/guide`; the origin root -> `index`.
+ */
+export function relativeUnitPath(rawUrl: string): string {
+  let pathname: string;
+  try {
+    pathname = new URL(rawUrl).pathname;
+  } catch {
+    pathname = rawUrl; // already relative
+  }
+  const trimmed = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
+  return trimmed || "index";
 }
 
 function buildIntent(page: PageInfo): string {

@@ -318,6 +318,7 @@ planning sensibly.
 | `--diff` | (`watch`) report what changed against the previous cycle |
 | `--task <task>` | (`watch`) the task to re-plan on each cycle |
 | `--publisher <name>` | (`init`) publisher name written into the scaffolded manifest |
+| `--from-llms-txt <loc>` | (`init`) draft a `knowledge.yaml` from an existing `llms.txt` — URL or path |
 | `--dry-run` | (`init`) print the generated `knowledge.yaml` instead of writing it |
 | `--force` | (`init`) overwrite an existing `knowledge.yaml` |
 | `--model <id>` | (`ask`) model id: `provider/model` (e.g. `openai/gpt-4o`, `anthropic/claude-opus-4-8`) — default `claude-opus-4-8` |
@@ -447,6 +448,53 @@ caller-side of episodic memory, kept in character: the server stays stateless (t
 window *is* the session), a stub is emitted **only** on an exact sha match — any drift re-serves
 the fresh bytes — and because `kcp_load` re-plans and so re-gates every call, a unit the caller
 has since lost access to is simply absent, never smuggled back as a stub.
+
+## knowledge.yaml is llms.txt grown up
+
+[llms.txt](https://llmstxt.org) solved the easy half of the same problem — telling an agent
+what a site contains — and publishers adopted it. It is a flat link list, and that is all it
+can ever be.
+
+Same site, both ways:
+
+```
+# Acme Docs                                    kcp_version: "0.30"
+                                               project: "Acme Docs"
+> Everything you need to integrate Acme.       intent: "Everything you need to integrate Acme."
+
+## Guides                                      units:
+                                                 - id: "quickstart"
+- [Quickstart](/quickstart):                       path: "quickstart"
+    Get running in five minutes                    intent: "Get running in five minutes"
+                                                   audience: [agent, human]
+                                                   triggers: ["guides", "quickstart"]
+```
+
+Convert an existing one — deterministic, no model call, and it never overwrites a manifest
+you already have:
+
+```bash
+kcp-agent init --from-llms-txt https://acme.dev/llms.txt --dry-run
+```
+
+`kcp-agent discover <url>` also checks `/llms.txt` before falling back to crawling, and
+points you at the upgrade.
+
+What the upgrade buys, none of which llms.txt can express:
+
+| | llms.txt | knowledge.yaml |
+|---|---|---|
+| What exists | ✅ a link list | ✅ units with intent and triggers |
+| Who it is for | ❌ | `audience`, `not_for`, role gating |
+| When it is true | ❌ | `valid_from` / `valid_until`, supersession |
+| Whether it is authentic | ❌ | detached ed25519 signatures |
+| What it costs | ❌ | `payment`, budgets, rate limits |
+| What it points to | ❌ | federation to other publishers' manifests |
+| What an agent may *do* with it | ❌ | `kind: skill` / `playbook`, `action_scope`, `load_eligible` |
+
+The conversion marks every one of those as a TODO rather than inventing it. A converted
+manifest that silently claimed an audience or a validity window would be asserting something
+you never said.
 
 ## Signatures
 
