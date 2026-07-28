@@ -70,9 +70,10 @@ describe("the loop capture in docs/index.html", () => {
 
 describe("CLI reference", () => {
   const cli = read("src/cli.ts");
+  const args = read("src/args.ts"); // parseArgs and USAGE/OPTIONS moved here
   const header = cli.split("import type")[0]; // the option-doc comment block
   const readme = read("README.md");
-  const switchFlags = [...cli.matchAll(/case "(--[a-z-]+)":/g)].map((m) => m[1]);
+  const switchFlags = [...args.matchAll(/case "(--[a-z-]+)":/g)].map((m) => m[1]);
   const headerFlags = [...header.matchAll(/^\/\/\s+(--[a-z-]+)/gm)].map((m) => m[1]);
 
   it("parseArgs accepts at least the classic option set", () => {
