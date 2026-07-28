@@ -313,6 +313,12 @@ planning sensibly.
 | `--trace` | (`plan`) show the decision trace: per-unit gate cascade — every gate each unit was evaluated against, in order |
 | `--json` | emit the plan (and, for `ask`, the answer) as JSON |
 | `--help` | print usage and the option reference (also `-h`; works after any subcommand) |
+| `--once` | (`watch`) run a single validate/plan cycle and exit instead of watching |
+| `--diff` | (`watch`) report what changed against the previous cycle |
+| `--task <task>` | (`watch`) the task to re-plan on each cycle |
+| `--publisher <name>` | (`init`) publisher name written into the scaffolded manifest |
+| `--dry-run` | (`init`) print the generated `knowledge.yaml` instead of writing it |
+| `--force` | (`init`) overwrite an existing `knowledge.yaml` |
 | `--model <id>` | (`ask`) model id: `provider/model` (e.g. `openai/gpt-4o`, `anthropic/claude-opus-4-8`) — default `claude-opus-4-8` |
 | `--base-url <url>` | (`ask`) base URL for OpenAI-compatible endpoints (overrides provider default) |
 | `--api-key <key>` | (`ask`) API key — alternative to env vars `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |

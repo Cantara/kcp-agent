@@ -40,7 +40,7 @@ const PLANNER_OPTIONS = [
   { cli: "--attest", mcp: "attest" },
 ];
 
-const cliSrc = read("src/cli.ts");
+const cliSrc = read("src/cli.ts") + read("src/args.ts"); // parseArgs lives in args.ts
 const mcpSrc = read("src/mcp.ts");
 const cliFlags = new Set([...cliSrc.matchAll(/case "(--[a-z-]+)":/g)].map((m) => m[1]));
 
