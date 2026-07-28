@@ -14,6 +14,13 @@ import { describe, expect, it } from "vitest";
 // load, which — with no argv to act on — exits(1) and fails the run even when every
 // assertion here passes. Being importable without that side effect is why args.ts exists.
 import { OPTIONS, USAGE, UnknownOptionError, parseArgs } from "../src/args.js";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+/** The parser's own source, for scraping its `case "--x":` labels. */
+function rawArgsSource(): string {
+  return readFileSync(path.resolve(__dirname, "..", "src", "args.ts"), "utf8");
+}
 
 /** Every distinct `--flag` token the CLI advertises to users. */
 function documentedFlags(): string[] {
@@ -47,6 +54,30 @@ describe("every documented flag is accepted by the parser", () => {
   for (const flag of flags) {
     it(`accepts ${flag}`, () => {
       expect(() => parseArgs(invocationFor(flag))).not.toThrow();
+    });
+  }
+});
+
+// The converse direction, and the one that was missing. The suite above asserts every
+// documented flag parses; nothing asserted that every parsed flag is documented. So
+// --correlation-id and --from-llms-txt shipped working but absent from `--help` — passing
+// the existing docs gate, which reads the cli.ts header comment and README rather than the
+// USAGE/OPTIONS text a user actually sees.
+//
+// It also matters to consumers: pi-kcp probes `--help` to decide whether the installed
+// kcp-agent supports a flag, because its parser fail-closes on unknown options. A flag
+// missing from the help text is, to that probe, a flag that does not exist.
+describe("every flag the parser accepts appears in the printed help", () => {
+  const parserFlags = [...rawArgsSource().matchAll(/case "(--[a-z0-9-]+)":/g)].map((m) => m[1]);
+  const helpFlags = new Set([...(USAGE + OPTIONS).matchAll(/--[a-z0-9-]+/g)].map((m) => m[0]));
+
+  it("finds the parser's cases at all (guards the scrape)", () => {
+    expect(parserFlags.length).toBeGreaterThan(30);
+  });
+
+  for (const flag of [...new Set(parserFlags)].sort()) {
+    it(`documents ${flag}`, () => {
+      expect(helpFlags.has(flag), `${flag} parses but is absent from USAGE/OPTIONS`).toBe(true);
     });
   }
 });
