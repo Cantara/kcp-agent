@@ -312,6 +312,7 @@ planning sensibly.
 | `--trust-key <loc>` | pinned ed25519 public key (path, URL, or inline) for verification |
 | `--trace` | (`plan`) show the decision trace: per-unit gate cascade — every gate each unit was evaluated against, in order |
 | `--json` | emit the plan (and, for `ask`, the answer) as JSON |
+| `--correlation-id <id>` | opaque caller-supplied id echoed into the `--json` envelope, so a plan artifact can be joined to the caller's decision chain or audit log |
 | `--help` | print usage and the option reference (also `-h`; works after any subcommand) |
 | `--once` | (`watch`) run a single validate/plan cycle and exit instead of watching |
 | `--diff` | (`watch`) report what changed against the previous cycle |
