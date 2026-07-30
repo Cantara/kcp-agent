@@ -117,6 +117,7 @@ export async function replayArtifact(artifactJson: unknown, artifactName = "plan
         strict: s.options.strict,
         budget: s.options.budget,
         grantCeiling: s.options.grantCeiling,
+        spend: s.options.spend,
       });
     } catch (e) {
       checks.push({ source, project, status: "error", detail: `re-plan failed: ${e instanceof Error ? e.message : String(e)}` });

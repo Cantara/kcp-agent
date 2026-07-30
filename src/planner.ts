@@ -63,6 +63,17 @@ export interface PlanOptions {
    * Absent means no external grant ceiling applies.
    */
   grantCeiling?: string;
+  /**
+   * §4.3a.1 — a spend the enacting agent proposes to make while enacting a governed
+   * composition, checked against each governed step's declared `action_scope.spend`
+   * ceiling. A step (or its `uses` target skill) whose declared `max_spend` the proposed
+   * `amount` would exceed — or whose `allowed_vendors` excludes the named `vendor`, or
+   * whose declared `currency` disagrees with the proposal's — makes the composition
+   * unenactable as written (fail-closed). Absent (or neither `amount` nor `vendor` set)
+   * means no spend is proposed, so no spend ceiling is evaluated and existing behavior
+   * is preserved.
+   */
+  spend?: { amount?: number; vendor?: string; currency?: string };
 }
 
 export interface PaymentPlan {
@@ -98,6 +109,20 @@ export interface PlannedUnit {
    * level the plan was audited at.
    */
   authority?: AuthorityResolution;
+  /**
+   * The binding `action_scope.spend` ceiling that was evaluated against a proposed spend
+   * (§4.3a.1). Present only when the agent proposed a spend and a governed step declares a
+   * spend scope; a downstream enforcer reads it to keep enactment within the limit the plan
+   * was audited at.
+   */
+  spend?: SpendResolution;
+  /**
+   * Escalation grants owed before this composition may be enacted (§3.14, RFC-0026) — one
+   * per step whose declared triggers the deterministic planner cannot itself clear. The
+   * planner never auto-approves: it surfaces the request so a human or an authority above
+   * the agent grants it out of band.
+   */
+  grantRequests?: GrantRequest[];
 }
 
 /**
@@ -117,6 +142,41 @@ export interface SkippedUnit {
   reason: string;
   /** Resolved authority ceiling, when an authority source gated or bounded this unit (§3.13). */
   authority?: AuthorityResolution;
+  /** Binding spend ceiling, when a proposed spend gated or bounded this unit (§4.3a.1). */
+  spend?: SpendResolution;
+  /** Escalation grants owed before enactment, when a step declared triggers (§3.14). */
+  grantRequests?: GrantRequest[];
+}
+
+/**
+ * The binding `action_scope.spend` ceiling that a proposed spend was evaluated against
+ * (§4.3a.1) — surfaced on the plan so a reviewer can audit the max_spend / allowed_vendors
+ * that bound (or would bind) enactment, and which step declared it.
+ */
+export interface SpendResolution {
+  /** The binding `max_spend` ceiling, when the declaring step's scope sets one. */
+  maxSpend?: number;
+  /** The vendors the declaring step's scope permits, when it lists any. */
+  allowedVendors?: string[];
+  /** Currency the declared ceiling is denominated in. */
+  currency?: string;
+  /** Which step declared the binding scope (e.g. "step 'pay' action_scope.spend"). */
+  bindingSource: string;
+}
+
+/**
+ * A structured escalation marker (§3.14, RFC-0026): a step declares triggers
+ * (`requires_approval | insufficient_authority_level | confidence_below_threshold`) the
+ * deterministic planner cannot itself satisfy, so a grant is owed before the step may be
+ * enacted. The planner emits this and never auto-approves.
+ */
+export interface GrantRequest {
+  /** The step that owes a grant before enactment. */
+  step: string;
+  /** The declared triggers that fired and require an out-of-band grant. */
+  triggers: string[];
+  /** Human-readable statement of what must be granted. */
+  note: string;
 }
 
 export interface FederationPlan {
@@ -170,7 +230,7 @@ export interface AgentPlan {
   environment?: string;
   asOf: string;
   /** The planner inputs echoed into the artifact — everything `kcp-agent replay` needs to recompute this plan. */
-  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number; grantCeiling?: string };
+  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number; grantCeiling?: string; spend?: { amount?: number; vendor?: string; currency?: string } };
   selected: PlannedUnit[];
   skipped: SkippedUnit[];
   federation: FederationPlan[];
@@ -336,6 +396,106 @@ export function resolveAuthorityCeiling(
     }
   }
   return { ceiling };
+}
+
+/**
+ * §4.3a.1 — resolve the binding `action_scope.spend` ceiling for a governed unit and report
+ * the first step whose declared scope a proposed spend would exceed. For a `kind: playbook`
+ * each step's ceiling is the `action_scope.spend` of the skill it `uses` (a step names the
+ * unit it enacts, and that unit's scope is what actually spends); a bare governed unit is
+ * checked against its own `action_scope.spend`. A step is refused when the proposed `amount`
+ * exceeds `max_spend`, when the proposed `vendor` is outside a declared `allowed_vendors`, or
+ * when the proposal's currency disagrees with the declared one (fail-closed: an unmatched
+ * currency can't be compared, so it is refused rather than admitted).
+ *
+ * Returns `{}` when no spend is proposed or no governed step declares a spend scope, so a
+ * composition with no spend declaration (or an agent proposing none) keeps existing behavior.
+ */
+export function resolveSpendScope(
+  unit: Unit,
+  manifest: Manifest,
+  proposed?: { amount?: number; vendor?: string; currency?: string },
+): { limit?: SpendResolution; violation?: { step: string; detail: string } } {
+  if (!proposed || (proposed.amount === undefined && proposed.vendor === undefined)) return {};
+  // The (step, declared-spend-scope) pairs this unit puts under a spend ceiling.
+  const scopes: { step: string; spend: NonNullable<NonNullable<Unit["action_scope"]>["spend"]> }[] = [];
+  if (unit.kind === "playbook" && unit.steps) {
+    for (const step of unit.steps) {
+      const target = step.uses ? manifest.units.find((u) => u.id === step.uses) : undefined;
+      const spend = target?.action_scope?.spend ?? (step.uses ? undefined : unit.action_scope?.spend);
+      if (spend) scopes.push({ step: step.id, spend });
+    }
+  } else if (unit.action_scope?.spend) {
+    scopes.push({ step: unit.id, spend: unit.action_scope.spend });
+  }
+  if (scopes.length === 0) return {};
+
+  const limitOf = (step: string, spend: (typeof scopes)[number]["spend"]): SpendResolution => ({
+    ...(spend.max_spend !== undefined ? { maxSpend: spend.max_spend } : {}),
+    ...(spend.allowed_vendors && spend.allowed_vendors.length > 0 ? { allowedVendors: spend.allowed_vendors } : {}),
+    ...(spend.currency !== undefined ? { currency: spend.currency } : {}),
+    bindingSource: `step '${step}' action_scope.spend`,
+  });
+
+  for (const { step, spend } of scopes) {
+    // vendor: a proposal that names a vendor outside a declared allow-list is refused.
+    if (proposed.vendor !== undefined && spend.allowed_vendors && spend.allowed_vendors.length > 0 &&
+        !spend.allowed_vendors.includes(proposed.vendor)) {
+      return { limit: limitOf(step, spend), violation: { step, detail: `names vendor '${proposed.vendor}', outside allowed_vendors ${JSON.stringify(spend.allowed_vendors)}` } };
+    }
+    if (proposed.amount !== undefined && spend.max_spend !== undefined) {
+      // currency: an unmatched denomination can't be compared — fail closed.
+      if (spend.currency !== undefined && proposed.currency !== undefined && spend.currency !== proposed.currency) {
+        return { limit: limitOf(step, spend), violation: { step, detail: `proposed ${proposed.amount} ${proposed.currency} cannot be checked against a ${spend.currency} ceiling (currency mismatch)` } };
+      }
+      if (proposed.amount > spend.max_spend + 1e-9) {
+        return { limit: limitOf(step, spend), violation: { step, detail: `proposed spend ${proposed.amount} exceeds max_spend ${spend.max_spend}` } };
+      }
+    }
+  }
+  // No violation — surface the most restrictive (lowest max_spend) scope as the binding limit.
+  let bound = scopes[0];
+  for (const s of scopes) {
+    if ((s.spend.max_spend ?? Infinity) < (bound.spend.max_spend ?? Infinity)) bound = s;
+  }
+  return { limit: limitOf(bound.step, bound.spend) };
+}
+
+/**
+ * §3.14 (RFC-0026) — evaluate a playbook's per-step escalation triggers during planning and
+ * emit a grant_request for each step that owes an out-of-band grant. The triggers are
+ * disjunctive; the deterministic planner can only *clear* `insufficient_authority_level`
+ * (when the step's authority is within the resolved ceiling) — `requires_approval`,
+ * `confidence_below_threshold`, and any other declared trigger it cannot satisfy fail
+ * closed and require a grant. The planner never auto-approves.
+ */
+export function evaluateEscalation(
+  unit: Unit,
+  authorityViolationStep?: string,
+): GrantRequest[] {
+  const out: GrantRequest[] = [];
+  for (const step of unit.steps ?? []) {
+    const triggers = step.escalation;
+    if (!triggers || triggers.length === 0) continue;
+    const fired: string[] = [];
+    for (const t of triggers) {
+      // `insufficient_authority_level` fires only when the authority ceiling is actually
+      // exceeded (the one trigger the planner can prove is satisfied when it isn't).
+      if (t === "insufficient_authority_level") {
+        if (authorityViolationStep === step.id) fired.push(t);
+      } else {
+        fired.push(t);
+      }
+    }
+    if (fired.length > 0) {
+      out.push({
+        step: step.id,
+        triggers: fired,
+        note: `step '${step.id}' declares escalation ${JSON.stringify(fired)} — a grant is owed before enactment (not auto-approved) — §3.14`,
+      });
+    }
+  }
+  return out;
 }
 
 /** Build the ContextPlan from the finally-selected units and the token ceiling. */
@@ -520,15 +680,44 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     // step demanding more than the ceiling makes the composition unenactable as written.
     // Mirrored in trace.ts (skill_eligibility gate) — change one, change the other.
     let authority: AuthorityResolution | undefined;
+    let authorityViolationStep: string | undefined;
     if (unit.kind === "playbook" && loadEligible && unit.steps) {
       const res = resolveAuthorityCeiling(unit, manifest.authority_level_scale ?? DEFAULT_AUTHORITY_SCALE, options.grantCeiling);
       authority = res.ceiling;
       if (res.violation && res.ceiling) {
         loadEligible = false;
+        authorityViolationStep = res.violation.step;
         reasons.push(
           `step '${res.violation.step}' requires '${res.violation.required}' authority, above the resolved ceiling '${res.ceiling.ceiling}' (bound by ${res.ceiling.bindingSource}) — §3.13`,
         );
       }
+    }
+
+    // §4.3a.1 action_scope.spend: a proposed spend threaded through planning may not exceed a
+    // governed step's declared max_spend, nor name a vendor outside its allowed_vendors. The
+    // parser read action_scope.spend and the plan already surfaces it, but nothing gated on
+    // it — a proposed spend over a step's ceiling was selected with no check. Fail-closed: an
+    // over-budget/forbidden-vendor step makes the composition unenactable as written.
+    // Mirrored in trace.ts (skill_eligibility gate) — change one, change the other.
+    let spend: SpendResolution | undefined;
+    if (options.spend && (options.spend.amount !== undefined || options.spend.vendor !== undefined)) {
+      const res = resolveSpendScope(unit, manifest, options.spend);
+      spend = res.limit;
+      if (res.violation && loadEligible) {
+        loadEligible = false;
+        reasons.push(`step '${res.violation.step}' ${res.violation.detail} — §4.3a.1`);
+      }
+    }
+
+    // §3.14 escalation triggers: a step declaring `requires_approval` / a triggered
+    // `insufficient_authority_level` / `confidence_below_threshold` owes an out-of-band grant
+    // before enactment. Emitted as a structured marker on the plan entry (selected or
+    // skipped); the planner never auto-approves, and — unlike the gates above — a mere
+    // approval requirement does not by itself refuse the step.
+    let grantRequests: GrantRequest[] | undefined;
+    if (unit.kind === "playbook" && unit.steps) {
+      const gr = evaluateEscalation(unit, authorityViolationStep);
+      if (gr.length > 0) grantRequests = gr;
     }
 
     // trust: restricted units need attestation the agent can present
@@ -556,7 +745,12 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     }
 
     if (options.strict && !loadEligible) {
-      skipped.push({ id: unit.id, reason: reasons[reasons.length - 1] ?? "not load-eligible", ...(authority ? { authority } : {}) });
+      skipped.push({
+        id: unit.id, reason: reasons[reasons.length - 1] ?? "not load-eligible",
+        ...(authority ? { authority } : {}),
+        ...(spend ? { spend } : {}),
+        ...(grantRequests ? { grantRequests } : {}),
+      });
       continue;
     }
     selected.push({
@@ -564,6 +758,8 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       payment, requiresAttestation: unitRequiresAttestation, loadEligible,
       action_scope: unit.action_scope,
       ...(authority ? { authority } : {}),
+      ...(spend ? { spend } : {}),
+      ...(grantRequests ? { grantRequests } : {}),
     });
   }
 
@@ -672,6 +868,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       ...(budget ? { budget } : {}),
       ...(contextBudget !== undefined ? { contextBudget } : {}),
       ...(options.grantCeiling !== undefined ? { grantCeiling: options.grantCeiling } : {}),
+      ...(options.spend !== undefined ? { spend: options.spend } : {}),
     },
     selected: capped,
     skipped,
