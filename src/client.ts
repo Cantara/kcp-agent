@@ -124,6 +124,7 @@ function parseUnit(v: Raw): Unit {
     not_for: asStrArr(v["not_for"]),
     kind: asStr(v["kind"]),
     steps: parseSteps(v["steps"]),
+    authority_level: asStr(v["authority_level"]),
     load_eligible: v["load_eligible"] === undefined ? undefined : Boolean(v["load_eligible"]),
     action_scope: isObj(v["action_scope"])
       ? {
@@ -215,6 +216,7 @@ export function parseManifest(text: string, source?: string): Manifest {
     project: String(raw["project"] ?? "(unnamed)"),
     version: String(raw["version"] ?? "0.0.0"),
     kcp_version: asStr(raw["kcp_version"]),
+    authority_level_scale: Array.isArray(raw["authority_level_scale"]) ? raw["authority_level_scale"].map(String) : undefined,
     units: Array.isArray(raw["units"]) ? raw["units"].filter(isObj).map(parseUnit) : [],
     manifests: Array.isArray(raw["manifests"]) ? raw["manifests"].filter(isObj).map(parseManifestRef) : [],
     payment: parsePayment(raw["payment"]),

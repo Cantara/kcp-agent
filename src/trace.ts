@@ -16,6 +16,8 @@ import {
   temporalStatus,
   selectableSuccessor,
   planPayment,
+  resolveAuthorityCeiling,
+  DEFAULT_AUTHORITY_SCALE,
   DEFAULT_CAPABILITIES,
   type AgentCapabilities,
   type AgentPlan,
@@ -233,6 +235,18 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       }
     }
 
+    // §3.13 authority ceiling (mirrors planner): a granted, compose-clean playbook whose
+    // step demands more authority than the effective ceiling (min of the playbook's
+    // authority_level and the agent grant) is unenactable as written. Folded into
+    // skill_eligibility, like composeFailure, so the trace attributes the refusal to a gate.
+    let authorityFailure: string | undefined;
+    if (unit.kind === "playbook" && unit.load_eligible === true && !composeFailure && unit.steps) {
+      const res = resolveAuthorityCeiling(unit, manifest.authority_level_scale ?? DEFAULT_AUTHORITY_SCALE, options.grantCeiling);
+      if (res.violation && res.ceiling) {
+        authorityFailure = `step '${res.violation.step}' requires '${res.violation.required}' authority, above the resolved ceiling '${res.ceiling.ceiling}' (bound by ${res.ceiling.bindingSource}) — §3.13`;
+      }
+    }
+
     if (composeFailure) {
       loadEligible = false;
       if (options.strict) {
@@ -247,6 +261,13 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
         reject("skill_eligibility", why);
       } else {
         pass("skill_eligibility", `${why} (loadEligible=false)`);
+      }
+    } else if (authorityFailure) {
+      loadEligible = false;
+      if (options.strict) {
+        reject("skill_eligibility", authorityFailure);
+      } else {
+        pass("skill_eligibility", `${authorityFailure} (loadEligible=false)`);
       }
     } else {
       pass(
