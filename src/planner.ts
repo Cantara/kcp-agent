@@ -55,6 +55,14 @@ export interface PlanOptions {
    * which excludes it fail-closed.
    */
   contextBudget?: number;
+  /**
+   * The enacting agent/tenant/task-type authority grant ceiling — §3.13. It is one source
+   * of a playbook's effective authority: the effective level is the MINIMUM across this,
+   * the playbook's declared `authority_level`, and each step's. A step demanding more than
+   * the resolved ceiling makes the composition unenactable as written (fail-closed).
+   * Absent means no external grant ceiling applies.
+   */
+  grantCeiling?: string;
 }
 
 export interface PaymentPlan {
@@ -83,11 +91,32 @@ export interface PlannedUnit {
    * evaluated if the manifest changes between plan and invoke.
    */
   action_scope?: Unit["action_scope"];
+  /**
+   * Resolved authority ceiling for a governed composition (§3.13) — the effective level
+   * and the source that bound it. Present on playbooks that declare, or run under, an
+   * authority ceiling; a downstream enforcer reads it to keep enactment within the
+   * level the plan was audited at.
+   */
+  authority?: AuthorityResolution;
+}
+
+/**
+ * The resolved authority ceiling for a governed composition (§3.13) — surfaced on the
+ * plan so a reviewer can audit the effective level and which declared source set it,
+ * without re-deriving the minimum from the raw manifest and the agent's grant.
+ */
+export interface AuthorityResolution {
+  /** The effective authority ceiling — the minimum across every declared source. */
+  ceiling: string;
+  /** Which declared source set that ceiling ('playbook authority_level' | 'agent grant_ceiling'). */
+  bindingSource: string;
 }
 
 export interface SkippedUnit {
   id: string;
   reason: string;
+  /** Resolved authority ceiling, when an authority source gated or bounded this unit (§3.13). */
+  authority?: AuthorityResolution;
 }
 
 export interface FederationPlan {
@@ -141,7 +170,7 @@ export interface AgentPlan {
   environment?: string;
   asOf: string;
   /** The planner inputs echoed into the artifact — everything `kcp-agent replay` needs to recompute this plan. */
-  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number };
+  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number; grantCeiling?: string };
   selected: PlannedUnit[];
   skipped: SkippedUnit[];
   federation: FederationPlan[];
@@ -262,6 +291,51 @@ export function unitTokens(unit: Unit): { tokens?: number; approximate: boolean;
   if (unit.size_tokens !== undefined) return { tokens: unit.size_tokens, approximate: false, measured: true };
   if (unit.bytes !== undefined) return { tokens: Math.ceil(unit.bytes / 4), approximate: true, measured: true };
   return { tokens: undefined, approximate: false, measured: false };
+}
+
+/**
+ * §3.13 (v0.27) — the canonical authority ladder, ascending. A manifest MAY declare its
+ * own `authority_level_scale`; absent, this is the scale every `authority_level` is ranked
+ * against. observe < explain < suggest < prepare < commit.
+ */
+export const DEFAULT_AUTHORITY_SCALE: readonly string[] = ["observe", "explain", "suggest", "prepare", "commit"] as const;
+
+/**
+ * Resolve a `kind: playbook`'s effective authority ceiling and report the first step that
+ * exceeds it — §3.13. The effective authority is the MINIMUM ('laveste av') across every
+ * declared ceiling source: the playbook's own `authority_level` and the enacting
+ * agent/tenant grant (`grantCeiling`). A source can only lower the ceiling, never raise it.
+ *
+ * Fail-closed: a level absent from the scale ranks below everything (rank -1), so an
+ * unrecognised ceiling blocks every step and an unrecognised step level is refused against
+ * any real ceiling. Returns `{}` when no source declares a ceiling, so a composition with
+ * no authority declaration keeps its existing planning behavior.
+ */
+export function resolveAuthorityCeiling(
+  unit: Unit,
+  scale: readonly string[] = DEFAULT_AUTHORITY_SCALE,
+  grantCeiling?: string,
+): { ceiling?: AuthorityResolution; violation?: { step: string; required: string } } {
+  const sources: { level: string; source: string }[] = [];
+  if (unit.authority_level !== undefined) sources.push({ level: unit.authority_level, source: "playbook authority_level" });
+  if (grantCeiling !== undefined) sources.push({ level: grantCeiling, source: "agent grant_ceiling" });
+  if (sources.length === 0) return {}; // no ceiling declared — keep existing behavior
+  const rankOf = (lvl: string): number => scale.indexOf(lvl);
+  // The binding ceiling is the lowest-ranked source (the minimum).
+  let bound = sources[0];
+  for (const s of sources) if (rankOf(s.level) < rankOf(bound.level)) bound = s;
+  const ceiling: AuthorityResolution = { ceiling: bound.level, bindingSource: bound.source };
+  const ceilingRank = rankOf(bound.level);
+  for (const step of unit.steps ?? []) {
+    if (step.authority_level === undefined) continue; // step declares no level — not gated
+    const reqRank = rankOf(step.authority_level);
+    // Fail-closed: an unrecognised step level (reqRank -1) is refused against a real
+    // ceiling, and a recognised level above the ceiling is refused.
+    if (reqRank < 0 || reqRank > ceilingRank) {
+      return { ceiling, violation: { step: step.id, required: step.authority_level } };
+    }
+  }
+  return { ceiling };
 }
 
 /** Build the ContextPlan from the finally-selected units and the token ceiling. */
@@ -438,6 +512,25 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       }
     }
 
+    // §3.13 authority ceiling: a step may not act above the effective authority ceiling —
+    // the MINIMUM across the playbook's declared `authority_level` and the enacting
+    // agent/tenant grant (options.grantCeiling). The parser read `authority_level` but the
+    // planner never gated on it, so a granted, compose-clean playbook could carry a commit
+    // step under a prepare ceiling and be selected with no authority check. Fail-closed: a
+    // step demanding more than the ceiling makes the composition unenactable as written.
+    // Mirrored in trace.ts (skill_eligibility gate) — change one, change the other.
+    let authority: AuthorityResolution | undefined;
+    if (unit.kind === "playbook" && loadEligible && unit.steps) {
+      const res = resolveAuthorityCeiling(unit, manifest.authority_level_scale ?? DEFAULT_AUTHORITY_SCALE, options.grantCeiling);
+      authority = res.ceiling;
+      if (res.violation && res.ceiling) {
+        loadEligible = false;
+        reasons.push(
+          `step '${res.violation.step}' requires '${res.violation.required}' authority, above the resolved ceiling '${res.ceiling.ceiling}' (bound by ${res.ceiling.bindingSource}) — §3.13`,
+        );
+      }
+    }
+
     // trust: restricted units need attestation the agent can present
     const unitRequiresAttestation = requiresAttestation && unit.access === "restricted";
     if (unitRequiresAttestation && !agentCanAttest) {
@@ -463,13 +556,14 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     }
 
     if (options.strict && !loadEligible) {
-      skipped.push({ id: unit.id, reason: reasons[reasons.length - 1] ?? "not load-eligible" });
+      skipped.push({ id: unit.id, reason: reasons[reasons.length - 1] ?? "not load-eligible", ...(authority ? { authority } : {}) });
       continue;
     }
     selected.push({
       id: unit.id, path: unit.path, intent: unit.intent, score, reasons,
       payment, requiresAttestation: unitRequiresAttestation, loadEligible,
       action_scope: unit.action_scope,
+      ...(authority ? { authority } : {}),
     });
   }
 
@@ -577,6 +671,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       strict: !!options.strict,
       ...(budget ? { budget } : {}),
       ...(contextBudget !== undefined ? { contextBudget } : {}),
+      ...(options.grantCeiling !== undefined ? { grantCeiling: options.grantCeiling } : {}),
     },
     selected: capped,
     skipped,

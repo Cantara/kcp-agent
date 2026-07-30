@@ -96,6 +96,13 @@ export interface Unit {
    */
   steps?: PlaybookStep[];
   /**
+   * Playbook-level authority ceiling — §3.13 (v0.27). A ceiling over every step: no step
+   * may act above it, whatever the step declares. It is one source of the effective
+   * authority (the minimum across it, each step's `authority_level`, and the enacting
+   * agent/tenant grant); a playbook can only lower authority from here, never raise it.
+   */
+  authority_level?: string;
+  /**
    * Explicit eligibility grant for a skill or playbook. Both fail closed by default;
    * only a unit with `load_eligible: true` is load/invoke-eligible (#100, #118).
    */
@@ -163,6 +170,12 @@ export interface Manifest {
   project: string;
   version: string;
   kcp_version?: string;
+  /**
+   * The ordinal authority ladder every `authority_level` is ranked against — §3.13 (v0.27).
+   * Ascending: earlier = less authority. Absent means the canonical scale
+   * (observe < explain < suggest < prepare < commit).
+   */
+  authority_level_scale?: string[];
   units: Unit[];
   manifests: ManifestRef[];
   payment?: Payment;
