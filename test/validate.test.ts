@@ -203,7 +203,7 @@ units:
   });
 
   it("does not warn on any §4.3a kind — policy/schema/... are spec-valid, not defects (#115)", () => {
-    for (const kind of ["knowledge", "schema", "service", "policy", "executable", "skill"]) {
+    for (const kind of ["knowledge", "schema", "service", "policy", "executable", "skill", "playbook"]) {
       const m = parseManifest(`
 project: p
 version: 1.0.0

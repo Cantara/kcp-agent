@@ -39,7 +39,7 @@ const ACCESS_VALUES = new Set(["public", "authenticated", "restricted"]);
  * ignored. That's an unknown-data-passes-through gap in an otherwise
  * fail-closed gate, so the linter still flags it at publish time.
  */
-const KIND_VALUES = new Set(["knowledge", "schema", "service", "policy", "executable", "skill"]);
+const KIND_VALUES = new Set(["knowledge", "schema", "service", "policy", "executable", "skill", "playbook"]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ].*)?$/;
 
 function unsafePath(path: string): string | undefined {
@@ -82,7 +82,7 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
     }
     if (unit.kind && !KIND_VALUES.has(unit.kind)) {
       warn(where, `unknown kind '${unit.kind}' — not a §4.3a kind (knowledge/schema/service/policy/` +
-        `executable/skill); parsers ignore it and the unit loads as plain knowledge. If 'skill' was ` +
+        `executable/skill/playbook); parsers ignore it and the unit loads as plain knowledge. If 'skill' was ` +
         `meant, note action_scope/load_eligible/skill_eligibility will NOT apply as written`);
     }
     validateTemporal(unit, where, findings);
