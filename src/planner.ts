@@ -29,6 +29,41 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
   attestationProvider: undefined,
 };
 
+/** A unit's declared action scope — the allowlist plus its optional `deny` sibling (§4.3a). */
+export type ActionScope = NonNullable<Unit["action_scope"]>;
+
+/**
+ * §4.3a (v0.31, RFC-0029): does a skill's `action_scope.deny` deny `token` on
+ * `dimension`? Fail-closed override — a deny entry denies the token even when the
+ * allowlist grants it. Exact-string match, mirroring the reference validator's
+ * `deniesToken` so a runtime enforcer and the spec's overlap lint share one
+ * adjudication rule.
+ */
+export function deniesToken(
+  scope: ActionScope | undefined,
+  dimension: "tools" | "paths" | "capabilities",
+  token: string,
+): boolean {
+  return scope?.deny?.[dimension]?.includes(token) ?? false;
+}
+
+/**
+ * Adjudicate a requested `token` on `dimension` against an action_scope, applying
+ * deny-overrides-allow (§4.3a): `deny` is checked FIRST and a match refuses the
+ * token even when the allowlist grants it. A token absent from the allowlist is
+ * refused too — a skill's action_scope authorizes nothing it does not list
+ * (fail-closed, #100). This is the canonical gate an enforcer evaluates an action
+ * against a scope with.
+ */
+export function scopeAllows(
+  scope: ActionScope | undefined,
+  dimension: "tools" | "paths" | "capabilities",
+  token: string,
+): boolean {
+  if (deniesToken(scope, dimension, token)) return false; // deny-first, overrides allow
+  return scope?.[dimension]?.includes(token) ?? false;
+}
+
 export interface PlanOptions {
   capabilities?: Partial<AgentCapabilities>;
   /** Runtime environment for federation `context` selection (dev/test/staging/prod). */

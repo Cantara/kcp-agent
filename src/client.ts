@@ -138,6 +138,17 @@ function parseUnit(v: Raw): Unit {
                 currency: asStr(v["action_scope"]["spend"]["currency"]),
               }
             : undefined,
+          // §4.3a (v0.31, RFC-0029): the explicit negative scope. Mirrors the
+          // allowlist shape; a malformed block degrades to "declares no
+          // prohibition" (undefined) rather than taking down the parse. Carried
+          // onto the unit so a downstream enforcer and the browser bundle see it.
+          deny: isObj(v["action_scope"]["deny"])
+            ? {
+                tools: asStrArr(v["action_scope"]["deny"]["tools"]),
+                paths: asStrArr(v["action_scope"]["deny"]["paths"]),
+                capabilities: asStrArr(v["action_scope"]["deny"]["capabilities"]),
+              }
+            : undefined,
         }
       : undefined,
     payment: parsePayment(v["payment"]),

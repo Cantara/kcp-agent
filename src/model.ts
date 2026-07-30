@@ -57,6 +57,22 @@ export interface ManifestRef {
   agent_identity?: AgentIdentity;
 }
 
+/**
+ * Explicit negative scope on a `kind: skill` action_scope — §4.3a (v0.31, RFC-0029).
+ *
+ * Same {tools, paths, capabilities} shape as the allowlist, but every entry is a
+ * PROHIBITION: a token listed here is denied even when the allowlist grants it.
+ * `deny` is checked in addition to — and overrides — the allowlist, fail-closed.
+ */
+export interface DenyScope {
+  /** Tool names the procedure MUST NOT invoke, even if allowlisted. */
+  tools?: string[];
+  /** Paths the procedure MUST NOT touch (same path semantics as the allowlist). */
+  paths?: string[];
+  /** Named capabilities the procedure MUST NOT exercise. */
+  capabilities?: string[];
+}
+
 export interface Unit {
   id: string;
   path: string;
@@ -76,12 +92,18 @@ export interface Unit {
   /**
    * Declared action scope for a governed procedure/skill — the tools, paths, and
    * capabilities it is permitted to touch when invoked (#100).
+   *
+   * `deny` is an optional negative-scope sibling with the same shape as the
+   * allowlist (§4.3a, v0.31, RFC-0029): a token listed under `deny` is refused
+   * even when the allowlist grants it. Deny overrides allow, deny-first,
+   * fail-closed.
    */
   action_scope?: {
     tools?: string[];
     paths?: string[];
     capabilities?: string[];
     spend?: { max_spend?: number; allowed_vendors?: string[]; currency?: string };
+    deny?: DenyScope;
   };
   /**
    * Ordered composition a `kind: playbook` declares — §4.3b (v0.29, RFC-0027).
