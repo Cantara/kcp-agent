@@ -216,6 +216,42 @@ function validateSkillScope(unit: Unit, where: string, findings: Finding[]) {
         "declares one (fail-closed, #100)",
     });
   }
+
+  // §4.3a (v0.31, RFC-0029): the optional negative scope. A deny never widens
+  // anything, so a slip here fails safe — but a slip is still worth surfacing:
+  //  - an empty `deny` object prohibits nothing (an authoring slip: the author
+  //    reached for a prohibition and declared none);
+  //  - a token that is BOTH allowed and denied. Deny overrides allow, fail-closed,
+  //    so the unit is safe, but the allow entry is neutralized — an exact
+  //    contradiction the author probably did not intend.
+  const deny = as?.deny;
+  if (deny) {
+    const forbidsAnything =
+      (deny.tools ?? []).length > 0 ||
+      (deny.paths ?? []).length > 0 ||
+      (deny.capabilities ?? []).length > 0;
+    if (!forbidsAnything) {
+      findings.push({
+        level: "warning",
+        where,
+        message: "action_scope.deny is declared but empty — it prohibits nothing (§4.3a)",
+      });
+    }
+    for (const dim of ["tools", "paths", "capabilities"] as const) {
+      const allowed = new Set(as?.[dim] ?? []);
+      for (const token of deny[dim] ?? []) {
+        if (allowed.has(token)) {
+          findings.push({
+            level: "warning",
+            where,
+            message:
+              `action_scope.${dim} allows '${token}' while deny.${dim} denies it — the allow entry is ` +
+              "neutralized; deny overrides allow, fail-closed (§4.3a)",
+          });
+        }
+      }
+    }
+  }
 }
 
 function validateTemporal(unit: Unit, where: string, findings: Finding[]) {
