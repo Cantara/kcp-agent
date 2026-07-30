@@ -17,6 +17,7 @@ import {
   selectableSuccessor,
   planPayment,
   resolveAuthorityCeiling,
+  resolveSpendScope,
   DEFAULT_AUTHORITY_SCALE,
   DEFAULT_CAPABILITIES,
   type AgentCapabilities,
@@ -247,6 +248,20 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       }
     }
 
+    // §4.3a.1 spend scope (mirrors planner): a proposed spend over a governed step's
+    // max_spend, or a vendor outside its allowed_vendors, refuses the composition. Folded
+    // into skill_eligibility like the authority gate so the trace attributes the refusal.
+    // Evaluated after the authority gate, and only when that did not already refuse, so a
+    // compose-clean, authority-clean playbook is what the spend check sees.
+    let spendFailure: string | undefined;
+    if (!composeFailure && !authorityFailure && (governed || unit.action_scope?.spend) &&
+        options.spend && (options.spend.amount !== undefined || options.spend.vendor !== undefined)) {
+      const res = resolveSpendScope(unit, manifest, options.spend);
+      if (res.violation) {
+        spendFailure = `step '${res.violation.step}' ${res.violation.detail} — §4.3a.1`;
+      }
+    }
+
     if (composeFailure) {
       loadEligible = false;
       if (options.strict) {
@@ -268,6 +283,13 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
         reject("skill_eligibility", authorityFailure);
       } else {
         pass("skill_eligibility", `${authorityFailure} (loadEligible=false)`);
+      }
+    } else if (spendFailure) {
+      loadEligible = false;
+      if (options.strict) {
+        reject("skill_eligibility", spendFailure);
+      } else {
+        pass("skill_eligibility", `${spendFailure} (loadEligible=false)`);
       }
     } else {
       pass(
