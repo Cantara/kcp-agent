@@ -142,6 +142,8 @@ function parseUnit(v: Raw): Unit {
           // allowlist shape; a malformed block degrades to "declares no
           // prohibition" (undefined) rather than taking down the parse. Carried
           // onto the unit so a downstream enforcer and the browser bundle see it.
+          // Parsed for every kind: on a `kind: playbook` this same field is the
+          // §4.3b (v0.32, RFC-0030) blanket prohibition over every step.
           deny: isObj(v["action_scope"]["deny"])
             ? {
                 tools: asStrArr(v["action_scope"]["deny"]["tools"]),

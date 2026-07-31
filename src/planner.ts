@@ -64,6 +64,23 @@ export function scopeAllows(
   return scope?.[dimension]?.includes(token) ?? false;
 }
 
+/**
+ * §4.3b (v0.32, RFC-0030): does the UNION of deny lists deny `token` on `dimension`?
+ * The effective denylist for a playbook step is the union of the playbook's own
+ * `action_scope.deny` and the used skill's — a match in either denies, overriding any
+ * allow. Union is the only sound composition: adding a source can only refuse more,
+ * never less (the scope-axis mirror of the §3.13 lowest-of rule). Mirrors the reference
+ * validator's `effectiveDeniesToken` so runtime enforcers and the self-nullified-step
+ * lint share one adjudication rule, the way `deniesToken` already does for §4.3a.
+ */
+export function effectiveDeniesToken(
+  scopes: ReadonlyArray<ActionScope | undefined>,
+  dimension: "tools" | "paths" | "capabilities",
+  token: string,
+): boolean {
+  return scopes.some((scope) => deniesToken(scope, dimension, token));
+}
+
 export interface PlanOptions {
   capabilities?: Partial<AgentCapabilities>;
   /** Runtime environment for federation `context` selection (dev/test/staging/prod). */
@@ -109,6 +126,17 @@ export interface PlanOptions {
    * is preserved.
    */
   spend?: { amount?: number; vendor?: string; currency?: string };
+  /**
+   * §4.3b (v0.32, RFC-0030) — an action the enacting agent proposes to perform while
+   * enacting a governed unit, checked against the effective denylist of every step: the
+   * UNION of the playbook's own `action_scope.deny` (a blanket prohibition over every
+   * step, inline steps included) and the used skill's `action_scope.deny` (§4.3a). A
+   * token matching EITHER source is refused, overriding any allow, deny-first,
+   * fail-closed — and the refusal is FINAL: a deny-hit raises a notify-only
+   * prohibited-attempt marker, never a grant request. Absent (or no token set) means
+   * no action is proposed, so no deny is evaluated and existing behavior is preserved.
+   */
+  action?: { tool?: string; path?: string; capability?: string };
 }
 
 export interface PaymentPlan {
@@ -158,6 +186,14 @@ export interface PlannedUnit {
    * the agent grants it out of band.
    */
   grantRequests?: GrantRequest[];
+  /**
+   * Prohibited attempts (§4.3b, v0.32, RFC-0030) — the proposed action matched the
+   * effective denylist of a step (playbook deny ∪ skill deny). Unlike `grantRequests`
+   * this is a notify-only audit event, NOT a request for permission: no grant, approval,
+   * or escalation outcome may enact the denied action. The only way past a deny is a new
+   * manifest version that no longer declares it.
+   */
+  prohibitedAttempts?: ProhibitedAttempt[];
 }
 
 /**
@@ -181,6 +217,8 @@ export interface SkippedUnit {
   spend?: SpendResolution;
   /** Escalation grants owed before enactment, when a step declared triggers (§3.14). */
   grantRequests?: GrantRequest[];
+  /** Notify-only prohibited-attempt events, when a proposed action hit a deny (§4.3b). */
+  prohibitedAttempts?: ProhibitedAttempt[];
 }
 
 /**
@@ -211,6 +249,34 @@ export interface GrantRequest {
   /** The declared triggers that fired and require an out-of-band grant. */
   triggers: string[];
   /** Human-readable statement of what must be granted. */
+  note: string;
+}
+
+/**
+ * A notify-only prohibited-attempt event (§4.3b, v0.32, RFC-0030): a proposed action
+ * matched the effective denylist of a step — the union of the playbook's own
+ * `action_scope.deny` and the used skill's. Deliberately a different shape from
+ * `GrantRequest`, because it means the opposite thing: a grant request asks for a
+ * permission that can be given; a prohibited attempt records a refusal that is FINAL.
+ * Resolving it with a grant records acknowledgement and MUST NOT cause enactment —
+ * repeated attempts to do forbidden things is a governance signal (misconfiguration,
+ * compromise, or probing), and that signal is only trustworthy if the answer at the
+ * gate is always no.
+ */
+export interface ProhibitedAttempt {
+  /** The step whose effective deny the proposed action matched. */
+  step: string;
+  /** The action_scope dimension the token was refused on. */
+  dimension: "tools" | "paths" | "capabilities";
+  /** The refused token, verbatim from the proposal. */
+  token: string;
+  /**
+   * The deny source(s) that matched — `"playbook action_scope.deny"`, the used
+   * skill's (`"skill '<id>' action_scope.deny"`), or both, named in that order
+   * (the same auditing shape as the §3.13 binding source).
+   */
+  bindingSource: string;
+  /** Human-readable statement of the refusal — final, never grantable. */
   note: string;
 }
 
@@ -265,7 +331,7 @@ export interface AgentPlan {
   environment?: string;
   asOf: string;
   /** The planner inputs echoed into the artifact — everything `kcp-agent replay` needs to recompute this plan. */
-  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number; grantCeiling?: string; spend?: { amount?: number; vendor?: string; currency?: string } };
+  options: { capabilities: AgentCapabilities; maxUnits: number; strict: boolean; budget?: { amount: number; currency?: string; spent?: number }; contextBudget?: number; grantCeiling?: string; spend?: { amount?: number; vendor?: string; currency?: string }; action?: { tool?: string; path?: string; capability?: string } };
   selected: PlannedUnit[];
   skipped: SkippedUnit[];
   federation: FederationPlan[];
@@ -494,6 +560,75 @@ export function resolveSpendScope(
     if ((s.spend.max_spend ?? Infinity) < (bound.spend.max_spend ?? Infinity)) bound = s;
   }
   return { limit: limitOf(bound.step, bound.spend) };
+}
+
+/**
+ * §4.3b (v0.32, RFC-0030) — adjudicate a proposed action against the effective denylist of
+ * every step of a governed unit and report the first prohibited attempt. For a `kind:
+ * playbook` each step's effective deny is the UNION of the playbook's own
+ * `action_scope.deny` — a blanket prohibition over every step, inline (`action`) steps
+ * included, the first scope bound an inline step has ever had — and the `action_scope.deny`
+ * of the skill the step `uses` (§4.3a). A token matching EITHER source is refused,
+ * overriding any allow; the matching source(s) are named as the binding source, both when
+ * both match. A bare governed unit is checked against its own deny (§4.3a, unchanged).
+ *
+ * Only the deny side is adjudicated here: the rest of the playbook's action_scope envelope
+ * stays a declaration for review, not a grant — an enforced playbook-level allow could
+ * widen a step beyond its skill's scope and is unsound when the steps' union is not
+ * computable, while a deny only ever removes, so it needs no union to be sound.
+ *
+ * Returns `{}` when no action is proposed or no deny source matches, so a composition with
+ * no prohibition (or an agent proposing nothing) keeps existing behavior.
+ */
+export function resolveDenyScope(
+  unit: Unit,
+  manifest: Manifest,
+  proposed?: { tool?: string; path?: string; capability?: string },
+): { prohibited?: ProhibitedAttempt } {
+  if (!proposed) return {};
+  const requests: { dimension: "tools" | "paths" | "capabilities"; token: string }[] = [];
+  if (proposed.tool !== undefined) requests.push({ dimension: "tools", token: proposed.tool });
+  if (proposed.path !== undefined) requests.push({ dimension: "paths", token: proposed.path });
+  if (proposed.capability !== undefined) requests.push({ dimension: "capabilities", token: proposed.capability });
+  if (requests.length === 0) return {};
+
+  // The (step, deny-source) pairs this unit puts under a prohibition. The playbook's own
+  // deny binds every step — including inline steps, which have no `uses` unit to attach
+  // scope enforcement to (§4.3b enforces at the orchestration gate instead).
+  const steps: { step: string; playbookScope?: NonNullable<Unit["action_scope"]>; skillScope?: NonNullable<Unit["action_scope"]>; skillId?: string }[] = [];
+  if (unit.kind === "playbook" && unit.steps) {
+    for (const step of unit.steps) {
+      const target = step.uses ? manifest.units.find((u) => u.id === step.uses) : undefined;
+      steps.push({ step: step.id, playbookScope: unit.action_scope, skillScope: target?.action_scope, skillId: step.uses });
+    }
+  } else {
+    steps.push({ step: unit.id, skillScope: unit.action_scope, skillId: unit.id });
+  }
+
+  for (const s of steps) {
+    for (const r of requests) {
+      const byPlaybook = deniesToken(s.playbookScope, r.dimension, r.token);
+      const bySkill = deniesToken(s.skillScope, r.dimension, r.token);
+      if (!byPlaybook && !bySkill) continue;
+      const sources: string[] = [];
+      if (byPlaybook) sources.push("playbook action_scope.deny");
+      if (bySkill) sources.push(`skill '${s.skillId}' action_scope.deny`);
+      const bindingSource = sources.join(" and ");
+      return {
+        prohibited: {
+          step: s.step,
+          dimension: r.dimension,
+          token: r.token,
+          bindingSource,
+          note:
+            `prohibited attempt: '${r.token}' (${r.dimension}) matches ${bindingSource} — ` +
+            `refused finally, not grantable; a grant against this event records acknowledgement ` +
+            `and does not enact (§4.3b, RFC-0030)`,
+        },
+      };
+    }
+  }
+  return {};
 }
 
 /**
@@ -744,14 +879,40 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       }
     }
 
+    // §4.3b (v0.32, RFC-0030) playbook-level prohibitions and deny finality: a proposed
+    // action threaded through planning is checked against the effective denylist of every
+    // step — the UNION of the playbook's own action_scope.deny (a blanket prohibition
+    // over every step, inline steps included) and the used skill's (§4.3a). A match in
+    // either refuses, overriding any allow, with the matching source(s) named as the
+    // binding source. The refusal is FINAL: what the plan raises is a notify-only
+    // prohibited-attempt marker, never a grant request — no approval or escalation
+    // outcome may enact a denied action; the only way past a deny is a new, reviewed
+    // manifest version that no longer declares it.
+    // Mirrored in trace.ts (skill_eligibility gate) — change one, change the other.
+    let prohibitedAttempts: ProhibitedAttempt[] | undefined;
+    let prohibitedStep: string | undefined;
+    if (options.action && (options.action.tool !== undefined || options.action.path !== undefined || options.action.capability !== undefined)) {
+      const res = resolveDenyScope(unit, manifest, options.action);
+      if (res.prohibited) {
+        prohibitedAttempts = [res.prohibited];
+        prohibitedStep = res.prohibited.step;
+        loadEligible = false;
+        reasons.push(
+          `step '${res.prohibited.step}' attempts '${res.prohibited.token}' (${res.prohibited.dimension}), denied by ${res.prohibited.bindingSource} — refused finally, not grantable (§4.3b, RFC-0030)`,
+        );
+      }
+    }
+
     // §3.14 escalation triggers: a step declaring `requires_approval` / a triggered
     // `insufficient_authority_level` / `confidence_below_threshold` owes an out-of-band grant
     // before enactment. Emitted as a structured marker on the plan entry (selected or
     // skipped); the planner never auto-approves, and — unlike the gates above — a mere
-    // approval requirement does not by itself refuse the step.
+    // approval requirement does not by itself refuse the step. A step with a deny-hit
+    // raises NO grant request: a deny is never grantable (§4.3b, RFC-0030), so there is
+    // nothing to ask for — the prohibited-attempt marker above is the only event raised.
     let grantRequests: GrantRequest[] | undefined;
     if (unit.kind === "playbook" && unit.steps) {
-      const gr = evaluateEscalation(unit, authorityViolationStep);
+      const gr = evaluateEscalation(unit, authorityViolationStep).filter((g) => g.step !== prohibitedStep);
       if (gr.length > 0) grantRequests = gr;
     }
 
@@ -785,6 +946,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
         ...(authority ? { authority } : {}),
         ...(spend ? { spend } : {}),
         ...(grantRequests ? { grantRequests } : {}),
+        ...(prohibitedAttempts ? { prohibitedAttempts } : {}),
       });
       continue;
     }
@@ -795,6 +957,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       ...(authority ? { authority } : {}),
       ...(spend ? { spend } : {}),
       ...(grantRequests ? { grantRequests } : {}),
+      ...(prohibitedAttempts ? { prohibitedAttempts } : {}),
     });
   }
 
@@ -904,6 +1067,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       ...(contextBudget !== undefined ? { contextBudget } : {}),
       ...(options.grantCeiling !== undefined ? { grantCeiling: options.grantCeiling } : {}),
       ...(options.spend !== undefined ? { spend: options.spend } : {}),
+      ...(options.action !== undefined ? { action: options.action } : {}),
     },
     selected: capped,
     skipped,

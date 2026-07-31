@@ -18,6 +18,7 @@ import {
   planPayment,
   resolveAuthorityCeiling,
   resolveSpendScope,
+  resolveDenyScope,
   DEFAULT_AUTHORITY_SCALE,
   DEFAULT_CAPABILITIES,
   type AgentCapabilities,
@@ -262,6 +263,21 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       }
     }
 
+    // §4.3b (v0.32, RFC-0030) deny gate (mirrors planner): a proposed action matching the
+    // effective denylist of any step — the union of the playbook's own action_scope.deny
+    // and the used skill's — refuses the composition, finally. Folded into
+    // skill_eligibility like the gates above so the trace attributes the refusal, with
+    // the binding source named in the verdict detail. The refusal is not grantable, so
+    // it never becomes a grant request — only a prohibited-attempt marker on the plan.
+    let denyFailure: string | undefined;
+    if (!composeFailure && !authorityFailure && !spendFailure &&
+        options.action && (options.action.tool !== undefined || options.action.path !== undefined || options.action.capability !== undefined)) {
+      const res = resolveDenyScope(unit, manifest, options.action);
+      if (res.prohibited) {
+        denyFailure = `step '${res.prohibited.step}' attempts '${res.prohibited.token}' (${res.prohibited.dimension}), denied by ${res.prohibited.bindingSource} — refused finally, not grantable (§4.3b, RFC-0030)`;
+      }
+    }
+
     if (composeFailure) {
       loadEligible = false;
       if (options.strict) {
@@ -290,6 +306,13 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
         reject("skill_eligibility", spendFailure);
       } else {
         pass("skill_eligibility", `${spendFailure} (loadEligible=false)`);
+      }
+    } else if (denyFailure) {
+      loadEligible = false;
+      if (options.strict) {
+        reject("skill_eligibility", denyFailure);
+      } else {
+        pass("skill_eligibility", `${denyFailure} (loadEligible=false)`);
       }
     } else {
       pass(
