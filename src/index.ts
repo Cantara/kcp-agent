@@ -25,6 +25,7 @@ export {
   plan,
   scoreUnit,
   unitTokens,
+  pathGlobMatches,
   deniesToken,
   scopeAllows,
   effectiveDeniesToken,
