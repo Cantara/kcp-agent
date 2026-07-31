@@ -6,10 +6,10 @@
 # test/manifest.test.ts keeps this file honest: it parses the manifest, checks
 # every unit path exists on disk, and runs a plan against it.
 
-kcp_version: "0.30"
+kcp_version: "0.32"
 project: kcp-agent
-version: 0.22.1
-updated: "2026-07-23"
+version: 0.26.0
+updated: "2026-07-31"
 language: en
 
 trust:

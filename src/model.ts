@@ -58,11 +58,17 @@ export interface ManifestRef {
 }
 
 /**
- * Explicit negative scope on a `kind: skill` action_scope — §4.3a (v0.31, RFC-0029).
+ * Explicit negative scope on a `kind: skill` action_scope — §4.3a (v0.31, RFC-0029) —
+ * and, since §4.3b (v0.32, RFC-0030), on a `kind: playbook` too.
  *
  * Same {tools, paths, capabilities} shape as the allowlist, but every entry is a
  * PROHIBITION: a token listed here is denied even when the allowlist grants it.
  * `deny` is checked in addition to — and overrides — the allowlist, fail-closed.
+ *
+ * On a playbook it is the one NORMATIVE sub-object of an otherwise declarative
+ * action_scope envelope: a blanket prohibition over every step, inline steps included.
+ * The effective denylist for a step is the UNION of the playbook's deny and the used
+ * skill's — a match in either denies, and a deny is never grantable (§4.3b).
  */
 export interface DenyScope {
   /** Tool names the procedure MUST NOT invoke, even if allowlisted. */

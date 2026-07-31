@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { loadManifestText, parseManifest } from "./client.js";
 import type { FetchGuard } from "./fetch.js";
-import { terms } from "./planner.js";
+import { terms, effectiveDeniesToken } from "./planner.js";
 import type { Manifest, Unit } from "./model.js";
 
 export interface Finding {
@@ -88,6 +88,7 @@ export function validateManifest(manifest: Manifest, baseDir?: string): Finding[
     validateTemporal(unit, where, findings);
     validateNotFor(unit, where, findings);
     validateSkillScope(unit, where, findings);
+    validatePlaybookDeny(unit, manifest, where, findings);
     for (const m of unit.payment?.methods ?? []) {
       if (!m.type) err(where, "payment method missing 'type'");
       if (m.type === "x402" && (!m.price_per_request || !m.currency)) {
@@ -217,38 +218,81 @@ function validateSkillScope(unit: Unit, where: string, findings: Finding[]) {
     });
   }
 
-  // §4.3a (v0.31, RFC-0029): the optional negative scope. A deny never widens
-  // anything, so a slip here fails safe — but a slip is still worth surfacing:
-  //  - an empty `deny` object prohibits nothing (an authoring slip: the author
-  //    reached for a prohibition and declared none);
-  //  - a token that is BOTH allowed and denied. Deny overrides allow, fail-closed,
-  //    so the unit is safe, but the allow entry is neutralized — an exact
-  //    contradiction the author probably did not intend.
+  validateDenyLints(unit, where, findings, "§4.3a");
+}
+
+/**
+ * The deny lints shared by §4.3a (v0.31, RFC-0029, skill) and §4.3b (v0.32, RFC-0030,
+ * playbook — the one sub-object of the playbook envelope that is normative for
+ * enactment). A deny never widens anything, so a slip here fails safe — but a slip is
+ * still worth surfacing:
+ *  - an empty `deny` object prohibits nothing (an authoring slip: the author
+ *    reached for a prohibition and declared none);
+ *  - a token that is BOTH allowed and denied. Deny overrides allow, fail-closed,
+ *    so the unit is safe, but the allow entry is neutralized — an exact
+ *    contradiction the author probably did not intend.
+ */
+function validateDenyLints(unit: Unit, where: string, findings: Finding[], section: string) {
+  const as = unit.action_scope;
   const deny = as?.deny;
-  if (deny) {
-    const forbidsAnything =
-      (deny.tools ?? []).length > 0 ||
-      (deny.paths ?? []).length > 0 ||
-      (deny.capabilities ?? []).length > 0;
-    if (!forbidsAnything) {
-      findings.push({
-        level: "warning",
-        where,
-        message: "action_scope.deny is declared but empty — it prohibits nothing (§4.3a)",
-      });
+  if (!deny) return;
+  const forbidsAnything =
+    (deny.tools ?? []).length > 0 ||
+    (deny.paths ?? []).length > 0 ||
+    (deny.capabilities ?? []).length > 0;
+  if (!forbidsAnything) {
+    findings.push({
+      level: "warning",
+      where,
+      message: `action_scope.deny is declared but empty — it prohibits nothing (${section})`,
+    });
+  }
+  for (const dim of ["tools", "paths", "capabilities"] as const) {
+    const allowed = new Set(as?.[dim] ?? []);
+    for (const token of deny[dim] ?? []) {
+      if (allowed.has(token)) {
+        findings.push({
+          level: "warning",
+          where,
+          message:
+            `action_scope.${dim} allows '${token}' while deny.${dim} denies it — the allow entry is ` +
+            `neutralized; deny overrides allow, fail-closed (${section})`,
+        });
+      }
     }
+  }
+}
+
+/**
+ * Playbook-level prohibitions (§4.3b, v0.32, RFC-0030): a `kind: playbook` unit's
+ * `action_scope.deny` is normative for enactment — a blanket prohibition over every
+ * step — so it earns the same lints a skill's deny gets, plus one of its own: a step
+ * whose used skill's allowlist is entirely contained in the effective deny (playbook
+ * deny ∪ skill deny) on some dimension is self-nullified on that dimension — it reads
+ * enactable but cannot act. A warning, not an error: denying never widens anything, so
+ * the slip fails safe, but a dead step is worth naming.
+ */
+function validatePlaybookDeny(unit: Unit, manifest: Manifest, where: string, findings: Finding[]) {
+  if (unit.kind !== "playbook") return;
+  validateDenyLints(unit, where, findings, "§4.3b");
+  for (const step of unit.steps ?? []) {
+    if (!step.uses) continue;
+    const target = manifest.units.find((u) => u.id === step.uses);
+    const targetScope = target?.action_scope;
+    if (!targetScope) continue;
     for (const dim of ["tools", "paths", "capabilities"] as const) {
-      const allowed = new Set(as?.[dim] ?? []);
-      for (const token of deny[dim] ?? []) {
-        if (allowed.has(token)) {
-          findings.push({
-            level: "warning",
-            where,
-            message:
-              `action_scope.${dim} allows '${token}' while deny.${dim} denies it — the allow entry is ` +
-              "neutralized; deny overrides allow, fail-closed (§4.3a)",
-          });
-        }
+      const allowed = targetScope[dim] ?? [];
+      if (
+        allowed.length > 0 &&
+        allowed.every((token) => effectiveDeniesToken([unit.action_scope, targetScope], dim, token))
+      ) {
+        findings.push({
+          level: "warning",
+          where,
+          message:
+            `step '${step.id}': every '${dim}' entry '${step.uses}' allows is denied by the ` +
+            `effective deny (playbook ∪ skill) — the step is self-nullified on '${dim}' (§4.3b, RFC-0030)`,
+        });
       }
     }
   }

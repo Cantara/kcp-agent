@@ -1,6 +1,6 @@
 {
   "$comment": "The conformance matrix rendered on the gh-pages site. test/docs.test.ts enforces that every impl file exists and every proof names a real test in the referenced file — a claim cannot outlive its proof.",
-  "spec": "KCP 0.30",
+  "spec": "KCP 0.32",
   "rows": [
     {
       "layer": "Query scoring (intent / triggers / id+path)",
