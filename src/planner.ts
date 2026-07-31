@@ -33,18 +33,50 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
 export type ActionScope = NonNullable<Unit["action_scope"]>;
 
 /**
+ * §4.3a (v0.32.1 errata): match a path against an action_scope paths PATTERN.
+ * Path entries are globs ("globs permitted", the `schema/secrets/**` carve-out):
+ * `**` matches any sequence including `/` (crosses segment boundaries), `*` matches
+ * within a single segment (no `/`), every other character matches literally.
+ * Mirrors the reference validator's `pathGlobMatches` — exact-string comparison
+ * never fires a pattern (no requested path is ever the literal `legal/hold/**`),
+ * which left the paths dimension of every deny unenforced.
+ */
+export function pathGlobMatches(pattern: string, path: string): boolean {
+  let re = "";
+  for (let i = 0; i < pattern.length; ) {
+    if (pattern.startsWith("**", i)) {
+      re += ".*";
+      i += 2;
+    } else if (pattern[i] === "*") {
+      re += "[^/]*";
+      i += 1;
+    } else {
+      re += pattern[i]!.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+      i += 1;
+    }
+  }
+  return new RegExp("^" + re + "$").test(path);
+}
+
+/**
  * §4.3a (v0.31, RFC-0029): does a skill's `action_scope.deny` deny `token` on
  * `dimension`? Fail-closed override — a deny entry denies the token even when the
- * allowlist grants it. Exact-string match, mirroring the reference validator's
- * `deniesToken` so a runtime enforcer and the spec's overlap lint share one
- * adjudication rule.
+ * allowlist grants it. Paths are patterns (§4.3a, v0.32.1 errata): a requested path
+ * is denied when any deny entry glob-matches it; tools/capabilities remain exact
+ * tokens. Mirrors the reference validator's `deniesToken` so a runtime enforcer and
+ * the spec's overlap lint share one adjudication rule.
  */
 export function deniesToken(
   scope: ActionScope | undefined,
   dimension: "tools" | "paths" | "capabilities",
   token: string,
 ): boolean {
-  return scope?.deny?.[dimension]?.includes(token) ?? false;
+  const entries = scope?.deny?.[dimension];
+  if (!entries) return false;
+  if (dimension === "paths") {
+    return entries.some((p) => p === token || pathGlobMatches(p, token));
+  }
+  return entries.includes(token);
 }
 
 /**
@@ -52,8 +84,10 @@ export function deniesToken(
  * deny-overrides-allow (§4.3a): `deny` is checked FIRST and a match refuses the
  * token even when the allowlist grants it. A token absent from the allowlist is
  * refused too — a skill's action_scope authorizes nothing it does not list
- * (fail-closed, #100). This is the canonical gate an enforcer evaluates an action
- * against a scope with.
+ * (fail-closed, #100). Paths are patterns on the allow side as well (§4.3a,
+ * v0.32.1 errata): a requested path is IN scope when any allowlist entry
+ * glob-matches it, with the same matcher the deny side uses. This is the
+ * canonical gate an enforcer evaluates an action against a scope with.
  */
 export function scopeAllows(
   scope: ActionScope | undefined,
@@ -61,7 +95,12 @@ export function scopeAllows(
   token: string,
 ): boolean {
   if (deniesToken(scope, dimension, token)) return false; // deny-first, overrides allow
-  return scope?.[dimension]?.includes(token) ?? false;
+  const entries = scope?.[dimension];
+  if (!entries) return false;
+  if (dimension === "paths") {
+    return entries.some((p) => p === token || pathGlobMatches(p, token));
+  }
+  return entries.includes(token);
 }
 
 /**
