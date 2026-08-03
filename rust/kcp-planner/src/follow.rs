@@ -12,7 +12,7 @@ use std::pin::Pin;
 
 use sha2::{Digest, Sha256};
 
-use crate::client::{load_manifest_text, normalize, resolve_location};
+use crate::client::{is_url, load_manifest_text, normalize, resolve_local_manifest_file, resolve_location};
 use crate::fetch::FetchGuard;
 use crate::model::parse_manifest;
 use crate::planner::{plan, AgentPlan, PlanOptions};
@@ -152,7 +152,14 @@ impl<'o> Walk<'o> {
                     node.not_followed.push(NotFollowedRef { id: r.id.clone(), url: r.url.clone(), reason: format!("beyond max depth {}", self.max_depth) });
                     continue;
                 }
-                let child_loc = resolve_location(Some(&source), &r.url);
+                // #136 (SPEC.md §3.6): a local_mirror is only meaningful when the declaring
+                // manifest is itself local — "relative to this manifest" has no filesystem
+                // sense when `source` is a URL, so in that case fall straight through to url.
+                let mirror_loc = r.local_mirror.as_ref().filter(|_| !is_url(&source)).map(|m| resolve_location(Some(&source), m));
+                let child_loc = match mirror_loc.filter(|m| resolve_local_manifest_file(m).is_some()) {
+                    Some(m) => m,
+                    None => resolve_location(Some(&source), &r.url),
+                };
                 if self.visited.contains(&normalize(&child_loc)) {
                     node.not_followed.push(NotFollowedRef { id: r.id.clone(), url: r.url.clone(), reason: "already visited (cycle)".to_string() });
                     continue;

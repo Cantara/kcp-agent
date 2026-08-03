@@ -460,7 +460,7 @@ public final class KcpPlanner {
                 reason = "eligible";
             }
             federation.add(new FederationPlan(ref.id(), ref.url(), inEnv, reason, credentialNeeded,
-                    ref.agentIdentity() != null ? ref.agentIdentity().docsUrl() : null));
+                    ref.agentIdentity() != null ? ref.agentIdentity().docsUrl() : null, ref.localMirror()));
         }
 
         BudgetPlan budgetPlan = planBudget(manifest, caps, capped, budget);

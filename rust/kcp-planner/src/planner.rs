@@ -128,6 +128,8 @@ pub struct FederationPlan {
     pub reason: String,
     pub credential_needed: Option<String>,
     pub docs_url: Option<String>,
+    /// Relative path (to the declaring manifest) to a preferred local copy of `url` (#136).
+    pub local_mirror: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -554,6 +556,7 @@ pub fn plan(manifest: &Manifest, task: &str, options: &PlanOptions) -> AgentPlan
                 reason,
                 credential_needed,
                 docs_url: ai.and_then(|a| a.docs_url.clone()),
+                local_mirror: r.local_mirror.clone(),
             }
         })
         .collect();

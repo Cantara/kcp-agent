@@ -115,4 +115,87 @@ class FederationWalkerTest {
         assertTrue(vendor.notFollowed().contains("vendor_token"));
         assertNull(vendor.plan(), "an un-followed ref is never fetched");
     }
+
+    @Test
+    void localMirrorIsPreferredOverUrl(@TempDir Path dir) throws IOException {
+        Path mirror = dir.resolve("mirror.yaml");
+        Files.writeString(mirror, """
+                kcp_version: "0.25"
+                project: mirror-child
+                version: 1.0.0
+                units:
+                  - id: mirror-doc
+                    path: m.md
+                    intent: "deploy production runbook"
+                    audience: [agent]
+                    triggers: [deploy]
+                """);
+        Path root = dir.resolve("knowledge.yaml");
+        Files.writeString(root, """
+                kcp_version: "0.25"
+                project: root
+                version: 1.0.0
+                units:
+                  - id: root-doc
+                    path: r.md
+                    intent: "deploy production guide"
+                    audience: [agent]
+                    triggers: [deploy]
+                manifests:
+                  - id: mirrored
+                    url: %s
+                    local_mirror: mirror.yaml
+                """.formatted(dir.resolve("does-not-exist.yaml").toString()));
+
+        FederationWalker walker = new FederationWalker(ManifestClient.create());
+        PlanOptions options = PlanOptions.builder().role("agent").asOf("2026-07-06").build();
+        PlanNode rootNode = walker.walk(root.toString(), "deploy to production", options, FollowOptions.defaults());
+
+        // url points at a file that does not exist — success here proves the mirror was used.
+        PlanNode mirrored = rootNode.children().get(0);
+        assertNull(mirrored.error());
+        assertNull(mirrored.notFollowed());
+        assertEquals("mirror-child", mirrored.plan().manifest().project());
+    }
+
+    @Test
+    void fallsBackToUrlWhenLocalMirrorFileIsMissing(@TempDir Path dir) throws IOException {
+        Path child = dir.resolve("child.yaml");
+        Files.writeString(child, """
+                kcp_version: "0.25"
+                project: fallback-child
+                version: 1.0.0
+                units:
+                  - id: child-doc
+                    path: c.md
+                    intent: "deploy production runbook"
+                    audience: [agent]
+                    triggers: [deploy]
+                """);
+        Path root = dir.resolve("knowledge.yaml");
+        Files.writeString(root, """
+                kcp_version: "0.25"
+                project: root
+                version: 1.0.0
+                units:
+                  - id: root-doc
+                    path: r.md
+                    intent: "deploy production guide"
+                    audience: [agent]
+                    triggers: [deploy]
+                manifests:
+                  - id: fallback
+                    url: %s
+                    local_mirror: does-not-exist.yaml
+                """.formatted(child.toString()));
+
+        FederationWalker walker = new FederationWalker(ManifestClient.create());
+        PlanOptions options = PlanOptions.builder().role("agent").asOf("2026-07-06").build();
+        PlanNode rootNode = walker.walk(root.toString(), "deploy to production", options, FollowOptions.defaults());
+
+        PlanNode fallback = rootNode.children().get(0);
+        assertNull(fallback.error());
+        assertNull(fallback.notFollowed());
+        assertEquals("fallback-child", fallback.plan().manifest().project());
+    }
 }

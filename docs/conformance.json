@@ -85,12 +85,13 @@
       ]
     },
     {
-      "layer": "Federation context + agent_identity, fail-closed follow",
+      "layer": "Federation context + agent_identity + local_mirror, fail-closed follow",
       "section": "§3.6",
-      "where": "planner.ts + follow.ts",
+      "where": "planner.ts + follow.ts + client.ts",
       "impl": [
         "src/planner.ts",
-        "src/follow.ts"
+        "src/follow.ts",
+        "src/client.ts"
       ],
       "proofs": [
         {
@@ -100,6 +101,14 @@
         {
           "file": "test/follow.test.ts",
           "test": "fails closed: never fetches context-excluded or credential-gated refs"
+        },
+        {
+          "file": "test/follow.test.ts",
+          "test": "prefers a present local_mirror over url"
+        },
+        {
+          "file": "test/follow.test.ts",
+          "test": "falls back to url when the declared local_mirror file is missing"
         }
       ]
     },

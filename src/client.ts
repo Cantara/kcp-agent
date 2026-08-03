@@ -175,6 +175,7 @@ function parseManifestRef(v: Raw): ManifestRef {
     label: asStr(v["label"]),
     relationship: asStr(v["relationship"]),
     context: Array.isArray(v["context"]) ? v["context"].map(String) : undefined,
+    local_mirror: asStr(v["local_mirror"]),
     agent_identity: ai
       ? {
           required: ai["required"] === undefined ? undefined : Boolean(ai["required"]),
@@ -247,6 +248,20 @@ export function parseManifest(text: string, source?: string): Manifest {
     serving,
     source,
   };
+}
+
+/**
+ * Resolve a local path/dir to an existing manifest file, or undefined if none
+ * exists there. Used to decide whether a declared `local_mirror` (#136,
+ * SPEC.md §3.6) is actually usable before preferring it over `url` — mirrors
+ * loadManifestText's own local-path branch without performing the read.
+ */
+export function resolveLocalManifestFile(location: string): string | undefined {
+  if (existsSync(location) && statSync(location).isDirectory()) {
+    const candidates = [join(location, "knowledge.yaml"), join(location, ".well-known", "knowledge.yaml")];
+    return candidates.find((c) => existsSync(c));
+  }
+  return existsSync(location) ? location : undefined;
 }
 
 /** Resolve a location (file, directory, or HTTPS URL) to manifest text + source label. */

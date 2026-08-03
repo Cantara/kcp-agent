@@ -3,6 +3,7 @@ import { planTree, plans } from "../src/follow.js";
 import { synthesize, loadPlannedUnits } from "../src/synthesize.js";
 
 const HUB = "test/fixtures/fed/hub";
+const LOCALMIRROR_HUB = "test/fixtures/fed/localmirror-hub";
 const TASK = "how do I deploy?";
 
 describe("planTree", () => {
@@ -65,6 +66,24 @@ describe("planTree", () => {
     const result = await synthesize(plans(tree));
     expect(result.unitsLoaded).toHaveLength(0);
     expect(result.answer).toContain("nothing to answer from");
+  });
+});
+
+describe("local_mirror (#136, SPEC.md §3.6)", () => {
+  it("prefers a present local_mirror over url", async () => {
+    const tree = await planTree(LOCALMIRROR_HUB, TASK, { maxDepth: 1 });
+    const mirrored = tree.children.find((c) => c.refId === "mirrored");
+    // url is a bogus path that would error if fetched — success here proves
+    // the mirror was used instead.
+    expect(mirrored?.error).toBeUndefined();
+    expect(mirrored?.plan?.manifest.project).toBe("fed-localmirror-child");
+  });
+
+  it("falls back to url when the declared local_mirror file is missing", async () => {
+    const tree = await planTree(LOCALMIRROR_HUB, TASK, { maxDepth: 1 });
+    const missingMirror = tree.children.find((c) => c.refId === "missing-mirror");
+    expect(missingMirror?.error).toBeUndefined();
+    expect(missingMirror?.plan?.manifest.project).toBe("fed-child");
   });
 });
 

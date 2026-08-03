@@ -7,7 +7,7 @@
 // fetched manifest passes through signature verification before it is planned;
 // an invalid signature poisons that node (and its subtree), never the parent.
 
-import { loadManifestText, parseManifest } from "./client.js";
+import { loadManifestText, parseManifest, resolveLocalManifestFile } from "./client.js";
 import { plan, type PlanOptions, type AgentPlan } from "./planner.js";
 import { verifyManifestText, resolveLocation, type SignatureResult, type VerifyOptions } from "./verify.js";
 import type { FetchGuard } from "./fetch.js";
@@ -128,7 +128,15 @@ export async function planTree(location: string, task: string, options: FollowOp
         node.notFollowed.push({ id: ref.id, url: ref.url, reason: `beyond max depth ${maxDepth}` });
         continue;
       }
-      const childLoc = resolveLocation(source, ref.url);
+      // #136 (SPEC.md §3.6): a local_mirror is only meaningful when the declaring
+      // manifest is itself local — "relative to this manifest" has no filesystem
+      // sense when `source` is a URL, so in that case fall straight through to url.
+      let childLoc: string | undefined;
+      if (ref.localMirror && !/^https?:\/\//.test(source)) {
+        const mirrorLoc = resolveLocation(source, ref.localMirror);
+        if (resolveLocalManifestFile(mirrorLoc)) childLoc = mirrorLoc;
+      }
+      if (childLoc === undefined) childLoc = resolveLocation(source, ref.url);
       if (visited.has(normalize(childLoc))) {
         node.notFollowed.push({ id: ref.id, url: ref.url, reason: "already visited (cycle)" });
         continue;

@@ -1,0 +1,6 @@
+project: fallback-child
+version: 1.0.0
+units:
+  - id: fallback-unit
+    path: fallback.md
+    intent: fallback content doc

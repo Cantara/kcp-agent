@@ -182,7 +182,8 @@ public final class ManifestParser {
                 asStr(get(v, "label")),
                 asStr(get(v, "relationship")),
                 context,
-                identity);
+                identity,
+                asStr(get(v, "local_mirror")));
     }
 
     private static Payment parsePayment(Object v) {

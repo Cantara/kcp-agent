@@ -1,0 +1,9 @@
+kcp_version: "0.25"
+project: fed-localmirror-child
+version: 1.0.0
+units:
+  - id: mirror-deploy
+    path: docs/deploy.md
+    intent: "Mirror child deploy runbook"
+    audience: [agent]
+    triggers: [deploy]

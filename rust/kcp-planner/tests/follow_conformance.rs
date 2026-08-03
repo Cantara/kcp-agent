@@ -5,6 +5,7 @@
 #![cfg(feature = "network")]
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use kcp_planner::{plan_tree, FetchGuard, FollowOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -100,4 +101,38 @@ async fn cleartext_http_is_refused_without_allow_private() {
     assert!(root.error.is_some());
     let err = root.error.unwrap();
     assert!(err.contains("fetch failed") && (err.contains("private") || err.contains("cleartext")), "unexpected error: {}", err);
+}
+
+/// #136 (SPEC.md §3.6): local_mirror over a fully local root manifest — no HTTP
+/// server needed here, but this module (and tokio) is only compiled under the
+/// `network` feature, so these tests live alongside the HTTP-based ones.
+fn local_mirror_fixture(name: &str) -> String {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/follow-local-mirror")
+        .join(name)
+        .to_string_lossy()
+        .to_string()
+}
+
+#[tokio::test]
+async fn local_mirror_is_preferred_over_url() {
+    let opts = FollowOptions { max_depth: 1, ..Default::default() };
+    let root = plan_tree(&local_mirror_fixture("hub.yaml"), "hub", &opts).await;
+
+    assert!(root.error.is_none(), "root errored: {:?}", root.error);
+    let mirrored = root.children.iter().find(|c| c.ref_id.as_deref() == Some("mirrored")).expect("mirrored child");
+    // url points at a file that does not exist — success here proves the mirror was used.
+    assert!(mirrored.error.is_none(), "mirrored child errored: {:?}", mirrored.error);
+    assert_eq!(mirrored.plan.as_ref().unwrap().manifest_project, "mirror-child");
+}
+
+#[tokio::test]
+async fn falls_back_to_url_when_local_mirror_file_is_missing() {
+    let opts = FollowOptions { max_depth: 1, ..Default::default() };
+    let root = plan_tree(&local_mirror_fixture("hub.yaml"), "hub", &opts).await;
+
+    assert!(root.error.is_none(), "root errored: {:?}", root.error);
+    let fallback = root.children.iter().find(|c| c.ref_id.as_deref() == Some("fallback")).expect("fallback child");
+    assert!(fallback.error.is_none(), "fallback child errored: {:?}", fallback.error);
+    assert_eq!(fallback.plan.as_ref().unwrap().manifest_project, "fallback-child");
 }

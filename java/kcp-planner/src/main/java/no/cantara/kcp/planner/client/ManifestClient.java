@@ -108,6 +108,26 @@ public final class ManifestClient {
     private record Loaded(String text, String source) {
     }
 
+    /**
+     * Resolve a local path/dir to an existing manifest file, or {@code null} if none
+     * exists there. Used to decide whether a declared {@code local_mirror} (#136,
+     * SPEC.md §3.6) is actually usable before preferring it over {@code url} —
+     * mirrors {@link #loadText}'s own local-path branch without performing the read.
+     */
+    public static String resolveLocalManifestFile(String location) {
+        Path path = Path.of(location);
+        if (Files.isDirectory(path)) {
+            Path[] candidates = {path.resolve("knowledge.yaml"), path.resolve(".well-known").resolve("knowledge.yaml")};
+            for (Path c : candidates) {
+                if (Files.exists(c)) {
+                    return c.toString();
+                }
+            }
+            return null;
+        }
+        return Files.exists(path) ? path.toString() : null;
+    }
+
     private Loaded loadText(String location) throws IOException {
         if (isUrl(location)) {
             return new Loaded(guardedFetchText(location), location);

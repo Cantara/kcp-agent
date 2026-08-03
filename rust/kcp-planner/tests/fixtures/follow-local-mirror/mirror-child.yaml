@@ -1,0 +1,6 @@
+project: mirror-child
+version: 1.0.0
+units:
+  - id: mirror-unit
+    path: mirror.md
+    intent: mirror content doc

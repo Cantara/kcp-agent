@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import no.cantara.kcp.planner.AgentCapabilities;
 import no.cantara.kcp.planner.AgentPlan;
@@ -26,6 +27,8 @@ import no.cantara.kcp.planner.verify.SignatureResult;
  * location) keep an adversarial or cyclic federation from exhausting the client.</p>
  */
 public final class FederationWalker {
+
+    private static final Pattern URL_SCHEME = Pattern.compile("^https?://.*", Pattern.CASE_INSENSITIVE);
 
     private final ManifestClient client;
 
@@ -106,7 +109,19 @@ public final class FederationWalker {
                     children.add(notFollowed(f, "needs credential " + f.credentialNeeded()));
                     continue;
                 }
-                String childLoc = ManifestVerifier.resolveLocation(lm.source(), f.url());
+                // #136 (SPEC.md §3.6): a local_mirror is only meaningful when the declaring
+                // manifest is itself local — "relative to this manifest" has no filesystem
+                // sense when lm.source() is a URL, so in that case fall straight through to url.
+                String childLoc = null;
+                if (f.localMirror() != null && !URL_SCHEME.matcher(lm.source()).matches()) {
+                    String mirrorLoc = ManifestVerifier.resolveLocation(lm.source(), f.localMirror());
+                    if (ManifestClient.resolveLocalManifestFile(mirrorLoc) != null) {
+                        childLoc = mirrorLoc;
+                    }
+                }
+                if (childLoc == null) {
+                    childLoc = ManifestVerifier.resolveLocation(lm.source(), f.url());
+                }
                 if (!seen.add(childLoc)) {
                     children.add(notFollowed(f, "cycle: already visited " + childLoc));
                     continue;
