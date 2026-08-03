@@ -4,6 +4,7 @@
 
 use crate::fetch::{guarded_fetch_text, FetchGuard};
 use crate::validate::load_local_manifest_text;
+pub use crate::validate::resolve_local_manifest_file;
 
 /// True for an `http(s)://` location (leading whitespace tolerated, matching the TS regex).
 pub fn is_url(location: &str) -> bool {

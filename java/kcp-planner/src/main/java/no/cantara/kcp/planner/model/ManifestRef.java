@@ -14,6 +14,8 @@ import java.util.List;
  * @param context       environments this ref applies to (e.g. {@code [dev, test]});
  *                      {@code null} means it applies unconditionally
  * @param agentIdentity identity required before following the ref, if any
+ * @param localMirror   relative path (to this manifest) to a preferred local copy
+ *                      of {@code url} (SPEC.md §3.6, #136)
  */
 public record ManifestRef(
         String id,
@@ -21,5 +23,6 @@ public record ManifestRef(
         String label,
         String relationship,
         List<String> context,
-        AgentIdentity agentIdentity) {
+        AgentIdentity agentIdentity,
+        String localMirror) {
 }

@@ -326,6 +326,8 @@ export interface FederationPlan {
   reason: string;
   credentialNeeded?: string;
   docsUrl?: string;
+  /** Relative path (to the declaring manifest) to a preferred local copy of `url` (#136). */
+  localMirror?: string;
 }
 
 export interface BudgetPlan {
@@ -1078,7 +1080,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       : credentialNeeded
         ? `needs ${credentialNeeded} before fetch`
         : "eligible";
-    return { id: ref.id, url: ref.url, selected: inEnv, reason, credentialNeeded, docsUrl: ai?.docs_url };
+    return { id: ref.id, url: ref.url, selected: inEnv, reason, credentialNeeded, docsUrl: ai?.docs_url, localMirror: ref.local_mirror };
   });
 
   const budgetPlan = planBudget(manifest, caps, capped, options.budget);

@@ -55,6 +55,8 @@ export interface ManifestRef {
   relationship?: string;
   context?: string[];
   agent_identity?: AgentIdentity;
+  /** Relative path (to this manifest) to a local copy of `url` (SPEC.md §3.6, #136). */
+  local_mirror?: string;
 }
 
 /**

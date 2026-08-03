@@ -1,0 +1,18 @@
+kcp_version: "0.25"
+project: fed-localmirror-hub
+version: 1.0.0
+units:
+  - id: hub-guide
+    path: docs/guide.md
+    intent: "How to deploy through the local-mirror hub"
+    audience: [agent]
+    triggers: [deploy, pipeline]
+manifests:
+  - id: mirrored
+    url: "../does-not-exist-url-target/knowledge.yaml"
+    local_mirror: "../localmirror-child/knowledge.yaml"
+    relationship: peer
+  - id: missing-mirror
+    url: "../child/knowledge.yaml"
+    local_mirror: "./does-not-exist/knowledge.yaml"
+    relationship: peer

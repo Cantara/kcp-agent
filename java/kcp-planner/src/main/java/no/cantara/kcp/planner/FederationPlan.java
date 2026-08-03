@@ -11,6 +11,8 @@ package no.cantara.kcp.planner;
  * @param reason           the human-readable selection reason
  * @param credentialNeeded a credential required before fetching, or {@code null}
  * @param docsUrl          documentation for obtaining that credential, or {@code null}
+ * @param localMirror      relative path (to the declaring manifest) to a preferred
+ *                         local copy of {@code url}, or {@code null} (#136)
  */
 public record FederationPlan(
         String id,
@@ -18,5 +20,6 @@ public record FederationPlan(
         boolean selected,
         String reason,
         String credentialNeeded,
-        String docsUrl) {
+        String docsUrl,
+        String localMirror) {
 }

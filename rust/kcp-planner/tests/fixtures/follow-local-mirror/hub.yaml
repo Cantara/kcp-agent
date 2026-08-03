@@ -1,0 +1,14 @@
+project: localmirror-hub
+version: 1.0.0
+kcp_version: "0.25"
+units:
+  - id: hub-unit
+    path: hub.md
+    intent: hub root doc
+manifests:
+  - id: mirrored
+    url: does-not-exist-url-target.yaml
+    local_mirror: mirror-child.yaml
+  - id: fallback
+    url: fallback-child.yaml
+    local_mirror: does-not-exist-mirror.yaml

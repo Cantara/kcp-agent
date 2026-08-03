@@ -171,6 +171,9 @@ pub struct ManifestRef {
     pub context: Option<Vec<String>>,
     #[serde(default)]
     pub agent_identity: Option<AgentIdentity>,
+    /// Relative path (to this manifest) to a preferred local copy of `url` (SPEC.md §3.6, #136).
+    #[serde(default)]
+    pub local_mirror: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

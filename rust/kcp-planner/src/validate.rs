@@ -345,6 +345,29 @@ pub fn load_local_manifest_text(location: &str) -> Result<(String, String), Stri
     Ok((text, source))
 }
 
+/// Resolve a local path/dir to an existing manifest file, or `None` if none exists
+/// there. Used to decide whether a declared `local_mirror` (#136, SPEC.md §3.6) is
+/// actually usable before preferring it over `url` — mirrors
+/// `load_local_manifest_text`'s own dir-vs-file logic without performing the read.
+pub fn resolve_local_manifest_file(location: &str) -> Option<String> {
+    let path = std::path::Path::new(location);
+    if path.is_dir() {
+        let a = node_join(&[location, "knowledge.yaml"]);
+        let b = node_join(&[location, ".well-known", "knowledge.yaml"]);
+        if std::path::Path::new(&a).exists() {
+            Some(a)
+        } else if std::path::Path::new(&b).exists() {
+            Some(b)
+        } else {
+            None
+        }
+    } else if path.exists() {
+        Some(location.to_string())
+    } else {
+        None
+    }
+}
+
 /// Join path segments the way Node's `path.join` does on POSIX: concatenate with
 /// `/`, then normalize (drop `.` segments, resolve `..`). The TS reference records
 /// the joined result as the manifest `source`, so byte-parity of `validate --json`
