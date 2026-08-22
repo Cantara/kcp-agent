@@ -210,6 +210,68 @@ describe("makeProviderVerifier — token budget (the 256-token-cap fix)", () => 
   });
 });
 
+describe("makeProviderVerifier — message ordering for prompt-cache reuse", () => {
+  // Root cause this section guards against: groundAnswer() calls the
+  // verifier once PER CLAIM in a synthesized answer (often 6-11 times for
+  // one answer, per the local-LLM benchmark PR that surfaced this), always
+  // against the SAME loaded units. Measured live (Bonsai-8B via
+  // llama-server): prompt processing dominates wall-clock (~35-50s per
+  // call at ~14.5 tok/s) far more than generation (2-11s) once reasoning
+  // is off. llama-server's own prompt cache does longest-common-PREFIX
+  // matching -- if the large, constant part (units) comes first and the
+  // small, varying part (task/claim) comes last, every claim-check after
+  // the first one only needs to prefill its own short tail, not the whole
+  // units block again. The old ordering (task, then claim, then units)
+  // put the varying part first, defeating prefix reuse entirely.
+  function recordingProvider(): { provider: SynthesisProvider; lastMessages: () => Message[] | undefined } {
+    let last: Message[] | undefined;
+    const provider: SynthesisProvider = {
+      name: "test",
+      model: "test-model",
+      complete: async (messages: Message[], _options?: CompletionOptions) => {
+        last = messages;
+        return JSON.stringify({ supportedBy: null });
+      },
+      stream: async function* () {},
+    };
+    return { provider, lastMessages: () => last };
+  }
+
+  it("puts the loaded units BEFORE the task and claim in the user message", async () => {
+    const { provider, lastMessages } = recordingProvider();
+    const verifier = makeProviderVerifier(provider);
+    const units = [U("policy-a", "UNIQUE_UNIT_MARKER access control policy content")];
+    await verifier({ task: "UNIQUE_TASK_MARKER check the policy", claim: "UNIQUE_CLAIM_MARKER the policy exists", units });
+    const userMessage = lastMessages()?.find((m) => m.role === "user")?.content ?? "";
+    const unitIdx = userMessage.indexOf("UNIQUE_UNIT_MARKER");
+    const taskIdx = userMessage.indexOf("UNIQUE_TASK_MARKER");
+    const claimIdx = userMessage.indexOf("UNIQUE_CLAIM_MARKER");
+    expect(unitIdx).toBeGreaterThanOrEqual(0);
+    expect(taskIdx).toBeGreaterThan(unitIdx);
+    expect(claimIdx).toBeGreaterThan(taskIdx);
+  });
+
+  it("the units block is byte-identical across two calls with the same units but different claims — the actual prefix-cache precondition", async () => {
+    const { provider, lastMessages } = recordingProvider();
+    const verifier = makeProviderVerifier(provider);
+    const units = [U("policy-a", "Access control policy v2"), U("policy-b", "Incident response policy v1")];
+    await verifier({ task: "check compliance", claim: "the access policy exists", units });
+    const firstMessage = lastMessages()?.find((m) => m.role === "user")?.content ?? "";
+    await verifier({ task: "check compliance", claim: "a totally different claim about incident response", units });
+    const secondMessage = lastMessages()?.find((m) => m.role === "user")?.content ?? "";
+    // Both messages must share an identical PREFIX that actually contains
+    // the units content -- not just shared label boilerplate ("Task: ...
+    // Claim to verify:") that happens to precede the variable claim text
+    // regardless of ordering. Find the longest common prefix directly and
+    // assert it extends past where the (larger) units content lives.
+    let i = 0;
+    while (i < firstMessage.length && i < secondMessage.length && firstMessage[i] === secondMessage[i]) i++;
+    const sharedPrefix = firstMessage.slice(0, i);
+    expect(sharedPrefix).toContain("Access control policy v2");
+    expect(sharedPrefix).toContain("Incident response policy v1");
+  });
+});
+
 describe("formatGrounded — the two-part artifact", () => {
   const units = [U("deploy-guide", "Deploy via the pipeline"), U("runbook", "Roll back with the runbook")];
 
