@@ -108,10 +108,15 @@ const EVALUATOR_SYSTEM =
 /** A production evaluator backed by the pluggable provider interface. */
 export function makeProviderEvaluator(provider: SynthesisProvider): ConfidenceEvaluator {
   return async ({ task, answer, units }) => {
+    // Units first, task+answer last -- same prefix-cache reasoning as
+    // ground.ts's buildVerifierUserMessage(): every requirement checked
+    // against the same document calls this evaluator with the same units,
+    // so putting the large constant part first lets a server that does
+    // longest-common-prefix KV-cache reuse actually benefit.
     const knowledge = units.map((u) => `<unit id="${u.id}">\n${u.content}\n</unit>`).join("\n\n");
     const messages: Message[] = [
       { role: "system", content: EVALUATOR_SYSTEM },
-      { role: "user", content: `Task: ${task}\n\nAnswer to evaluate:\n${answer}\n\nLoaded units:\n\n${knowledge}` },
+      { role: "user", content: `Loaded units:\n\n${knowledge}\n\nTask: ${task}\n\nAnswer to evaluate:\n${answer}` },
     ];
     const text = await provider.complete(messages, { maxTokens: 256 });
     try {

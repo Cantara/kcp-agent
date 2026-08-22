@@ -65,15 +65,32 @@ const VERIFIER_SYSTEM =
   "of the ids provided. If no unit supports the claim, return null. Be strict: partial or tangential overlap is not support.";
 
 /**
+ * Builds the verifier's user message with the large, constant part (loaded
+ * units) FIRST and the small, per-call part (task/claim) LAST. groundAnswer()
+ * calls the verifier once per claim in a synthesized answer -- often 6-11
+ * times, per the local-LLM benchmark that surfaced this -- always against
+ * the SAME units. Servers that do longest-common-prefix KV-cache reuse
+ * (llama-server's prompt cache, for one) can only benefit if the shared
+ * content is an actual prefix; putting the varying claim first, as the
+ * original ordering did, defeated that entirely. Measured live against a
+ * local model: prompt processing dominated wall-clock far more than
+ * generation once reasoning was disabled, so this ordering is a real,
+ * measured lever, not a theoretical one.
+ */
+function buildVerifierUserMessage(task: string, claim: string, units: GroundUnit[]): string {
+  const knowledge = units.map((u) => `<unit id="${u.id}">\n${u.content}\n</unit>`).join("\n\n");
+  return `Loaded units:\n\n${knowledge}\n\nTask: ${task}\n\nClaim to verify:\n${claim}`;
+}
+
+/**
  * A production verifier backed by the provider interface.
  * Uses the pluggable LLM layer so the verifier works with any supported model.
  */
 export function makeProviderVerifier(provider: SynthesisProvider): Verifier {
   return async ({ task, claim, units }) => {
-    const knowledge = units.map((u) => `<unit id="${u.id}">\n${u.content}\n</unit>`).join("\n\n");
     const messages: Message[] = [
       { role: "system", content: VERIFIER_SYSTEM },
-      { role: "user", content: `Task: ${task}\n\nClaim to verify:\n${claim}\n\nLoaded units:\n\n${knowledge}` },
+      { role: "user", content: buildVerifierUserMessage(task, claim, units) },
     ];
     const text = await provider.complete(messages, { maxTokens: 256 });
     try {
@@ -108,14 +125,11 @@ export function makeClaudeVerifier(
   return async ({ task, claim, units }) => {
     const Anthropic = await loadSdk();
     const client = new Anthropic();
-    const knowledge = units.map((u) => `<unit id="${u.id}">\n${u.content}\n</unit>`).join("\n\n");
     const message = await client.messages.create({
       model,
       max_tokens: 256,
       system: VERIFIER_SYSTEM,
-      messages: [
-        { role: "user", content: `Task: ${task}\n\nClaim to verify:\n${claim}\n\nLoaded units:\n\n${knowledge}` },
-      ],
+      messages: [{ role: "user", content: buildVerifierUserMessage(task, claim, units) }],
     });
     const text = message.content
       .filter((b): b is { type: "text"; text: string } & typeof b => b.type === "text")

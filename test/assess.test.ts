@@ -195,4 +195,24 @@ describe("makeProviderEvaluator", () => {
     expect(s.score).toBe(0);
     expect(s.reasoning).toMatch(/unparseable/i);
   });
+
+  it("puts the loaded units BEFORE the task and answer, for the same prefix-cache reason as the verifier fix in ground.ts — multiple requirements checked against the same document all share this evaluator call, same units each time", async () => {
+    let captured: string | undefined;
+    const recording: SynthesisProvider = {
+      name: "fake",
+      complete: async (messages) => {
+        captured = (messages.find((m) => m.role === "user")?.content as string) ?? "";
+        return '{"score": 0.5, "reasoning": "x"}';
+      },
+      stream: async function* () {},
+    } as unknown as SynthesisProvider;
+    const ev = makeProviderEvaluator(recording);
+    await ev({ task: "UNIQUE_TASK_MARKER", answer: "UNIQUE_ANSWER_MARKER", units: [U("u1", "UNIQUE_UNIT_MARKER")] });
+    const unitIdx = captured?.indexOf("UNIQUE_UNIT_MARKER") ?? -1;
+    const taskIdx = captured?.indexOf("UNIQUE_TASK_MARKER") ?? -1;
+    const answerIdx = captured?.indexOf("UNIQUE_ANSWER_MARKER") ?? -1;
+    expect(unitIdx).toBeGreaterThanOrEqual(0);
+    expect(taskIdx).toBeGreaterThan(unitIdx);
+    expect(answerIdx).toBeGreaterThan(taskIdx);
+  });
 });
