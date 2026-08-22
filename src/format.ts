@@ -183,7 +183,12 @@ export function formatGrounded(g: GroundedAnswer): string {
   out.push(c.bold(`Grounded (${g.grounded.length}/${g.claims.length} claim${g.claims.length === 1 ? "" : "s"}):`));
   for (const claim of g.grounded) {
     out.push(`  ${c.green("●")} ${claim.claim}`);
-    out.push(`     ${c.dim(`↳ ${claim.unitId} · sha ${(claim.sha256 ?? "").slice(0, 12)}`)}`);
+    if (claim.groundedVia === "absence") {
+      const n = claim.reviewedUnits?.length ?? 0;
+      out.push(`     ${c.dim(`↳ confirmed absent — ${n} unit${n === 1 ? "" : "s"} reviewed`)}`);
+    } else {
+      out.push(`     ${c.dim(`↳ ${claim.unitId} · sha ${(claim.sha256 ?? "").slice(0, 12)}`)}`);
+    }
   }
   if (g.gaps.length) {
     out.push("");

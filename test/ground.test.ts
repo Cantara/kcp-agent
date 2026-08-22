@@ -9,8 +9,16 @@
 // deterministic layer, not trusted from the verifier.
 
 import { describe, it, expect } from "vitest";
-import { splitClaims, groundAnswer, type GroundUnit, type Verifier } from "../src/ground.js";
+import {
+  splitClaims,
+  groundAnswer,
+  makeProviderVerifier,
+  DEFAULT_VERIFIER_MAX_TOKENS,
+  type GroundUnit,
+  type Verifier,
+} from "../src/ground.js";
 import { formatGrounded } from "../src/format.js";
+import type { SynthesisProvider, Message, CompletionOptions } from "../src/provider.js";
 
 const U = (id: string, content: string): GroundUnit => ({ id, sha256: `sha-${id}`, content });
 
@@ -104,6 +112,104 @@ describe("groundAnswer — terminal grounding", () => {
   });
 });
 
+describe("groundAnswer — absence claims (the grounding-asymmetry fix)", () => {
+  // Root cause this section guards against: a claim like "the document lacks
+  // an information security policy" can never be textually SUPPORTED by any
+  // unit — no document supports a statement about what it doesn't contain.
+  // The old verifier contract (supportedBy: unitId | null) had no other path,
+  // so every absence claim fell through to "unsupported" no matter how
+  // correct it was. A verifier can now instead return `absenceConfirmed: true`
+  // after reviewing the FULL loaded set — groundAnswer adjudicates that the
+  // full set really was reviewed (same fail-closed spirit as citation
+  // checking: the verifier's word alone is a proposal, not the grounding).
+  const units = [U("policy-a", "Access control policy v2"), U("policy-b", "Incident response policy v1")];
+
+  it("grounds an absence claim the verifier confirms after reviewing all loaded units", async () => {
+    const absenceVerifier: Verifier = async () => ({ supportedBy: null, absenceConfirmed: true, note: "no unit addresses encryption-at-rest" });
+    const r = await groundAnswer("is data encrypted at rest?", "The document does not address encryption at rest.", units, {
+      verifier: absenceVerifier,
+    });
+    expect(r.status).toBe("grounded");
+    expect(r.gaps).toEqual([]);
+    expect(r.claims[0].grounded).toBe(true);
+    expect(r.claims[0].groundedVia).toBe("absence");
+    // no single citing unit — cited via the reviewed set, not one document
+    expect(r.claims[0].unitId).toBeUndefined();
+  });
+
+  it("pins the reviewed set (id + sha256) for every loaded unit, not just a subset", async () => {
+    const absenceVerifier: Verifier = async () => ({ supportedBy: null, absenceConfirmed: true });
+    const r = await groundAnswer("x", "Nothing here covers that.", units, { verifier: absenceVerifier });
+    expect(r.claims[0].reviewedUnits).toEqual([
+      { id: "policy-a", sha256: "sha-policy-a" },
+      { id: "policy-b", sha256: "sha-policy-b" },
+    ]);
+  });
+
+  it("does NOT ground an absence claim the verifier can't confirm — absenceConfirmed defaults to a gap, same as before", async () => {
+    const unsure: Verifier = async () => ({ supportedBy: null, note: "cannot rule out encryption is covered elsewhere" });
+    const r = await groundAnswer("x", "The document does not address encryption.", units, { verifier: unsure });
+    expect(r.status).toBe("partial-unsupported");
+    expect(r.gaps).toHaveLength(1);
+  });
+
+  it("a positive supportedBy citation still wins over absenceConfirmed if a verifier (wrongly) sets both — citation is adjudicated, never trusted blindly, so this is deliberately not a crash but a defined precedence", async () => {
+    const both: Verifier = async () => ({ supportedBy: "policy-a", absenceConfirmed: true });
+    const r = await groundAnswer("x", "Access control policy v2 exists.", units, { verifier: both });
+    expect(r.claims[0].groundedVia).toBe("citation");
+    expect(r.claims[0].unitId).toBe("policy-a");
+  });
+
+  it("REGRESSION: existing citation-based grounding still works, now consistently labeled", async () => {
+    const r = await groundAnswer("x", "Access control policy v2.", units, { verifier: substringVerifier });
+    expect(r.claims[0].grounded).toBe(true);
+    expect(r.claims[0].unitId).toBe("policy-a");
+    // both paths now set groundedVia consistently, so callers can always ask "how" — this is new,
+    // additive labeling on the existing citation path, not a behavior change to what gets grounded.
+    expect(r.claims[0].groundedVia).toBe("citation");
+  });
+});
+
+describe("makeProviderVerifier — token budget (the 256-token-cap fix)", () => {
+  // Root cause this section guards against: a reasoning/thinking model spends
+  // its entire completion budget on chain-of-thought and returns an empty
+  // string once truncated at 256 tokens — both roles (verifier AND
+  // evaluator, though evaluator is assess.ts's concern) then fail closed,
+  // which reads as "small/local models can't emit JSON" when the real cause
+  // is the cap. The fix: make the budget configurable with a much higher
+  // default, not a silent hardcoded 256.
+  function recordingProvider(): { provider: SynthesisProvider; calls: (Message[] | undefined)[]; opts: (CompletionOptions | undefined)[] } {
+    const opts: (CompletionOptions | undefined)[] = [];
+    const calls: (Message[] | undefined)[] = [];
+    const provider: SynthesisProvider = {
+      name: "test",
+      model: "test-model",
+      complete: async (messages, options) => {
+        calls.push(messages);
+        opts.push(options);
+        return JSON.stringify({ supportedBy: null });
+      },
+      stream: async function* () {},
+    };
+    return { provider, calls, opts };
+  }
+
+  it("defaults to a budget well above the old 256-token cap", async () => {
+    const { provider, opts } = recordingProvider();
+    const verifier = makeProviderVerifier(provider);
+    await verifier({ task: "x", claim: "x", units: [] });
+    expect(opts[0]?.maxTokens).toBe(DEFAULT_VERIFIER_MAX_TOKENS);
+    expect(DEFAULT_VERIFIER_MAX_TOKENS).toBeGreaterThan(256);
+  });
+
+  it("is configurable per call, for callers who know their model needs more or less", async () => {
+    const { provider, opts } = recordingProvider();
+    const verifier = makeProviderVerifier(provider, { maxTokens: 8192 });
+    await verifier({ task: "x", claim: "x", units: [] });
+    expect(opts[0]?.maxTokens).toBe(8192);
+  });
+});
+
 describe("formatGrounded — the two-part artifact", () => {
   const units = [U("deploy-guide", "Deploy via the pipeline"), U("runbook", "Roll back with the runbook")];
 
@@ -129,5 +235,15 @@ describe("formatGrounded — the two-part artifact", () => {
     const g = await groundAnswer("x", "One. Two. Three.", units, { verifier: substringVerifier, maxGaps: 1 });
     const out = formatGrounded(g);
     expect(out).toMatch(/2 more/);
+  });
+
+  it("renders an absence-grounded claim without crashing on the missing single unitId, showing the reviewed-set count instead", async () => {
+    const absenceVerifier: Verifier = async () => ({ supportedBy: null, absenceConfirmed: true });
+    const g = await groundAnswer("x", "Nothing here covers encryption.", units, { verifier: absenceVerifier });
+    const out = formatGrounded(g);
+    expect(out).toMatch(/Grounded \(1/);
+    expect(out).toContain("Nothing here covers encryption.");
+    expect(out).toMatch(/2 units? reviewed/i);
+    expect(out).not.toMatch(/undefined/);
   });
 });
