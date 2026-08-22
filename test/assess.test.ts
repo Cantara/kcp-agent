@@ -196,6 +196,21 @@ describe("makeProviderEvaluator", () => {
     expect(s.reasoning).toMatch(/unparseable/i);
   });
 
+  it("token budget defaults well above the old 256-token cap that truncated reasoning models to empty output", async () => {
+    let seenMaxTokens: number | undefined;
+    const recording: SynthesisProvider = {
+      name: "fake",
+      complete: async (_messages, options) => {
+        seenMaxTokens = options?.maxTokens;
+        return '{"score": 0.5, "reasoning": "x"}';
+      },
+      stream: async function* () {},
+    } as unknown as SynthesisProvider;
+    const ev = makeProviderEvaluator(recording);
+    await ev({ task: "t", answer: "a", units: UNITS });
+    expect(seenMaxTokens).toBeGreaterThan(256);
+  });
+
   it("puts the loaded units BEFORE the task and answer, for the same prefix-cache reason as the verifier fix in ground.ts — multiple requirements checked against the same document all share this evaluator call, same units each time", async () => {
     let captured: string | undefined;
     const recording: SynthesisProvider = {
