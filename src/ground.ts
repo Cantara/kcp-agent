@@ -54,7 +54,17 @@ export interface Gap {
   reason: string;
 }
 
-export type GroundStatus = "grounded" | "partial-unsupported";
+/**
+ * "grounded"             every claim is backed — by citation or confirmed absence.
+ * "partial-unsupported"  there were claims, and at least one could not be substantiated.
+ * "ungrounded"           there were NO claims to check, so nothing was substantiated.
+ *
+ * The third case is not a variant of the second: "partial-unsupported" reports a
+ * failed verification, "ungrounded" reports that verification never happened. It
+ * exists because deriving status from "are there gaps?" alone made an empty answer
+ * produce zero gaps and read as fully grounded — see groundAnswer.
+ */
+export type GroundStatus = "grounded" | "partial-unsupported" | "ungrounded";
 
 export interface GroundedAnswer {
   status: GroundStatus;
@@ -256,7 +266,11 @@ export async function groundAnswer(
   const gaps: Gap[] = allGaps.slice(0, maxGaps).map((c) => ({ claim: c.claim, reason: c.reason ?? "unsupported" }));
 
   return {
-    status: allGaps.length === 0 ? "grounded" : "partial-unsupported",
+    // An answer with no claims is not grounded — it is unverifiable. Deriving
+    // this from allGaps alone reported the empty set as "grounded", because no
+    // claims means no gaps. That let a caller sign a grounded finding in which
+    // the verifier was never once invoked.
+    status: claims.length === 0 ? "ungrounded" : allGaps.length === 0 ? "grounded" : "partial-unsupported",
     claims,
     grounded,
     gaps,

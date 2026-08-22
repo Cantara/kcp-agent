@@ -203,7 +203,9 @@ export function formatGrounded(g: GroundedAnswer): string {
   out.push(
     g.status === "grounded"
       ? c.green("✓ grounded — every claim is backed by a loaded, hash-pinned unit")
-      : c.yellow(`⚠ partial-unsupported — ${g.gaps.length + g.gapsTruncated} claim(s) could not be substantiated`)
+      : g.status === "ungrounded"
+        ? c.red("✗ ungrounded — the answer contained no claims to check, so nothing was verified")
+        : c.yellow(`⚠ partial-unsupported — ${g.gaps.length + g.gapsTruncated} claim(s) could not be substantiated`)
   );
   out.push("");
   return out.join("\n");
