@@ -36,7 +36,9 @@ jobs:
           node-version: 22
 
       - name: Setup Rust (wasm target)
-        uses: dtolnay/rust-toolchain@stable
+        # Pinned to match the wasm-parity job in ci.yml -- see the comment there.
+        # These builds ship artifacts, so a compiler nobody chose must not select itself.
+        uses: dtolnay/rust-toolchain@1.97.1
         with:
           targets: wasm32-unknown-unknown
 

@@ -25,7 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # Pinned to match the wasm-parity job in ci.yml -- see the comment there.
+      # These builds ship artifacts, so a compiler nobody chose must not select itself.
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: clippy
       - run: cargo test --manifest-path ${{ env.CRATE_DIR }}/Cargo.toml --locked
@@ -56,7 +58,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
           targets: ${{ matrix.target }}
       # Cross linkers for the Linux musl targets (incl. aarch64). No-op elsewhere.
@@ -121,7 +123,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/rust-v')
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
       - name: cargo publish
         env:
           TOKEN: ${{ secrets.CRATES_IO_TOKEN }}

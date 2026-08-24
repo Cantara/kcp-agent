@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: clippy
       - run: cargo test --manifest-path rust/kcp-planner/Cargo.toml --locked
@@ -72,7 +72,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: dtolnay/rust-toolchain@stable
+      # Pinned, NOT @stable. The wasm-bindgen crate and CLI are pinned to each
+      # other at =0.2.126, but both float against the compiler -- and that is
+      # what broke this job. Last green run used rustc 1.97.1 (2026-08-03); the
+      # first red one used 1.98.0, with no .rs, Cargo.*, build script or
+      # workflow change in between. wasm32-unknown-unknown picks up
+      # newly-stabilised WASM features as defaults, which 0.2.126 cannot load:
+      #   CompileError: WebAssembly.instantiate(): unknown import kind 0x7f
+      # Bump this deliberately, together with wasm-bindgen, not by drifting.
+      - uses: dtolnay/rust-toolchain@1.97.1
         with:
           targets: wasm32-unknown-unknown
       - uses: taiki-e/install-action@v2
