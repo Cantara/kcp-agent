@@ -73,6 +73,23 @@ if (gzip >= MAX_GZIP) {
 if (over) process.exit(1);
 console.log(`✓ within size budget (< ${kb(MAX_RAW)} raw, < ${kb(MAX_GZIP)} gzipped)`);
 
+// A module that no engine can load still builds, still shrinks, and still fits
+// the budget above -- so without this check a broken artifact deploys GREEN.
+// That is exactly what happened on 2026-08-13: binaryen 132 began emitting an
+// import section V8 rejects, deploy.yml published it to Pages without a single
+// red build, and the only signal anywhere was ci.yml's wasm-parity job.
+// Validating the bytes we are about to ship is one line and closes that gap.
+try {
+  await WebAssembly.compile(readFileSync(WASM_OUT));
+} catch (e) {
+  console.error(`✗ the built module does not compile: ${e.message}`);
+  console.error("  The bytes are unloadable by any engine -- do NOT ship this.");
+  console.error("  Most likely the wasm-opt (binaryen) version emitted something");
+  console.error("  the runtime cannot decode; check the pin in the workflow.");
+  process.exit(1);
+}
+console.log("✓ module compiles (WebAssembly.compile)");
+
 // The WASM module is the shipping planner — record its integrity hash for the
 // site's Receipts section (anyone can reproduce it from source).
 const sha256 = createHash("sha256").update(readFileSync(WASM_OUT)).digest("hex");
