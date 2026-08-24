@@ -96,9 +96,15 @@ describe("groundAnswer — terminal grounding", () => {
     expect(r.claims.every((c) => !c.grounded)).toBe(true);
   });
 
-  it("an empty answer grounds vacuously — nothing asserted, nothing to gap", async () => {
+  // REVERSED 2026-08-22. This asserted `status: "grounded"` for an empty answer,
+  // on the vacuous-truth reading: no claims, so "every claim is backed" holds.
+  // That is sound logic and the wrong semantics for a safety property — the
+  // caller cannot tell it apart from a real grounding, and one did exactly that
+  // in production (see the "no claims is NOT grounded" block below for the field
+  // report). Nothing is asserted, so nothing is grounded: "ungrounded".
+  it("an empty answer is ungrounded — nothing asserted means nothing verified", async () => {
     const r = await groundAnswer("x", "", units, { verifier: substringVerifier });
-    expect(r.status).toBe("grounded");
+    expect(r.status).toBe("ungrounded");
     expect(r.claims).toEqual([]);
     expect(r.gaps).toEqual([]);
   });
@@ -167,6 +173,58 @@ describe("groundAnswer — absence claims (the grounding-asymmetry fix)", () => 
     // both paths now set groundedVia consistently, so callers can always ask "how" — this is new,
     // additive labeling on the existing citation path, not a behavior change to what gets grounded.
     expect(r.claims[0].groundedVia).toBe("citation");
+  });
+});
+
+describe("groundAnswer — an answer with no claims is NOT grounded (fail-open fix)", () => {
+  // Root cause this section guards against: `status` was derived purely from
+  // "are there any gaps?", so an answer that yields ZERO claims produced zero
+  // gaps and was reported "grounded" — vacuously. Nothing was verified, and the
+  // verifier was never even called, yet the caller receives the same
+  // status: "grounded" it would get from a fully cited answer.
+  //
+  // Found 2026-08-22 running Sara against a local model (Qwen3-8B). A small
+  // model frequently answers with nothing but the self-report trailer Sara asks
+  // for — the entire completion is `Conclusion: not_fulfilled.\nConfidence: 0.9.`
+  // Sara strips that trailer before grounding (correctly — it is a statement
+  // about the verdict, not about the document), which leaves the empty string,
+  // which splits into no claims. Sara then signed a grounded, 0.95-confidence
+  // finding in which not one claim had been checked: 7 of 8 evaluations.
+  //
+  // Grounding is a positive assertion that the answer rests on the loaded
+  // units. An empty answer cannot rest on anything, so the honest status is
+  // "ungrounded" — fail closed, consistent with how every other unprovable
+  // case in this file behaves.
+  const units = [U("policy-a", "Access control policy v2")];
+
+  it("reports ungrounded, not grounded, for an answer that yields no claims", async () => {
+    let called = 0;
+    const verifier: Verifier = async () => { called += 1; return { supportedBy: "policy-a" }; };
+    const r = await groundAnswer("x", "", units, { verifier });
+    expect(r.status).toBe("ungrounded");
+    expect(r.claims).toEqual([]);
+    expect(r.grounded).toEqual([]);
+    // the verifier is never consulted, which is exactly why the old status was
+    // indistinguishable from a real grounding
+    expect(called).toBe(0);
+  });
+
+  it("treats a whitespace-only answer the same as an empty one", async () => {
+    const verifier: Verifier = async () => ({ supportedBy: "policy-a" });
+    const r = await groundAnswer("x", "   \n\n  \t ", units, { verifier });
+    expect(r.status).toBe("ungrounded");
+  });
+
+  it("REGRESSION: an answer that does yield claims is unaffected", async () => {
+    const r = await groundAnswer("x", "Access control policy v2.", units, { verifier: substringVerifier });
+    expect(r.status).toBe("grounded");
+    expect(r.claims).toHaveLength(1);
+  });
+
+  it("REGRESSION: a claim-bearing answer that fails verification still reports partial-unsupported, not ungrounded", async () => {
+    const never: Verifier = async () => ({ supportedBy: null });
+    const r = await groundAnswer("x", "Something the units never say.", units, { verifier: never });
+    expect(r.status).toBe("partial-unsupported");
   });
 });
 
