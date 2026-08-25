@@ -78,7 +78,13 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-bindgen-cli@0.2.126
-      - run: npm i -g binaryen # provides wasm-opt
+      # Pinned. binaryen 132.0.0 (2026-08-13) emits an import section that V8
+      # cannot decode -- "unknown import kind 0x7f" -- from the same input that
+      # 131 optimizes fine. Unpinned, `npm i -g binaryen` picked it up silently
+      # and broke this job. Verified locally: identical rustc/wasm-bindgen/Node,
+      # only wasm-opt swapped -> 131 passes parity, 132 fails.
+      # Bump deliberately, and re-run wasm-parity when you do.
+      - run: npm i -g binaryen@131.0.0 # provides wasm-opt
       - name: Build WASM module (enforces the size budget)
         run: npm run build:wasm
       - name: Build native CLI (the parity reference)
