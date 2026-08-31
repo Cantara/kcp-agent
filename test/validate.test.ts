@@ -97,7 +97,7 @@ units:
     expect(level(validateManifest(m), "error").some((e) => e.includes("no agent can ever qualify"))).toBe(true);
   });
 
-  it("warns when not_for contains the unit's own vocabulary (self-sabotaging gate)", () => {
+  it("warns when not_for contains the unit's own vocabulary (self-sabotaging routing)", () => {
     const m = parseManifest(`
 project: p
 version: 1.0.0

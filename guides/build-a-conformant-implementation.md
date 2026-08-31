@@ -34,15 +34,16 @@ with that exact reason string (the strings are part of the contract — a consum
 
 1. **Audience** — if `audience` is non-empty and does not include the agent's `role`:
    `audience ["human"] excludes role 'agent'`.
-2. **Negative space (`not_for`)** — if any `not_for` phrase contains a task term:
-   `not_for declares it does not serve '<phrase>'`.
-3. **Temporal** (evaluated at `asOf`, UTC): before `valid_from` → `not active until <date>`; after
+2. **Relevance** — score the unit (see §3); score 0 → `no task-relevance match`.
+3. **Negative space (`not_for`)** — compare complete tokens after scoring. By default a match
+   halves the score (floored, minimum 1), keeps the unit, and adds a `not_for match: '<phrase>'`
+   caution. With `not_for_strict: true`, skip it with a reason naming the matched phrase.
+4. **Temporal** (evaluated at `asOf`, UTC): before `valid_from` → `not active until <date>`; after
    `valid_until` → `expired <date> (superseded by <id>)` (the parenthetical only if declared);
    `deprecated: true` → `deprecated`.
-4. **Supersession precedence** — even inside a validity overlap, if the unit's declared
+5. **Supersession precedence** — even inside a validity overlap, if the unit's declared
    `superseded_by` successor is itself selectable at `asOf`, skip the predecessor:
    `superseded by <id> (successor active)` (spec §4.22).
-5. **Relevance** — score the unit (see §3); score 0 → `no task-relevance match`.
 
 A unit that survives all five is **selected**, then evaluated for **load-eligibility** (it stays in
 the plan either way, so the caller sees the gate; `--strict` drops non-eligible units instead).
@@ -70,13 +71,18 @@ Eligibility is reduced by, in order, appending a reason each time:
 
 Tokenize the task and each unit's `intent`, `triggers`, and `id`+`path` with the **same** tokenizer:
 lowercase, split on any non-letter/digit (Unicode-aware), drop tokens ≤ 2 chars and a small stopword
-set (see `terms()` in `planner.ts`). Then:
+set, then deduplicate while preserving first occurrence (see `terms()` in `planner.ts`). Match only
+complete equal tokens. There is no stemming, fuzzy matching, or substring aliasing: publishers add
+intended forms such as `deploy`, `deployed`, and `deployment` explicitly to `triggers`. Then:
 
 ```
-score = 3 × (task terms found in intent)
-      + 4 × (task terms found in triggers)   // triggers match either direction: term⊂trigger or trigger⊂term
-      + 2 × (task terms found in id+path)
+score = 3 × (distinct task terms found in intent)
+      + 4 × (distinct task terms found in triggers)
+      + 2 × (distinct task terms found in id+path)
 ```
+
+Each reason names the exact contributing terms for its field, so another implementation can explain
+its score rather than only reproduce the total.
 
 ## 4. Selection order and the ceilings
 
@@ -117,8 +123,8 @@ with the reference on scoring, every gate, temporal precedence, federation slici
 
 - The skip/eligibility **reason strings are verbatim contract**, punctuation and all. Reproduce them
   exactly, or emit your own and let consumers lose the shared vocabulary.
-- The tokenizer must match, including the bidirectional trigger match and the stopword list — most
-  early mismatches are scoring, not gating.
+- The tokenizer must match, including first-occurrence deduplication, complete-token matching, and
+  the stopword list — most early mismatches are scoring, not gating.
 - `asOf` is the *only* source of "now". Never read the system clock inside the planner.
 - Order matters in every array; sort exactly as in §4.
 

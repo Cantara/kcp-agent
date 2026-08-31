@@ -122,6 +122,7 @@ function parseUnit(v: Raw): Unit {
     auth_scope: asStr(v["auth_scope"]),
     deprecated: v["deprecated"] === undefined ? undefined : Boolean(v["deprecated"]),
     not_for: asStrArr(v["not_for"]),
+    not_for_strict: v["not_for_strict"] === undefined ? undefined : Boolean(v["not_for_strict"]),
     kind: asStr(v["kind"]),
     steps: parseSteps(v["steps"]),
     authority_level: asStr(v["authority_level"]),

@@ -43,7 +43,7 @@ The planner evaluates gates in a fixed cascade and stops at the first rejection.
 For governed skills the relevant ones are:
 
 ```
-audience → not_for → temporal → deprecated → supersession → relevance
+audience → relevance → not_for → temporal → deprecated → supersession
         → skill_eligibility → attestation → payment → access → strict
         → max_units → money_budget → context_budget
 ```

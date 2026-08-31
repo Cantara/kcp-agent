@@ -11,7 +11,7 @@ import type { Manifest, Unit } from "./model.js";
 import {
   plan,
   terms,
-  scoreUnit,
+  evaluateRouting,
   unitTokens,
   temporalStatus,
   selectableSuccessor,
@@ -45,8 +45,8 @@ export type GateName =
 
 /** The full cascade in order. */
 export const GATE_ORDER: readonly GateName[] = [
-  "audience", "not_for", "temporal", "deprecated", "supersession",
-  "relevance", "skill_eligibility", "attestation", "payment", "access", "strict",
+  "audience", "relevance", "not_for", "temporal", "deprecated", "supersession",
+  "skill_eligibility", "attestation", "payment", "access", "strict",
   "max_units", "money_budget", "context_budget",
 ] as const;
 
@@ -74,6 +74,8 @@ export interface UnitTrace {
   tokens?: { value?: number; source: "declared" | "estimated" | "unmeasured" };
   /** Money cost attribution (only for pay-per-request selected units). */
   cost?: { amount?: number; currency?: string; method: string };
+  /** Advisory negative-routing annotation when `not_for` demoted this result. */
+  caution?: string;
   /** Declared action scope, verbatim from the manifest (only for selected units, #100). */
   action_scope?: Unit["action_scope"];
 }
@@ -110,8 +112,8 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
   const upstreamSpent = budget?.spent ?? 0;
   const contextBudget = options.contextBudget;
 
-  const selectedIds = new Set(p.selected.map((u) => u.id));
-  const skippedMap = new Map(p.skipped.map((s) => [s.id, s.reason]));
+  const selectedById = new Map(p.selected.map((u) => [u.id, u] as const));
+  const selectedIds = new Set(selectedById.keys());
 
   const ar = manifest.trust?.agent_requirements;
   const requiresAttestation = !!ar?.require_attestation;
@@ -158,16 +160,29 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
     }
     if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
 
-    // 2. not_for
-    const nf = (unit.not_for ?? []).find((n) => taskTerms.some((t) => n.toLowerCase().includes(t)));
-    if (nf) {
-      reject("not_for", `not_for declares it does not serve '${nf}'`);
+    // 2. relevance — canonical term matching and attribution come from evaluateRouting,
+    // the same implementation plan() uses. The positive score is shown here; any advisory
+    // demotion is then attributed to the following not_for gate (§15.11).
+    const routing = evaluateRouting(unit, taskTerms);
+    score = routing.score;
+    if (routing.baseScore === 0) {
+      reject("relevance", "no task-relevance match");
+    } else {
+      pass("relevance", `score ${routing.baseScore}: ${routing.baseReasons.join("; ")}`);
+    }
+    if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
+
+    // 3. not_for — exact-token matching; advisory by default, strict only on opt-in.
+    if (routing.negative?.strict) {
+      reject("not_for", routing.negative.detail);
+    } else if (routing.negative) {
+      pass("not_for", routing.negative.detail);
     } else {
       pass("not_for", unit.not_for?.length ? `task terms do not match ${JSON.stringify(unit.not_for)}` : "no not_for declarations");
     }
     if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
 
-    // 3. temporal
+    // 4. temporal
     const ts = temporalStatus(unit, asOf);
     if (ts === "future") {
       reject("temporal", `not active until ${unit.temporal?.valid_from}`);
@@ -193,16 +208,6 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       reject("supersession", `superseded by ${successor} (successor active)`);
     } else {
       pass("supersession", unit.temporal?.superseded_by ? `successor '${unit.temporal.superseded_by}' not active` : "no supersession declared");
-    }
-    if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
-
-    // 6. relevance
-    const { score: s, reasons } = scoreUnit(unit, taskTerms);
-    score = s;
-    if (score === 0) {
-      reject("relevance", "no task-relevance match");
-    } else {
-      pass("relevance", `score ${score}: ${reasons.join("; ")}`);
     }
     if (rejected) { candidates.push({ unit, gates, rejected, rejectedBy, score, loadEligible, payment }); continue; }
 
@@ -449,6 +454,8 @@ export function trace(manifest: Manifest, task: string, options: PlanOptions = {
       if (c.payment.method !== "free" && c.payment.pricePerRequest !== undefined) {
         ut.cost = { amount: c.payment.pricePerRequest, currency: c.payment.currency, method: c.payment.method };
       }
+      const planned = selectedById.get(c.unit.id);
+      if (planned?.caution) ut.caution = planned.caution;
       if (c.unit.action_scope) ut.action_scope = c.unit.action_scope;
     }
     return ut;

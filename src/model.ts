@@ -92,6 +92,8 @@ export interface Unit {
   auth_scope?: string;
   deprecated?: boolean;
   not_for?: string[];
+  /** Opt-in hard exclusion when a query matches `not_for`; absent/false is advisory (§4.20). */
+  not_for_strict?: boolean;
   payment?: Payment;
   rate_limits?: RateLimits;
   temporal?: Temporal;

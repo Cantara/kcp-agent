@@ -1,8 +1,8 @@
 {
   "name": "not-for-negative-target",
-  "spec": "§4",
-  "description": "a unit its publisher scoped out via not_for is skipped even when relevant",
-  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n",
+  "spec": "§4.20",
+  "description": "a relevant unit with not_for_strict is excluded with the matched phrase named",
+  "manifest": "kcp_version: \"0.25\"\nproject: hr\nversion: 1.0.0\nunits:\n  - id: salary-review\n    path: hr/salary.md\n    intent: \"Annual salary review for the merger integration team\"\n    audience: [human]\n    triggers: [salary, review, merger]\n  - id: press-kit\n    path: comms/press.md\n    intent: \"Press kit for the merger announcement\"\n    audience: [agent, human]\n    triggers: [press, merger, announcement]\n    not_for: [salary negotiation]\n    not_for_strict: true\n",
   "task": "salary negotiation press",
   "options": {
     "asOf": "2026-07-06",

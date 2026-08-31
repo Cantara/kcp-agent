@@ -583,7 +583,7 @@ manifest currently declares `kcp_version: 0.21` — the manifests are compatible
 | Spec layer | Section | Where |
 |------------|---------|-------|
 | Query scoring (intent / triggers / id+path) | §15 | `planner.ts` `scoreUnit` |
-| Audience & `not_for` targeting | §4 | `planner.ts` audience/negative gates |
+| Audience & `not_for` / `not_for_strict` targeting | §4.20 | `planner.ts` relevance/negative-routing gates |
 | Access is the auth axis — payment never substitutes | §4.11 | `planner.ts` access gate |
 | Temporal validity & supersession | §4.22 | `planner.ts` `temporalStatus` |
 | Agent attestation requirements | §3.2 | `planner.ts` trust gate |

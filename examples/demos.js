@@ -681,9 +681,9 @@ const SCENARIOS = [
         ]},
       ];
       // The footgun: the same manifest as a pre-publish draft (no signature yet)
-      // with not_for rewritten as a negation of the unit's own topic — the
-      // authoring bug that deterministically hides the allergy unit from
-      // exactly the family that needs it.
+      // with not_for rewritten as a negation of the unit's own topic and strict
+      // exclusion enabled — the authoring bug that deterministically hides the
+      // allergy unit from exactly the family that needs it.
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kcp-summer-'));
       let gated, lint;
       try {
@@ -691,7 +691,7 @@ const SCENARIOS = [
         const manifest = path.join(tmp, 'knowledge.yaml');
         fs.writeFileSync(manifest, fs.readFileSync(manifest, 'utf8')
           .replace('not_for: ["pollen forecasts", "pet hair in rental cars"]',
-                   'not_for: ["questions not about nut-free or allergen dining"]')
+                   'not_for: ["questions not about nut-free or allergen dining"]\n    not_for_strict: true')
           .replace(/signing:\n(  .*\n)+/, ''));
         const p = spawnSync('node', [CLI, 'plan', 'nut allergy safe dining for the kids', '--manifest', tmp], { encoding: 'utf8' });
         gated = stripAnsi((p.stdout || '').toString());
@@ -703,7 +703,7 @@ const SCENARIOS = [
       blocks.push({
         command:
           'kcp-agent plan "nut allergy safe dining for the kids" --manifest examples/summer/tourism-draft' +
-          '   # draft: not_for rewritten as a negation',
+          '   # draft: negated not_for with strict exclusion',
         lines: [
           ...pick(gated, ['allergen-dining:']).map((l) => c.yellow('  ' + l.trim())),
           '',
@@ -716,8 +716,9 @@ const SCENARIOS = [
     verdict:
       'The dangerous knowledge — allergy, accessibility, timetables — travels with signatures, ' +
       'credentials, validity windows and prices the planner enforces deterministically. And the ' +
-      'one authoring mistake that would silently hide the allergy unit from its own audience is ' +
-      'caught twice: as a written skip reason at plan time, and by validate before it ships.',
+      'one authoring mistake that would silently hide the allergy unit from its own audience when ' +
+      'strict exclusion is enabled is caught twice: as a written skip reason at plan time, and by ' +
+      'validate before it ships.',
   },
   {
     id: 'milky-way',
@@ -758,7 +759,7 @@ const SCENARIOS = [
           ]).map((l) => '  ' + l.trim()),
         ]},
         { command: press.command, lines: [
-          'the comms agent — R&D turns it away in its own words, brand catches it:',
+          'the comms agent — R&D strictly excludes it in its own words, brand catches it:',
           ...pick(press.stdout, ['formulations:', 'press-kit (']).map((l) => '  ' + l.trim()),
         ]},
         { command: salaryAgent.command, lines: [
@@ -785,8 +786,8 @@ const SCENARIOS = [
     },
     verdict:
       'One estate, five jobs, zero tribal knowledge: environment slicing, a future regulation ' +
-      'with a start date, audience targeting, not_for written in the excluded topic\'s own ' +
-      'words, HSM attestation for the crown jewels, an identity-gated vendor edge, and a ' +
+      'with a start date, audience targeting, strict not_for written in the excluded topic\'s ' +
+      'own words, HSM attestation for the crown jewels, an identity-gated vendor edge, and a ' +
       'subscription that moves the agent into the premium rate tier — every gate deterministic, ' +
       'every skip a sentence you could read to an auditor.',
   },
