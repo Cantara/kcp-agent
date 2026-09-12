@@ -97,13 +97,14 @@ describe("plan()", () => {
     expect(skipById["sales-deck"]).toMatch(/no task-relevance/);
   });
 
-  it("not_for negative targeting skips a unit its publisher scoped out (spec §4)", () => {
+  it("not_for negative targeting demotes and annotates by default (spec §4.20)", () => {
     const covered = plan(m, "gdpr data residency", { capabilities: { role: "agent" } });
     expect(covered.selected.map((u) => u.id)).toContain("eu-datasheet");
-    const excluded = plan(m, "gdpr medical advice", { capabilities: { role: "agent" } });
-    expect(excluded.selected.map((u) => u.id)).not.toContain("eu-datasheet");
-    const skip = excluded.skipped.find((s) => s.id === "eu-datasheet");
-    expect(skip?.reason).toBe("not_for declares it does not serve 'medical advice'");
+    const demoted = plan(m, "gdpr medical advice", { capabilities: { role: "agent" } });
+    const unit = demoted.selected.find((u) => u.id === "eu-datasheet");
+    expect(unit).toBeDefined();
+    expect(unit?.caution).toBe("not_for match: 'medical advice'");
+    expect(unit?.reasons.join(" ")).toContain("score demoted");
   });
 
   it("gates a restricted unit when the agent cannot attest", () => {

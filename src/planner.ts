@@ -192,6 +192,8 @@ export interface PlannedUnit {
   intent: string;
   score: number;
   reasons: string[];
+  /** Advisory negative-routing annotation (§4.20), e.g. `not_for match: 'end-user login'`. */
+  caution?: string;
   payment: PaymentPlan;
   requiresAttestation: boolean;
   loadEligible: boolean;
@@ -391,34 +393,124 @@ const STOPWORDS = new Set([
   "this", "that", "with", "my", "our", "can", "should", "will", "be", "get", "getting",
 ]);
 
-/** Tokenize a task/text into matchable terms — shared with `validate` so the lint sees exactly what the planner sees. */
+/**
+ * Tokenize task/metadata text into distinct matchable terms. The first occurrence wins so
+ * repeated query words cannot inflate a score. Shared with `validate` so lint and planning
+ * use the same Unicode-aware token boundaries.
+ */
 export function terms(task: string): string[] {
-  return task
+  const tokens = task
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u) // any-script letters/digits — "strømnett" is one term, not two fragments
     .filter((t) => t.length > 2 && !STOPWORDS.has(t));
+  return [...new Set(tokens)];
 }
 
-/** Score a unit against the task terms — mirrors the intent/trigger/id/path signal `kcp query` uses. */
-export function scoreUnit(unit: Unit, taskTerms: string[]): { score: number; reasons: string[] } {
-  const reasons: string[] = [];
-  let score = 0;
-  const intent = unit.intent.toLowerCase();
-  const triggers = unit.triggers.map((t) => t.toLowerCase());
-  const idPath = `${unit.id} ${unit.path}`.toLowerCase();
+export interface ScoreAttribution {
+  intent: string[];
+  triggers: string[];
+  idPath: string[];
+}
 
-  let intentHits = 0;
-  let triggerHits = 0;
-  let idHits = 0;
-  for (const t of taskTerms) {
-    if (intent.includes(t)) intentHits++;
-    if (triggers.some((tr) => tr.includes(t) || t.includes(tr))) triggerHits++;
-    if (idPath.includes(t)) idHits++;
+export interface ScoreResult {
+  score: number;
+  reasons: string[];
+  matches: ScoreAttribution;
+}
+
+export interface NegativeRoutingDecision {
+  phrase: string;
+  matchedTerms: string[];
+  strict: boolean;
+  detail: string;
+  caution?: string;
+}
+
+export interface RoutingEvaluation extends ScoreResult {
+  baseScore: number;
+  baseReasons: string[];
+  negative?: NegativeRoutingDecision;
+}
+
+/** Return distinct query terms that occur as complete metadata tokens, in query order. */
+function matchingTerms(taskTerms: string[], text: string): string[] {
+  const queryTerms = [...new Set(taskTerms.map((t) => t.toLowerCase()))];
+  const textTerms = new Set(terms(text));
+  return queryTerms.filter((t) => textTerms.has(t));
+}
+
+/**
+ * Score a unit using exact Unicode tokens. An inflected or other intended variant must be
+ * declared explicitly in `triggers`; arbitrary character substrings are not aliases.
+ */
+export function scoreUnit(unit: Unit, taskTerms: string[]): ScoreResult {
+  const matches: ScoreAttribution = {
+    intent: matchingTerms(taskTerms, unit.intent),
+    triggers: matchingTerms(taskTerms, unit.triggers.join(" ")),
+    idPath: matchingTerms(taskTerms, `${unit.id} ${unit.path}`),
+  };
+  const score = matches.intent.length * 3 + matches.triggers.length * 4 + matches.idPath.length * 2;
+  const reasons: string[] = [];
+  if (matches.intent.length) reasons.push(`intent matches ${matches.intent.length} term(s): ${JSON.stringify(matches.intent)}`);
+  if (matches.triggers.length) reasons.push(`triggers match ${matches.triggers.length} term(s): ${JSON.stringify(matches.triggers)}`);
+  if (matches.idPath.length) reasons.push(`id/path matches ${matches.idPath.length} term(s): ${JSON.stringify(matches.idPath)}`);
+  return { score, reasons, matches };
+}
+
+/**
+ * Canonical positive + negative routing evaluation, shared by plan and trace so score,
+ * term attribution, demotion, and strict exclusion cannot drift. Advisory `not_for`
+ * deterministically halves the score (floor, minimum 1), matching the KCP query bridge.
+ */
+export function evaluateRouting(unit: Unit, taskTerms: string[]): RoutingEvaluation {
+  const positive = scoreUnit(unit, taskTerms);
+  const queryTerms = [...new Set(taskTerms.map((t) => t.toLowerCase()))];
+  let phrase: string | undefined;
+  let matchedTerms: string[] = [];
+  for (const entry of unit.not_for ?? []) {
+    const hits = matchingTerms(queryTerms, entry);
+    if (hits.length > 0) {
+      phrase = entry;
+      matchedTerms = hits;
+      break;
+    }
   }
-  if (intentHits) { score += intentHits * 3; reasons.push(`intent matches ${intentHits} term(s)`); }
-  if (triggerHits) { score += triggerHits * 4; reasons.push(`triggers match ${triggerHits} term(s)`); }
-  if (idHits) { score += idHits * 2; reasons.push(`id/path matches ${idHits} term(s)`); }
-  return { score, reasons };
+  if (!phrase || positive.score === 0) {
+    return { ...positive, baseScore: positive.score, baseReasons: positive.reasons };
+  }
+
+  const strict = unit.not_for_strict === true;
+  const matched = JSON.stringify(matchedTerms);
+  if (strict) {
+    return {
+      ...positive,
+      baseScore: positive.score,
+      baseReasons: positive.reasons,
+      negative: {
+        phrase,
+        matchedTerms,
+        strict: true,
+        detail: `not_for declares it does not serve '${phrase}'`,
+      },
+    };
+  }
+
+  const score = Math.max(1, Math.floor(positive.score / 2));
+  const detail = `not_for advisory match '${phrase}' (matched term(s): ${matched}); score demoted from ${positive.score} to ${score}`;
+  return {
+    ...positive,
+    baseScore: positive.score,
+    baseReasons: positive.reasons,
+    score,
+    reasons: [...positive.reasons, detail],
+    negative: {
+      phrase,
+      matchedTerms,
+      strict: false,
+      detail,
+      caution: `not_for match: '${phrase}'`,
+    },
+  };
 }
 
 /** UTC "today" as YYYY-MM-DD, without relying on locale. */
@@ -818,12 +910,20 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       skipped.push({ id: unit.id, reason: `audience ${JSON.stringify(unit.audience)} excludes role '${caps.role}'` });
       continue;
     }
-    // negative space (not_for)
-    const nf = (unit.not_for ?? []).find((n) => taskTerms.some((t) => n.toLowerCase().includes(t)));
-    if (nf) {
-      skipped.push({ id: unit.id, reason: `not_for declares it does not serve '${nf}'` });
+
+    // score first, then apply negative routing before temporal/top-N filtering (§15.11).
+    // evaluateRouting is also the trace's sole source for these decisions (#152).
+    const routing = evaluateRouting(unit, taskTerms);
+    if (routing.baseScore === 0) {
+      skipped.push({ id: unit.id, reason: "no task-relevance match" });
       continue;
     }
+    if (routing.negative?.strict) {
+      skipped.push({ id: unit.id, reason: routing.negative.detail });
+      continue;
+    }
+    const { score, reasons } = routing;
+
     // temporal
     const ts = temporalStatus(unit, asOf);
     if (ts === "future") { skipped.push({ id: unit.id, reason: `not active until ${unit.temporal?.valid_from}` }); continue; }
@@ -840,10 +940,6 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
       skipped.push({ id: unit.id, reason: `superseded by ${successor} (successor active)` });
       continue;
     }
-
-    // relevance
-    const { score, reasons } = scoreUnit(unit, taskTerms);
-    if (score === 0) { skipped.push({ id: unit.id, reason: "no task-relevance match" }); continue; }
 
     // skill eligibility: a governed procedure (kind: skill, and kind: playbook since
     // v0.29) fails closed — load/invoke-eligible only with an explicit grant
@@ -993,6 +1089,7 @@ export function plan(manifest: Manifest, task: string, options: PlanOptions = {}
     }
     selected.push({
       id: unit.id, path: unit.path, intent: unit.intent, score, reasons,
+      ...(routing.negative?.caution ? { caution: routing.negative.caution } : {}),
       payment, requiresAttestation: unitRequiresAttestation, loadEligible,
       action_scope: unit.action_scope,
       ...(authority ? { authority } : {}),

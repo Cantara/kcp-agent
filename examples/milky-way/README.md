@@ -14,7 +14,7 @@ manifest facts instead of tribal knowledge.
 | Integration Platform | `it/platform/` | ERP/MES/logistics integrations | Rate-limit tiers, machine-readable OpenAPI unit, ADR supersession chain (§4.22) |
 | Dev Mirror | `it/dev-mirror/` | Sandbox + mock data | `context: [dev]` on the federation edge — invisible to prod agents |
 | Quality & Food Safety | `quality/` | HACCP, audits | Future regulation with `valid_from: 2027-01-01` — visible, dated, excluded |
-| R&D | `recipes/` | Formulations (crown jewels) | `access: restricted` + HSM attestation, `not_for` in the excluded topics' own words |
+| R&D | `recipes/` | Formulations (crown jewels) | `access: restricted` + HSM attestation, strict `not_for` in the excluded topics' own words |
 | People | `people/` | HR processes | `audience: [human]` — the agent is turned away from the salary document |
 | Brand & Communications | `brand/` | Press kit, guidelines | Public, CC-BY, where the comms agent legitimately lands |
 | Sustainability | `esg/` | CSRD reporting | Annual handover: overlap window disambiguated by `superseded_by` |

@@ -24,6 +24,7 @@ export {
 export {
   plan,
   scoreUnit,
+  evaluateRouting,
   unitTokens,
   pathGlobMatches,
   deniesToken,
@@ -36,6 +37,10 @@ export {
   type PlanOptions,
   type AgentPlan,
   type PlannedUnit,
+  type ScoreAttribution,
+  type ScoreResult,
+  type NegativeRoutingDecision,
+  type RoutingEvaluation,
   type SkippedUnit,
   type ProhibitedAttempt,
   type FederationPlan,

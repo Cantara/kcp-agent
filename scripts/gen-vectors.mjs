@@ -82,6 +82,7 @@ units:
     audience: [agent, human]
     triggers: [press, merger, announcement]
     not_for: [salary negotiation]
+    not_for_strict: true
 `;
 
 const ATTEST = `kcp_version: "0.25"
@@ -176,7 +177,7 @@ const inputs = [
   { name: 'audience-role-excludes', spec: '§4', description: 'a human-only unit is not selected for an agent; audience targeting',
     manifest: HUMAN_ONLY, task: 'merger salary review', options: { asOf: '2026-07-06', capabilities: cap({ role: 'agent' }) } },
 
-  { name: 'not-for-negative-target', spec: '§4', description: 'a unit its publisher scoped out via not_for is skipped even when relevant',
+  { name: 'not-for-negative-target', spec: '§4.20', description: 'a relevant unit with not_for_strict is excluded with the matched phrase named',
     manifest: HUMAN_ONLY, task: 'salary negotiation press', options: { asOf: '2026-07-06', capabilities: cap({ role: 'human' }) } },
 
   { name: 'access-restricted-gated', spec: '§4.11', description: 'access:restricted fails closed with no credentials, even when x402 is settleable',

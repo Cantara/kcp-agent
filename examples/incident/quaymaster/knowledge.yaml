@@ -28,3 +28,4 @@ units:
     audience: [agent, human]
     triggers: [quaymaster, broker, features, pricing, editions]
     not_for: ["active incident response", "zero-day mitigation guidance"]
+    not_for_strict: true

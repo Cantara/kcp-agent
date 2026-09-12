@@ -177,7 +177,7 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     // with the credential the registry is followed and the accessibility unit selected
     expect(out).toContain("federated: registry");
     expect(out).toContain("● 1. cabin-accessibility");
-    // the negated-draft footgun: gated at plan time AND caught by the 0.4.0 lint
+    // the strict negated-draft footgun: excluded at plan time AND caught by the lint
     expect(out).toContain("allergen-dining: not_for declares it does not serve");
     expect(out).toContain("contains the unit's own vocabulary (allergen, dining, free, nut)");
   });
@@ -191,7 +191,7 @@ describe("demo suite (examples/demos.js) — narrated claims hold against the re
     expect(out).toContain("hygiene-regulation-2027: not active until 2027-01-01");
     expect(out).toContain(`context ["dev"] excludes env 'prod'`);
     expect(out).toContain("vendor needs vendor_portal_token before fetch");
-    // comms agent: R&D's not_for turns it away in the excluded topic's own words
+    // comms agent: R&D's strict not_for turns it away in the excluded topic's own words
     expect(out).toContain("formulations: not_for declares it does not serve 'press releases'");
     expect(out).toContain("● 1. press-kit");
     // audience targeting: the same question flips on --role

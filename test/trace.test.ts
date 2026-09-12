@@ -286,11 +286,13 @@ units:
   const m = parseManifest(SKILLS, "test");
   const TASK = "how do I deploy a release to production?";
 
-  it("places skill_eligibility after relevance and before attestation in GATE_ORDER", () => {
+  it("places scoring/negative routing before skill_eligibility and attestation in GATE_ORDER", () => {
     const rel = GATE_ORDER.indexOf("relevance");
+    const negative = GATE_ORDER.indexOf("not_for");
     const skill = GATE_ORDER.indexOf("skill_eligibility");
     const att = GATE_ORDER.indexOf("attestation");
-    expect(skill).toBe(rel + 1);
+    expect(negative).toBe(rel + 1);
+    expect(skill).toBeGreaterThan(negative);
     expect(att).toBe(skill + 1);
   });
 

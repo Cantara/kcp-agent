@@ -17,16 +17,21 @@
       ]
     },
     {
-      "layer": "Audience & not_for targeting",
-      "section": "§4",
-      "where": "planner.ts · audience / negative gates",
+      "layer": "Audience & negative routing (not_for / not_for_strict)",
+      "section": "§4.20",
+      "where": "planner.ts · audience / relevance / negative-routing gates",
       "impl": [
-        "src/planner.ts"
+        "src/planner.ts",
+        "src/trace.ts"
       ],
       "proofs": [
         {
           "file": "test/planner.test.ts",
-          "test": "not_for negative targeting skips a unit its publisher scoped out (spec §4)"
+          "test": "not_for negative targeting demotes and annotates by default (spec §4.20)"
+        },
+        {
+          "file": "test/planner-routing.test.ts",
+          "test": "hard-excludes only an exact-token not_for match with not_for_strict: true"
         }
       ]
     },
